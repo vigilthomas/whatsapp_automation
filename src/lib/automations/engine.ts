@@ -151,10 +151,33 @@ export async function resumePendingExecution(pending: {
     return
   }
 
+  let contact: {
+    name?: string | null
+    phone?: string | null
+    email?: string | null
+    company?: string | null
+  } | null = null
+
+  if (pending.contact_id) {
+    const { data, error: contactError } = await db
+      .from('contacts')
+      .select('name, phone, email, company')
+      .eq('id', pending.contact_id)
+      .eq('account_id', automation.account_id)
+      .maybeSingle()
+
+    if (contactError) {
+      console.error('[automations] resume: contact load failed', contactError)
+    } else {
+      contact = data
+    }
+  }
+
   try {
     await executeStepsFrom({
       automation: automation as Automation,
       contactId: pending.contact_id,
+      contact,
       context: pending.context ?? {},
       parentStepId: pending.parent_step_id,
       branch: pending.branch,
@@ -207,9 +230,32 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
     return
   }
 
+  let contact: {
+    name?: string | null
+    phone?: string | null
+    email?: string | null
+    company?: string | null
+  } | null = null
+
+  if (input.contactId) {
+    const { data, error } = await db
+      .from('contacts')
+      .select('name, phone, email, company')
+      .eq('id', input.contactId)
+      .eq('account_id', automation.account_id)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[automations] contact load failed:', error)
+    } else {
+      contact = data
+    }
+  }
+
   await executeStepsFrom({
     automation,
     contactId: input.contactId ?? null,
+    contact,
     context: input.context ?? {},
     parentStepId: null,
     branch: null,
@@ -233,6 +279,12 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
 interface ExecuteArgs {
   automation: Automation
   contactId: string | null
+  contact: {
+    name?: string | null
+    phone?: string | null
+    email?: string | null
+    company?: string | null
+  } | null
   context: AutomationContext
   parentStepId: string | null
   branch: 'yes' | 'no' | null
@@ -377,7 +429,9 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
 
     case 'send_buttons':
     case 'send_list': {
-      const payload = step.step_config as SendButtonsStepConfig | SendListStepConfig
+    const rawPayload = step.step_config as SendButtonsStepConfig | SendListStepConfig
+    const payload = interpolateInteractivePayload(rawPayload, args) 
+
       if (!args.contactId) throw new Error(`${step.step_type} needs a contact`)
       // Validate against Meta's limits before the network call so a bad
       // payload surfaces as a clear failed-step detail rather than a raw
@@ -793,10 +847,58 @@ function waitMs(cfg: WaitStepConfig): number {
 function interpolate(s: string, args: ExecuteArgs): string {
   return s.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key) => {
     const [ns, prop] = String(key).split('.')
-    if (ns === 'message' && prop === 'text') return String(args.context.message_text ?? '')
-    if (ns === 'vars' && prop) return String(args.context.vars?.[prop] ?? '')
+
+    // {{message.text}}
+    if (ns === 'message' && prop === 'text') {
+      return String(args.context.message_text ?? '')
+    }
+
+    // {{vars.foo}}
+    if (ns === 'vars' && prop) {
+      return String(args.context.vars?.[prop] ?? '')
+    }
+
+    // {{contact.name}}
+    // {{contact.phone}}
+    // {{contact.email}}
+    // {{contact.company}}
+    if (ns === 'contact' && prop) {
+      const value =
+        args.contact?.[prop as keyof NonNullable<ExecuteArgs['contact']>]
+
+      return value == null ? '' : String(value)
+    }
+
     return ''
   })
+}
+
+function interpolateInteractivePayload(
+  payload: SendButtonsStepConfig | SendListStepConfig,
+  args: ExecuteArgs,
+): SendButtonsStepConfig | SendListStepConfig {
+  const render = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      return interpolate(value, args)
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(render)
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, value]) => [
+          key,
+          render(value),
+        ]),
+      )
+    }
+
+    return value
+  }
+
+  return render(payload) as SendButtonsStepConfig | SendListStepConfig
 }
 
 async function appendResults(
