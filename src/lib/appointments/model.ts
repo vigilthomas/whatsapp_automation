@@ -3,7 +3,7 @@
 //
 // Shared by the API route (validation), the calendar / list pages
 // (week maths, chip styling) and the dashboard (today's counts).
-// Table shape comes from migration 039_appointments.sql.
+// Table shape comes from migration 042_appointments.sql.
 // ============================================================
 
 export const APPOINTMENT_STATUSES = [

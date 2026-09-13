@@ -7,7 +7,7 @@
 // the add/edit form from it. Adding a field is one entry here plus
 // the column in the migration — no per-entity route or form code.
 //
-// Tables come from migration 038_clinic_master_data.sql; keep the two
+// Tables come from migration 041_clinic_master_data.sql; keep the two
 // in sync when adding fields.
 // ============================================================
 

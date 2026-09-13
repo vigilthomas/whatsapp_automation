@@ -3,7 +3,7 @@
 //
 // Lets an owner/admin decide which app modules each *role* may
 // open (Settings → Access control). The matrix lives on
-// `accounts.module_access` (migration 037) as a JSONB deny-list:
+// `accounts.module_access` (migration 040) as a JSONB deny-list:
 //
 //   { "viewer": ["broadcasts", "automations"], "agent": ["flows"] }
 //

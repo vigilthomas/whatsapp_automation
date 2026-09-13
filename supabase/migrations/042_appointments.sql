@@ -1,5 +1,5 @@
 -- ============================================================
--- 039_appointments
+-- 042_appointments
 --
 -- Clinic appointments — the calendar behind /appointments and the
 -- dashboard's "today" widgets. A patient (a `contacts` row) sees a

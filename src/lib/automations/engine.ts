@@ -151,10 +151,33 @@ export async function resumePendingExecution(pending: {
     return
   }
 
+  let contact: {
+    name?: string | null
+    phone?: string | null
+    email?: string | null
+    company?: string | null
+  } | null = null
+
+  if (pending.contact_id) {
+    const { data, error: contactError } = await db
+      .from('contacts')
+      .select('name, phone, email, company')
+      .eq('id', pending.contact_id)
+      .eq('account_id', automation.account_id)
+      .maybeSingle()
+
+    if (contactError) {
+      console.error('[automations] resume: contact load failed', contactError)
+    } else {
+      contact = data
+    }
+  }
+
   try {
     await executeStepsFrom({
       automation: automation as Automation,
       contactId: pending.contact_id,
+      contact,
       context: pending.context ?? {},
       parentStepId: pending.parent_step_id,
       branch: pending.branch,
@@ -189,7 +212,15 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
       contact_id: input.contactId ?? null,
       trigger_event: input.triggerType,
       steps_executed: [],
-      status: 'success',
+      // Seeded pessimistically. The row is written BEFORE any step runs,
+      // and every terminal path below overwrites it (`appendResults` at
+      // the outermost scope, or `finalizeLog`). Seeding 'success' meant a
+      // run that died mid-flight — the process frozen, the pod recycled —
+      // left a permanent `status: 'success'` with `steps_executed: []`,
+      // indistinguishable from an automation that genuinely had nothing
+      // to do. 'failed' inverts that: the status only becomes success if
+      // execution actually reached the end. See issue #409.
+      status: 'failed',
     })
     .select()
     .single()
@@ -199,9 +230,32 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
     return
   }
 
+  let contact: {
+    name?: string | null
+    phone?: string | null
+    email?: string | null
+    company?: string | null
+  } | null = null
+
+  if (input.contactId) {
+    const { data, error } = await db
+      .from('contacts')
+      .select('name, phone, email, company')
+      .eq('id', input.contactId)
+      .eq('account_id', automation.account_id)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[automations] contact load failed:', error)
+    } else {
+      contact = data
+    }
+  }
+
   await executeStepsFrom({
     automation,
     contactId: input.contactId ?? null,
+    contact,
     context: input.context ?? {},
     parentStepId: null,
     branch: null,
@@ -225,6 +279,12 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
 interface ExecuteArgs {
   automation: Automation
   contactId: string | null
+  contact: {
+    name?: string | null
+    phone?: string | null
+    email?: string | null
+    company?: string | null
+  } | null
   context: AutomationContext
   parentStepId: string | null
   branch: 'yes' | 'no' | null
@@ -369,7 +429,9 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
 
     case 'send_buttons':
     case 'send_list': {
-      const payload = step.step_config as SendButtonsStepConfig | SendListStepConfig
+    const rawPayload = step.step_config as SendButtonsStepConfig | SendListStepConfig
+    const payload = interpolateInteractivePayload(rawPayload, args) 
+
       if (!args.contactId) throw new Error(`${step.step_type} needs a contact`)
       // Validate against Meta's limits before the network call so a bad
       // payload surfaces as a clear failed-step detail rather than a raw
@@ -647,12 +709,56 @@ async function resolveConversationId(args: ExecuteArgs): Promise<string> {
   return data.id as string
 }
 
+/** Letter, digit or underscore in any script — the "inside a word" test. */
+const WORD_CHAR = '[\\p{L}\\p{N}_]'
+
+/**
+ * Whole-word keyword test, behind `match_type: 'word'` (issue #409 — a
+ * one-letter keyword under `contains` fires on every message containing
+ * that letter, e.g. "k" on "thanks").
+ *
+ * Deliberately NOT `\b`, which is defined against `[A-Za-z0-9_]` and so
+ * breaks two cases that matter for WhatsApp traffic:
+ *
+ *   - A keyword carrying punctuation: `/\bhi!\b/` demands a word character
+ *     after the "!", so it never matches "say hi!".
+ *   - Any non-Latin script: every character of "안녕" is a non-word
+ *     character to `\b`, so `/\b안녕\b/` matches nothing at all.
+ *
+ * Unicode-aware lookarounds handle both. Note this really is word-based:
+ * it won't find "안녕" inside "안녕하세요", because a language that doesn't
+ * delimit words with spaces has no word edge there. That's what `contains`
+ * is for, and it stays the default.
+ *
+ * Exported for direct unit testing of the escaping / boundary edges.
+ */
+export function matchesWholeWord(
+  text: string,
+  keyword: string,
+  caseSensitive = false,
+): boolean {
+  if (!keyword) return false
+  // The keyword is account-supplied free text, so metacharacters have to
+  // be literal — otherwise "(" is an unterminated group and RegExp throws.
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(
+    `(?<!${WORD_CHAR})${escaped}(?!${WORD_CHAR})`,
+    caseSensitive ? 'u' : 'iu',
+  )
+  return pattern.test(text)
+}
+
 export function triggerMatches(automation: Automation, ctx: AutomationContext | undefined): boolean {
   if (automation.trigger_type === 'keyword_match') {
     const cfg = automation.trigger_config as KeywordMatchTriggerConfig
     if (!cfg?.keywords || cfg.keywords.length === 0) return false
     const text = (ctx?.message_text ?? '').toString()
     if (!text) return false
+    if (cfg.match_type === 'word') {
+      return cfg.keywords.some((raw) =>
+        matchesWholeWord(text, raw, cfg.case_sensitive),
+      )
+    }
     const haystack = cfg.case_sensitive ? text : text.toLowerCase()
     return cfg.keywords.some((raw) => {
       const k = cfg.case_sensitive ? raw : raw.toLowerCase()
@@ -741,10 +847,58 @@ function waitMs(cfg: WaitStepConfig): number {
 function interpolate(s: string, args: ExecuteArgs): string {
   return s.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key) => {
     const [ns, prop] = String(key).split('.')
-    if (ns === 'message' && prop === 'text') return String(args.context.message_text ?? '')
-    if (ns === 'vars' && prop) return String(args.context.vars?.[prop] ?? '')
+
+    // {{message.text}}
+    if (ns === 'message' && prop === 'text') {
+      return String(args.context.message_text ?? '')
+    }
+
+    // {{vars.foo}}
+    if (ns === 'vars' && prop) {
+      return String(args.context.vars?.[prop] ?? '')
+    }
+
+    // {{contact.name}}
+    // {{contact.phone}}
+    // {{contact.email}}
+    // {{contact.company}}
+    if (ns === 'contact' && prop) {
+      const value =
+        args.contact?.[prop as keyof NonNullable<ExecuteArgs['contact']>]
+
+      return value == null ? '' : String(value)
+    }
+
     return ''
   })
+}
+
+function interpolateInteractivePayload(
+  payload: SendButtonsStepConfig | SendListStepConfig,
+  args: ExecuteArgs,
+): SendButtonsStepConfig | SendListStepConfig {
+  const render = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      return interpolate(value, args)
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(render)
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, value]) => [
+          key,
+          render(value),
+        ]),
+      )
+    }
+
+    return value
+  }
+
+  return render(payload) as SendButtonsStepConfig | SendListStepConfig
 }
 
 async function appendResults(

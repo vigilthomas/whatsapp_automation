@@ -1,5 +1,5 @@
 -- ============================================================
--- 037_module_access
+-- 040_module_access
 --
 -- Per-role module access matrix (Settings → Access control).
 --
