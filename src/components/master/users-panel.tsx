@@ -7,7 +7,6 @@ import { Loader2, Plus, Trash2, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/hooks/use-auth";
 import type { AccountMember } from "@/types";
-import type { AccountRole } from "@/lib/auth/roles";
 import type { MasterRecord } from "@/lib/master/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,18 +31,12 @@ import {
 import { SettingsPanelHead } from "@/components/settings/settings-panel-head";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
-const STAFF_TYPES = ["doctor", "assistant", "other"] as const;
-type StaffType = (typeof STAFF_TYPES)[number];
-const ROLES: AccountRole[] = ["admin", "agent", "viewer"];
-
 interface NewUser {
   full_name: string;
   email: string;
   password: string;
   clinic_id: string;
-  staff_type: StaffType;
   designation_id: string;
-  role: AccountRole;
   speciality: string;
   phone: string;
 }
@@ -53,9 +46,7 @@ const EMPTY: NewUser = {
   email: "",
   password: "",
   clinic_id: "",
-  staff_type: "doctor",
   designation_id: "",
-  role: "agent",
   speciality: "",
   phone: "",
 };
@@ -64,10 +55,11 @@ const selectCls =
   "h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60";
 
 /**
- * Master → Users. A clinic admin adds a doctor / assistant / other
- * staff member with a login in one step (name, email, password,
- * clinic, designation), and edits each user's clinic, designation
- * and staff type inline. Removing a user goes through the existing
+ * Master → Users. A clinic admin adds a staff member with a login in
+ * one step (name, email, password, clinic, designation) and edits each
+ * user's clinic and designation inline. Staff type and the RLS role
+ * are derived from the designation server-side — the form deliberately
+ * doesn't ask for them. Removing a user goes through the existing
  * members API (remove_account_member).
  *
  * Every control is gated on the caller's `users` permissions; the
@@ -75,7 +67,6 @@ const selectCls =
  */
 export function UsersPanel() {
   const t = useTranslations("Master.users");
-  const tRoles = useTranslations("Settings.roles");
   const confirm = useConfirm();
   const { user, can } = useAuth();
   const canWrite = can("users", "write");
@@ -118,7 +109,7 @@ export function UsersPanel() {
 
   async function patchMember(
     m: AccountMember,
-    body: Partial<{ clinic_id: string | null; designation_id: string | null; staff_type: string | null; role: AccountRole }>,
+    body: Partial<{ clinic_id: string | null; designation_id: string | null }>,
     confirmTitle: string,
   ) {
     if (!(await confirm({ title: confirmTitle, description: t("confirmChangeDesc") }))) return;
@@ -230,9 +221,7 @@ export function UsersPanel() {
               <TableRow>
                 <TableHead className="text-muted-foreground">{t("cols.user")}</TableHead>
                 <TableHead className="text-muted-foreground">{t("cols.clinic")}</TableHead>
-                <TableHead className="text-muted-foreground">{t("cols.staffType")}</TableHead>
                 <TableHead className="text-muted-foreground">{t("cols.designation")}</TableHead>
-                <TableHead className="text-muted-foreground">{t("cols.role")}</TableHead>
                 {canDelete && <TableHead className="w-12" />}
               </TableRow>
             </TableHeader>
@@ -285,29 +274,6 @@ export function UsersPanel() {
                     <TableCell>
                       {editable ? (
                         <select
-                          value={m.staff_type ?? ""}
-                          disabled={busy}
-                          onChange={(e) =>
-                            patchMember(m, { staff_type: e.target.value || null }, t("confirmStaffType", { name: m.full_name || "" }))
-                          }
-                          className={selectCls}
-                        >
-                          <option value="">—</option>
-                          {STAFF_TYPES.map((s) => (
-                            <option key={s} value={s}>
-                              {t(`staff.${s}`)}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {m.staff_type ? t(`staff.${m.staff_type}`) : "—"}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editable ? (
-                        <select
                           value={m.designation_id ?? ""}
                           disabled={busy}
                           onChange={(e) =>
@@ -327,28 +293,6 @@ export function UsersPanel() {
                           {designations.find((d) => d.id === m.designation_id)?.name
                             ? String(designations.find((d) => d.id === m.designation_id)?.name)
                             : t("noDesignation")}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editable ? (
-                        <select
-                          value={m.role}
-                          disabled={busy}
-                          onChange={(e) =>
-                            patchMember(m, { role: e.target.value as AccountRole }, t("confirmRole", { name: m.full_name || "" }))
-                          }
-                          className={selectCls}
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r} value={r}>
-                              {tRoles(r)}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                          {tRoles(m.role)}
                         </span>
                       )}
                     </TableCell>
@@ -390,21 +334,9 @@ export function UsersPanel() {
                 void createUser();
               }}
             >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label className="text-muted-foreground">{t("fields.name")} *</Label>
-                  <Input value={draft.full_name} onChange={(e) => set("full_name", e.target.value)} required autoFocus />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-muted-foreground">{t("fields.staffType")}</Label>
-                  <select value={draft.staff_type} onChange={(e) => set("staff_type", e.target.value as StaffType)} className={selectCls}>
-                    {STAFF_TYPES.map((s) => (
-                      <option key={s} value={s}>
-                        {t(`staff.${s}`)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid gap-1.5">
+                <Label className="text-muted-foreground">{t("fields.name")} *</Label>
+                <Input value={draft.full_name} onChange={(e) => set("full_name", e.target.value)} required autoFocus />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
@@ -447,8 +379,7 @@ export function UsersPanel() {
                   </select>
                 </div>
               </div>
-              {draft.staff_type === "doctor" && (
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-1.5">
                     <Label className="text-muted-foreground">{t("fields.speciality")}</Label>
                     <Input value={draft.speciality} onChange={(e) => set("speciality", e.target.value)} />
@@ -458,18 +389,7 @@ export function UsersPanel() {
                     <Input value={draft.phone} onChange={(e) => set("phone", e.target.value)} />
                   </div>
                 </div>
-              )}
-              <div className="grid gap-1.5">
-                <Label className="text-muted-foreground">{t("fields.role")}</Label>
-                <select value={draft.role} onChange={(e) => set("role", e.target.value as AccountRole)} className={selectCls}>
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {tRoles(r)}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground">{t("fields.roleHint")}</p>
-              </div>
+              <p className="text-xs text-muted-foreground">{t("fields.designationHint")}</p>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDraft(null)} disabled={saving}>
                   {t("cancel")}

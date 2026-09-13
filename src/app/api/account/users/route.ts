@@ -26,6 +26,15 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/rate-limit
 //   4. For doctors, insert a `doctors` row linked by user_id so they
 //      can be booked immediately.
 //
+// The form asks only for name / email / password / clinic /
+// designation. Staff type and access level are DERIVED from the
+// designation so admins don't juggle three overlapping concepts:
+//   - a designation named like "Doctor" → staff_type 'doctor' (and a
+//     bookable `doctors` row); "Assistant" → 'assistant'; else 'other'
+//   - a designation named like "Admin" → account_role 'admin'; else
+//     'agent'. What they can actually do comes from the designation's
+//     permission matrix either way; the role only sets the RLS tier.
+//
 // Gated on `users:write` — the designation matrix, not just the role.
 // Owner can't be granted here (ownership goes through transfer).
 // ============================================================
@@ -63,8 +72,9 @@ export async function POST(request: Request) {
   const fullName = typeof body.full_name === "string" ? body.full_name.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  const role: AccountRole = isAccountRole(body.role) ? body.role : "agent";
-  const staffType: StaffType | null =
+  // Explicit values still accepted (API clients); the UI sends neither.
+  let role: AccountRole = isAccountRole(body.role) ? body.role : "agent";
+  let staffType: StaffType | null =
     typeof body.staff_type === "string" && (STAFF_TYPES as readonly string[]).includes(body.staff_type)
       ? (body.staff_type as StaffType)
       : null;
@@ -88,11 +98,22 @@ export async function POST(request: Request) {
   if (designationId) {
     const { data } = await admin
       .from("designations")
-      .select("id")
+      .select("id, name")
       .eq("id", designationId)
       .eq("account_id", ctx.accountId)
       .maybeSingle();
     if (!data) return NextResponse.json({ error: "designation not found" }, { status: 400 });
+    const name = String(data.name ?? "");
+    if (staffType === null) {
+      staffType = /\bdoctor\b|\bdr\b|physician|surgeon|dentist/i.test(name)
+        ? "doctor"
+        : /assistant|nurse|receptionist/i.test(name)
+          ? "assistant"
+          : "other";
+    }
+    if (!isAccountRole(body.role)) {
+      role = /admin|manager|owner/i.test(name) ? "admin" : "agent";
+    }
   }
   if (clinicId) {
     const { data } = await admin

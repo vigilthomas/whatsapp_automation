@@ -1429,7 +1429,7 @@
         "speciality": "Speciality",
         "phone": "Phone / WhatsApp",
         "role": "Access level",
-        "roleHint": "Admin can manage users and settings; Agent works day-to-day; Viewer is read-only. The designation fine-tunes what they see."
+        "designationHint": "The designation decides what they can see and do. A designation named Doctor also makes them bookable in Appointments."
       }
     },
     "entities": {
