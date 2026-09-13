@@ -83,6 +83,13 @@ interface Member {
   avatar_url: string | null;
   role: AccountRole;
   joined_at: string;
+  designation_id: string | null;
+}
+
+interface Designation {
+  id: string;
+  name: string;
+  is_active: boolean;
 }
 
 interface Invitation {
@@ -131,6 +138,7 @@ export function MembersTab() {
   const { getPresence, getRow, now } = usePresence();
 
   const [members, setMembers] = useState<Member[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -142,12 +150,20 @@ export function MembersTab() {
 
   const loadEverything = useCallback(async () => {
     try {
-      const [mres, ires] = await Promise.all([
+      const [mres, ires, dres] = await Promise.all([
         fetch('/api/account/members', { cache: 'no-store' }),
         canManageMembers
           ? fetch('/api/account/invitations', { cache: 'no-store' })
           : Promise.resolve(null),
+        // Designations (043) drive the per-member dropdown. Tolerated
+        // when the table isn't there yet — the column just doesn't show.
+        fetch('/api/master/designations', { cache: 'no-store' }).catch(() => null),
       ]);
+
+      if (dres && dres.ok) {
+        const ddata = (await dres.json().catch(() => ({}))) as { records?: Designation[] };
+        setDesignations(Array.isArray(ddata.records) ? ddata.records : []);
+      }
 
       if (!mres.ok) {
         const payload = await mres.json().catch(() => ({}));
@@ -179,6 +195,30 @@ export function MembersTab() {
   useEffect(() => {
     void loadEverything();
   }, [loadEverything]);
+
+  async function handleDesignationChange(member: Member, designationId: string | null) {
+    setPendingMemberAction(member.user_id);
+    try {
+      const res = await fetch(`/api/account/members/${member.user_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ designation_id: designationId }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        toast.error(payload.error || t('designationFailed'));
+        return;
+      }
+      setMembers((prev) =>
+        prev.map((m) => (m.user_id === member.user_id ? { ...m, designation_id: designationId } : m)),
+      );
+      toast.success(t('designationUpdated'));
+    } catch {
+      toast.error(t('designationFailed'));
+    } finally {
+      setPendingMemberAction(null);
+    }
+  }
 
   async function handleRoleChange(member: Member, nextRole: AccountRole) {
     if (member.role === nextRole) return;
@@ -410,6 +450,32 @@ export function MembersTab() {
                       inline. Items align to the start on mobile so the
                       role dropdown lines up under the avatar. */}
                   <div className="flex items-center gap-2 sm:gap-3">
+                    {/* Designation — drives the member's permissions
+                        (Access control). Admin+ may change anyone's
+                        except the owner's, who is never restricted. */}
+                    {designations.length > 0 && !isOwnerRow ? (
+                      canManageMembers ? (
+                        <select
+                          value={member.designation_id ?? ''}
+                          disabled={isBusy}
+                          aria-label={t('designation')}
+                          onChange={(e) => handleDesignationChange(member, e.target.value || null)}
+                          className="h-8 w-40 rounded-lg border border-border bg-muted px-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60"
+                        >
+                          <option value="">{t('noDesignation')}</option>
+                          {designations.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {designations.find((d) => d.id === member.designation_id)?.name ?? t('noDesignation')}
+                        </span>
+                      )
+                    ) : null}
+
                     {/* Role display / editor. Inline Select is admin+
                         only AND not allowed on the owner row (owner
                         changes go through transfer, which lands later). */}

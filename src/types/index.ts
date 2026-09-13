@@ -75,6 +75,8 @@ export interface AccountMember {
   avatar_url: string | null;
   role: AccountRole;
   joined_at: string;
+  /** Designation (043) driving the member's permissions; null = role default. */
+  designation_id: string | null;
 }
 
 /**

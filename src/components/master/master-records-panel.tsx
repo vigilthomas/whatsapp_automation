@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { formatCurrency } from "@/lib/currency";
+import { downloadCsv, recordsToCsv } from "@/lib/master/csv";
 import {
   MASTER_ENTITIES,
   type MasterEntitySlug,
@@ -46,7 +48,12 @@ import { SettingsPanelHead } from "@/components/settings/settings-panel-head";
 export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
   const entity = MASTER_ENTITIES[slug];
   const t = useTranslations("Master");
-  const { canEditSettings } = useAuth();
+  // Every button here mirrors a server-side `requirePermission` on the
+  // same module — the UI hides what the API would refuse.
+  const { can, defaultCurrency } = useAuth();
+  const canWrite = can(entity.module, "write");
+  const canDelete = can(entity.module, "delete");
+  const canExport = can(entity.module, "export");
 
   const [records, setRecords] = useState<MasterRecord[]>([]);
   const [clinics, setClinics] = useState<MasterRecord[]>([]);
@@ -85,18 +92,22 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
   }, [clinics]);
 
   const listFields = entity.fields.filter((f) => f.list);
+  const formFields = entity.fields.filter((f) => f.form !== false);
 
   function openCreate() {
     const empty: Record<string, unknown> = {};
-    for (const f of entity.fields) {
-      empty[f.key] = f.type === "boolean" ? true : f.type === "clinic" ? null : "";
+    for (const f of formFields) {
+      empty[f.key] =
+        f.type === "boolean" ? true : f.type === "clinic" ? null : f.type === "number" ? (f.min ?? 0) : "";
     }
     setDraft(empty);
   }
 
   function openEdit(record: MasterRecord) {
     const values: Record<string, unknown> = { id: record.id };
-    for (const f of entity.fields) values[f.key] = record[f.key] ?? (f.type === "boolean" ? true : f.type === "clinic" ? null : "");
+    for (const f of formFields) {
+      values[f.key] = record[f.key] ?? (f.type === "boolean" ? true : f.type === "clinic" ? null : "");
+    }
     setDraft(values);
   }
 
@@ -158,9 +169,31 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
         );
       case "clinic":
         return clinicName(v);
+      case "number": {
+        const n = typeof v === "number" ? v : Number(v);
+        if (!Number.isFinite(n)) return "—";
+        if (field.money) return formatCurrency(n, defaultCurrency);
+        return field.unit ? `${n} ${field.unit}` : String(n);
+      }
       default:
         return v ? String(v) : <span className="text-muted-foreground">—</span>;
     }
+  };
+
+  const exportCsv = () => {
+    const columns = entity.fields
+      .filter((f) => f.type !== "permissions")
+      .map((f) => ({
+        key: f.key,
+        label: t(`fields.${f.labelKey}`),
+        value: (r: MasterRecord) => {
+          const v = r[f.key];
+          if (f.type === "clinic") return clinicName(v);
+          if (f.type === "boolean") return v ? t("active") : t("inactive");
+          return v == null ? "" : String(v);
+        },
+      }));
+    downloadCsv(`${slug}.csv`, recordsToCsv(records, columns));
   };
 
   const renderInput = (field: MasterField) => {
@@ -184,6 +217,17 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
               {v ? t("active") : t("inactive")}
             </span>
           </div>
+        );
+      case "number":
+        return (
+          <Input
+            type="number"
+            min={field.min}
+            step={field.step}
+            value={typeof v === "number" ? v : typeof v === "string" ? v : ""}
+            onChange={(e) => set(e.target.value === "" ? "" : Number(e.target.value))}
+            required={field.required}
+          />
         );
       case "clinic":
         return (
@@ -217,12 +261,20 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
         title={t(`entities.${entity.labelKey}`)}
         description={t(`entityDesc.${entity.labelKey}`)}
         action={
-          canEditSettings ? (
-            <Button onClick={openCreate}>
-              <Plus className="mr-1 h-4 w-4" />
-              {t("add", { entity: t(`entitySingular.${entity.labelKey}`) })}
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            {canExport && records.length > 0 ? (
+              <Button variant="outline" onClick={exportCsv}>
+                <Download className="h-4 w-4" />
+                {t("export")}
+              </Button>
+            ) : null}
+            {canWrite ? (
+              <Button onClick={openCreate}>
+                <Plus className="mr-1 h-4 w-4" />
+                {t("add", { entity: t(`entitySingular.${entity.labelKey}`) })}
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -244,7 +296,7 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
                     {t(`fields.${f.labelKey}`)}
                   </TableHead>
                 ))}
-                {canEditSettings && <TableHead className="w-24" />}
+                {(canWrite || canDelete) && <TableHead className="w-24" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -258,21 +310,25 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
                       {renderCell(f, r)}
                     </TableCell>
                   ))}
-                  {canEditSettings && (
+                  {(canWrite || canDelete) && (
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(r)} aria-label={t("edit")}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => remove(r.id)}
-                          aria-label={t("delete")}
-                          className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canWrite && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEdit(r)} aria-label={t("edit")}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => remove(r.id)}
+                            aria-label={t("delete")}
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   )}
@@ -300,7 +356,7 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
               void save();
             }}
           >
-            {entity.fields.map((f) => (
+            {formFields.map((f) => (
               <div key={f.key} className="grid gap-1.5">
                 <Label className="text-muted-foreground">
                   {t(`fields.${f.labelKey}`)}

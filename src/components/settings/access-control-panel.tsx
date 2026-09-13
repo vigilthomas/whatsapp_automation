@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Check, Loader2, LockKeyhole } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, GripVertical, Loader2, LockKeyhole, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import type { ModuleId } from "@/lib/auth/module-access";
 import {
-  MODULES,
-  RESTRICTABLE_ROLES,
-  canAccessModule,
-  toggleModuleAccess,
-  type ModuleAccess,
-  type ModuleId,
-  type RestrictableRole,
-} from "@/lib/auth/module-access";
+  ACTIONS,
+  can,
+  editorRows,
+  movePermission,
+  parsePermissions,
+  togglePermission,
+  type Action,
+  type Permissions,
+} from "@/lib/auth/permissions";
+import type { MasterRecord } from "@/lib/master/entities";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,9 +40,7 @@ import { SettingsPanelHead } from "./settings-panel-head";
 
 /**
  * Circular tick toggle for one matrix cell. Colours come straight from
- * the theme tokens (`primary` / `border` / `card`), so it follows both
- * the light/dark mode and the selected colour theme without any
- * per-theme styling here.
+ * the theme tokens so it follows light/dark and the colour theme.
  */
 function AccessToggle({
   checked,
@@ -75,142 +76,270 @@ function AccessToggle({
 }
 
 /**
- * Access control — the per-role module matrix.
+ * Access control — pick a designation, then set what it may do.
  *
- * One checkbox per (role × module): checked means that role can see
- * and open the module. Owner isn't a column — owners always see
- * everything (see module-access.ts for why). Writes go straight to
- * `accounts.module_access`; the `accounts_update` RLS policy (017)
- * already restricts that to admins+, so agents/viewers get a
- * read-only view of what applies to them.
+ * One row per module, five cells (view / read / write / delete /
+ * export). Rows the designation grants come first, in the order the
+ * admin arranged them — that order IS the sidebar order for everyone
+ * holding the designation; ungranted modules follow in default order
+ * so they can be switched on. Drag the handle (or use the arrows) to
+ * rearrange.
  *
- * Saving pulls the new matrix back through `refreshProfile()` so the
- * sidebar of the person editing updates immediately; other members
- * pick it up on their next profile fetch (page load / focus).
+ * Saves to `designations.permissions` via PATCH /api/master/
+ * designations/<id>, which itself is gated on `designations:write`,
+ * so the same matrix governs who may edit the matrix.
  */
 export function AccessControlPanel() {
-  const supabase = createClient();
-  const {
-    accountId,
-    moduleAccess,
-    canEditSettings,
-    profileLoading,
-    refreshProfile,
-  } = useAuth();
+  const { can: callerCan, profileLoading, refreshProfile } = useAuth();
   const t = useTranslations("Settings.access");
   const tModules = useTranslations("Settings.access.modules");
-  const tRoles = useTranslations("Settings.roles");
+  const tActions = useTranslations("Settings.access.actions");
 
-  const [draft, setDraft] = useState<ModuleAccess>(moduleAccess);
+  const [designations, setDesignations] = useState<MasterRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Permissions>([]);
   const [saving, setSaving] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
-  // Re-seed the draft whenever the stored matrix changes (initial
-  // load, or a save round-tripping through refreshProfile).
-  useEffect(() => {
-    setDraft(moduleAccess);
-  }, [moduleAccess]);
-
-  const dirty = JSON.stringify(draft) !== JSON.stringify(moduleAccess);
-
-  function setCell(role: RestrictableRole, module: ModuleId, allowed: boolean) {
-    setDraft((prev) => toggleModuleAccess(prev, role, module, allowed));
-  }
-
-  async function handleSave() {
-    if (!accountId || !dirty) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from("accounts")
-      .update({ module_access: draft })
-      .eq("id", accountId);
-    if (error) {
-      toast.error(t("saveFailed"));
-      setSaving(false);
-      return;
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/master/designations", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? t("loadFailed"));
+        return;
+      }
+      const rows: MasterRecord[] = Array.isArray(data.records) ? data.records : [];
+      setDesignations(rows);
+      setSelectedId((cur) => cur ?? (rows[0]?.id ?? null));
+    } catch {
+      toast.error(t("loadFailed"));
+    } finally {
+      setLoading(false);
     }
-    await refreshProfile();
-    setSaving(false);
-    toast.success(t("saveSuccess"));
-  }
+  }, [t]);
 
-  const editable = canEditSettings && !profileLoading;
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const selected = useMemo(
+    () => designations.find((d) => d.id === selectedId) ?? null,
+    [designations, selectedId],
+  );
+  const saved = useMemo(() => parsePermissions(selected?.permissions), [selected]);
+
+  // Re-seed the draft when the selection (or a save) changes.
+  useEffect(() => {
+    setDraft(saved);
+  }, [saved]);
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const editable = !profileLoading && callerCan("designations", "write");
+  const rows = useMemo(() => editorRows(draft), [draft]);
+  const grantedCount = draft.length;
+
+  const setCell = (module: ModuleId, action: Action, allowed: boolean) =>
+    setDraft((d) => togglePermission(d, module, action, allowed));
+
+  const move = (from: number, to: number) => setDraft((d) => movePermission(d, from, to));
+
+  async function save() {
+    if (!selected || !dirty) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/master/designations/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissions: draft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? t("saveFailed"));
+        return;
+      }
+      toast.success(t("saveSuccess"));
+      await load();
+      // The editor may have changed their own designation.
+      await refreshProfile();
+    } catch {
+      toast.error(t("saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <section className="max-w-4xl animate-in fade-in-50 duration-200">
+    <section className="max-w-5xl animate-in fade-in-50 duration-200">
       <SettingsPanelHead title={t("title")} description={t("description")} />
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-foreground">
-            <LockKeyhole className="size-4 text-primary" />
-            {t("matrixTitle")}
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            {t("matrixDesc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-40 text-muted-foreground">{t("moduleColumn")}</TableHead>
-                  {RESTRICTABLE_ROLES.map((role) => (
-                    <TableHead key={role} className="w-28 text-center text-muted-foreground">
-                      {tRoles(role)}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {MODULES.map((module) => (
-                  <TableRow key={module}>
-                    <TableCell className="font-medium text-foreground">
-                      {tModules(module)}
-                    </TableCell>
-                    {RESTRICTABLE_ROLES.map((role) => {
-                      const allowed = canAccessModule(draft, role, module);
+
+      <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+        {/* Designation picker */}
+        <Card className="lg:sticky lg:top-0">
+          <CardHeader>
+            <CardTitle className="text-sm text-foreground">{t("designations")}</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">{t("designationsHint")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {loading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : designations.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">{t("noDesignations")}</p>
+            ) : (
+              designations.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setSelectedId(d.id)}
+                  aria-current={d.id === selectedId ? "true" : undefined}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    d.id === selectedId
+                      ? "bg-primary/10 font-medium text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <span className="truncate">{String(d.name)}</span>
+                  <span className="ml-2 shrink-0 text-xs tabular-nums opacity-70">
+                    {parsePermissions(d.permissions).length}
+                  </span>
+                </button>
+              ))
+            )}
+            <Link
+              href="/master/designations"
+              className="mt-2 flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-primary hover:underline"
+            >
+              <Plus className="size-3.5" /> {t("manageDesignations")}
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Matrix */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <LockKeyhole className="size-4 text-primary" />
+              {selected ? t("matrixTitleFor", { name: String(selected.name) }) : t("matrixTitle")}
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">{t("matrixDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!selected ? (
+              <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+                {t("pickDesignation")}
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8" />
+                      <TableHead className="min-w-40 text-muted-foreground">{t("moduleColumn")}</TableHead>
+                      {ACTIONS.map((a) => (
+                        <TableHead key={a} className="w-20 text-center text-muted-foreground">
+                          {tActions(a)}
+                        </TableHead>
+                      ))}
+                      <TableHead className="w-20" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((module, i) => {
+                      const granted = i < grantedCount;
+                      const isFirstUngranted = i === grantedCount && grantedCount > 0;
                       return (
-                        <TableCell key={role} className="text-center">
-                          <AccessToggle
-                            checked={allowed}
-                            disabled={!editable}
-                            onChange={(v) => setCell(role, module, v)}
-                            label={t("cellAria", {
-                              role: tRoles(role),
-                              module: tModules(module),
-                            })}
-                          />
-                        </TableCell>
+                        <TableRow
+                          key={module}
+                          draggable={editable && granted}
+                          onDragStart={() => setDragIndex(i)}
+                          onDragOver={(e) => {
+                            if (dragIndex !== null && granted) e.preventDefault();
+                          }}
+                          onDrop={() => {
+                            if (dragIndex !== null && granted) move(dragIndex, i);
+                            setDragIndex(null);
+                          }}
+                          onDragEnd={() => setDragIndex(null)}
+                          className={cn(
+                            granted ? "" : "bg-muted/30",
+                            isFirstUngranted && "border-t-2 border-t-border",
+                            dragIndex === i && "opacity-50",
+                          )}
+                        >
+                          <TableCell className="text-muted-foreground">
+                            {granted && editable ? (
+                              <GripVertical className="size-4 cursor-grab" aria-hidden />
+                            ) : null}
+                          </TableCell>
+                          <TableCell className={cn("font-medium", granted ? "text-foreground" : "text-muted-foreground")}>
+                            {tModules(module)}
+                          </TableCell>
+                          {ACTIONS.map((a) => (
+                            <TableCell key={a} className="text-center">
+                              <AccessToggle
+                                checked={can(draft, module, a)}
+                                disabled={!editable}
+                                onChange={(v) => setCell(module, a, v)}
+                                label={t("cellAria", { action: tActions(a), module: tModules(module) })}
+                              />
+                            </TableCell>
+                          ))}
+                          <TableCell>
+                            {granted && editable ? (
+                              <div className="flex justify-end gap-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  aria-label={t("moveUp")}
+                                  disabled={i === 0}
+                                  onClick={() => move(i, i - 1)}
+                                >
+                                  <ArrowUp className="size-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  aria-label={t("moveDown")}
+                                  disabled={i >= grantedCount - 1}
+                                  onClick={() => move(i, i + 1)}
+                                >
+                                  <ArrowDown className="size-3.5" />
+                                </Button>
+                              </div>
+                            ) : null}
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
 
-          <p className="text-xs text-muted-foreground">{t("ownerNote")}</p>
+            <p className="text-xs text-muted-foreground">{t("ownerNote")}</p>
 
-          {canEditSettings ? (
-            <Button
-              onClick={handleSave}
-              disabled={saving || !dirty}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  {t("saving")}
-                </>
-              ) : (
-                t("save")
-              )}
-            </Button>
-          ) : (
-            <p className="text-xs text-muted-foreground">{t("adminOnlyHint")}</p>
-          )}
-        </CardContent>
-      </Card>
+            {editable ? (
+              <Button onClick={save} disabled={saving || !dirty || !selected}>
+                {saving ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    {t("saving")}
+                  </>
+                ) : (
+                  t("save")
+                )}
+              </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">{t("adminOnlyHint")}</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </section>
   );
 }

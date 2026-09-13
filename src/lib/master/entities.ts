@@ -11,10 +11,24 @@
 // in sync when adding fields.
 // ============================================================
 
-export const MASTER_ENTITY_SLUGS = ["clinics", "doctors", "clinic-admins"] as const;
+import { parsePermissions } from "@/lib/auth/permissions";
+
+export const MASTER_ENTITY_SLUGS = [
+  "clinics",
+  "branches",
+  "doctors",
+  "clinic-admins",
+  "services",
+  "designations",
+] as const;
 export type MasterEntitySlug = (typeof MASTER_ENTITY_SLUGS)[number];
 
-export type MasterFieldType = "text" | "textarea" | "boolean" | "clinic";
+/**
+ * `number` — numeric input (see `min` / `step`); `clinic` — pick from
+ * the clinics list; `permissions` — the designation matrix, edited on
+ * the Access control page rather than in the CRUD form (`form: false`).
+ */
+export type MasterFieldType = "text" | "textarea" | "boolean" | "number" | "clinic" | "permissions";
 
 export interface MasterField {
   key: string;
@@ -26,12 +40,23 @@ export interface MasterField {
   list?: boolean;
   /** Free-text max length (server-enforced). Defaults to 200; textarea 2000. */
   maxLength?: number;
+  /** Hide from the add/edit dialog (still validated by the API). */
+  form?: false;
+  /** `number` fields: lower bound (inclusive) and input step. */
+  min?: number;
+  step?: number;
+  /** `number` fields: render as money in the account currency. */
+  money?: boolean;
+  /** `number` fields: suffix shown in the list, e.g. "min". */
+  unit?: string;
 }
 
 export interface MasterEntity {
   slug: MasterEntitySlug;
   /** Postgres table name. */
-  table: "clinics" | "doctors" | "clinic_admins";
+  table: "clinics" | "branches" | "doctors" | "clinic_admins" | "services" | "designations";
+  /** Access-control module id checked by the API and the UI. */
+  module: MasterEntitySlug;
   /** i18n key under `Master.entities`. */
   labelKey: string;
   fields: MasterField[];
@@ -48,6 +73,7 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
   clinics: {
     slug: "clinics",
     table: "clinics",
+    module: "clinics",
     labelKey: "clinics",
     fields: [
       name,
@@ -59,9 +85,25 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
       isActive,
     ],
   },
+  branches: {
+    slug: "branches",
+    table: "branches",
+    module: "branches",
+    labelKey: "branches",
+    fields: [
+      name,
+      clinic,
+      { key: "address", labelKey: "address", type: "text", maxLength: 500 },
+      { key: "city", labelKey: "city", type: "text", list: true },
+      phone,
+      notes,
+      isActive,
+    ],
+  },
   doctors: {
     slug: "doctors",
     table: "doctors",
+    module: "doctors",
     labelKey: "doctors",
     fields: [
       name,
@@ -77,8 +119,34 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
   "clinic-admins": {
     slug: "clinic-admins",
     table: "clinic_admins",
+    module: "clinic-admins",
     labelKey: "clinicAdmins",
     fields: [name, clinic, phone, email, notes, isActive],
+  },
+  services: {
+    slug: "services",
+    table: "services",
+    module: "services",
+    labelKey: "services",
+    fields: [
+      name,
+      { key: "duration_min", labelKey: "duration", type: "number", required: true, list: true, min: 5, step: 5, unit: "min" },
+      { key: "price", labelKey: "price", type: "number", required: true, list: true, min: 0, step: 0.01, money: true },
+      { key: "description", labelKey: "description", type: "textarea" },
+      isActive,
+    ],
+  },
+  designations: {
+    slug: "designations",
+    table: "designations",
+    module: "designations",
+    labelKey: "designations",
+    fields: [
+      name,
+      { key: "description", labelKey: "description", type: "text", list: true, maxLength: 500 },
+      { key: "permissions", labelKey: "permissions", type: "permissions", form: false },
+      isActive,
+    ],
   },
 };
 
@@ -171,6 +239,23 @@ export function sanitizeMasterInput(
           return { ok: false, error: `${field.key} must be a clinic id` };
         }
         values[field.key] = raw;
+        break;
+      }
+      case "number": {
+        const n = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() ? Number(raw) : NaN;
+        if (!Number.isFinite(n)) return { ok: false, error: `${field.key} must be a number` };
+        if (field.min !== undefined && n < field.min) {
+          return { ok: false, error: `${field.key} must be at least ${field.min}` };
+        }
+        // Integer steps (minutes) reject fractions; money keeps 2 dp.
+        values[field.key] = field.step && Number.isInteger(field.step) ? Math.round(n) : Math.round(n * 100) / 100;
+        break;
+      }
+      case "permissions": {
+        if (!Array.isArray(raw)) {
+          return { ok: false, error: `${field.key} must be an array` };
+        }
+        values[field.key] = parsePermissions(raw);
         break;
       }
     }

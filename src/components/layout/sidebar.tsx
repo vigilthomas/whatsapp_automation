@@ -9,6 +9,7 @@ import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import {
   Bell,
+  BadgeCheck,
   Bot,
   Building2,
   CalendarDays,
@@ -17,6 +18,7 @@ import {
   Crown,
   Database,
   FileText,
+  MapPin,
   GitBranch,
   LayoutDashboard,
   LockKeyhole,
@@ -24,6 +26,7 @@ import {
   MessageSquare,
   Radio,
   Settings,
+  ClipboardList,
   Shield,
   ShieldCheck,
   SlidersHorizontal,
@@ -138,8 +141,12 @@ const navGroups: NavGroup[] = [
     icon: Database,
     children: [
       { href: "/master/clinics", labelKey: "clinics", icon: Building2, module: "clinics" },
+      { href: "/master/branches", labelKey: "branches", icon: MapPin, module: "branches" },
       { href: "/master/clinic-admins", labelKey: "clinicAdmins", icon: ShieldCheck, module: "clinic-admins" },
       { href: "/master/doctors", labelKey: "doctors", icon: Stethoscope, module: "doctors" },
+      { href: "/master/services", labelKey: "services", icon: ClipboardList, module: "services" },
+      { href: "/master/designations", labelKey: "designations", icon: BadgeCheck, module: "designations" },
+      { href: "/master/users", labelKey: "users", icon: UsersRound, module: "users" },
       { href: "/contacts", labelKey: "contacts", icon: Users, module: "contacts" },
     ],
   },
@@ -190,7 +197,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     account,
     accountRole,
     signOut,
-    canAccessModule,
+    sidebarModules,
     canManageMembers,
   } = useAuth();
   const totalUnread = useTotalUnread();
@@ -200,14 +207,25 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     pathname === href ||
     (href !== "/dashboard" && pathname.startsWith(href));
 
+  // Visibility and order both come from the member's permissions: a
+  // module shows only with `view`, and rows follow the order the
+  // designation was arranged in (Access control). Rows without a
+  // module (dashboard, settings) are fixed.
   const isItemVisible = (item: NavItem) =>
-    (!item.module || canAccessModule(item.module)) &&
+    (!item.module || sidebarModules.includes(item.module)) &&
     (!item.adminOnly || canManageMembers);
+  const byPermissionOrder = (a: NavItem, b: NavItem) => {
+    const ia = a.module ? sidebarModules.indexOf(a.module) : -1;
+    const ib = b.module ? sidebarModules.indexOf(b.module) : -1;
+    return ia - ib;
+  };
+  const orderVisible = (items: NavItem[]) => items.filter(isItemVisible).sort(byPermissionOrder);
 
-  // Groups with their access-filtered children; a group with nothing
-  // left to show is dropped rather than rendered as an empty toggle.
+  // Groups with their access-filtered, re-ordered children; a group
+  // with nothing left to show is dropped rather than rendered as an
+  // empty toggle.
   const visibleGroups = navGroups
-    .map((g) => ({ ...g, children: g.children.filter(isItemVisible) }))
+    .map((g) => ({ ...g, children: orderVisible(g.children) }))
     .filter((g) => g.children.length > 0);
 
   // A group starts expanded whenever one of its children is the
@@ -317,7 +335,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         {/* Main navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-1">
-            {navItems.filter(isItemVisible).map((item) => {
+            {orderVisible(navItems).map((item) => {
               const isActive = isItemActive(item.href);
 
               const showUnreadDot =

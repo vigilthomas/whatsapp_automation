@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { CalendarDays, ChevronLeft, ChevronRight, List, Plus } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Download, List, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,6 +14,8 @@ import {
   type AppointmentStatus,
 } from "@/lib/appointments/model";
 import type { MasterRecord } from "@/lib/master/entities";
+import { downloadCsv, recordsToCsv } from "@/lib/master/csv";
+import { patientLabel } from "@/lib/appointments/model";
 import { Button } from "@/components/ui/button";
 import {
   AppointmentCalendar,
@@ -37,8 +39,10 @@ type View = "calendar" | "list";
  */
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
-  const { canSendMessages } = useAuth();
-  const canEdit = canSendMessages; // agent+ — matches the API's requireRole('agent')
+  // Mirrors the API's requirePermission('appointments', …) checks.
+  const { can } = useAuth();
+  const canEdit = can("appointments", "write");
+  const canExport = can("appointments", "export");
 
   const [view, setView] = useState<View>("calendar");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
@@ -138,6 +142,7 @@ export default function AppointmentsPage() {
       case "changeDoctor":
         return openDialog(draftFromAppointment(a), "changeDoctor");
       case "cancel":
+        // Cancelling keeps the row (status change) — a write, not a delete.
         if (!window.confirm(t("confirmCancel"))) return;
         return void patch(a, { status: "cancelled" });
       case "confirm":
@@ -147,6 +152,25 @@ export default function AppointmentsPage() {
       case "noShow":
         return void patch(a, { status: "no_show" });
     }
+  };
+
+  const exportCsv = () => {
+    const fmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+    downloadCsv(
+      `appointments-${weekStart.toISOString().slice(0, 10)}.csv`,
+      recordsToCsv(appointments, [
+        { key: "starts_at", label: t("list.when"), value: (a) => fmt.format(new Date(a.starts_at)) },
+        { key: "ends", label: "Ends", value: (a) => fmt.format(new Date(a.ends_at)) },
+        { key: "patient", label: t("list.patient"), value: (a) => patientLabel(a.contact) },
+        { key: "phone", label: "Phone", value: (a) => a.contact?.phone ?? "" },
+        { key: "service", label: t("list.service"), value: (a) => a.service },
+        { key: "doctor", label: t("list.doctor"), value: (a) => a.doctor?.name ?? "" },
+        { key: "clinic", label: t("list.clinic"), value: (a) => a.clinic?.name ?? "" },
+        { key: "status", label: t("list.status"), value: (a) => a.status },
+        { key: "source", label: t("list.source"), value: (a) => a.source },
+        { key: "notes", label: "Notes", value: (a) => a.notes ?? "" },
+      ]),
+    );
   };
 
   const weekLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(weekStart);
@@ -160,12 +184,20 @@ export default function AppointmentsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("pageTitle")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("pageDesc")}</p>
         </div>
-        {canEdit && (
-          <Button onClick={() => openDialog(emptyDraft())}>
-            <Plus className="size-4" />
-            {t("actions.add")}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canExport && appointments.length > 0 && (
+            <Button variant="outline" onClick={exportCsv}>
+              <Download className="size-4" />
+              {t("actions.export")}
+            </Button>
+          )}
+          {canEdit && (
+            <Button onClick={() => openDialog(emptyDraft())}>
+              <Plus className="size-4" />
+              {t("actions.add")}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Toolbar */}

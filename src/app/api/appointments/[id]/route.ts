@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { toErrorResponse } from '@/lib/auth/account'
+import { requirePermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { validateAppointmentInput } from '@/lib/appointments/model'
 import { APPOINTMENT_SELECT, assertRefsInAccount } from '@/lib/appointments/server'
 
-// Update / delete one appointment. Both the agent role check and the
-// `account_id` scope live here because the service-role client
-// bypasses RLS.
+// Update / delete one appointment. Both the permission check (write /
+// delete on `appointments`) and the `account_id` scope live here
+// because the service-role client bypasses RLS.
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -14,7 +15,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params
   let ctx
   try {
-    ctx = await requireRole('agent')
+    ctx = await requirePermission('appointments', 'write')
   } catch (err) {
     return toErrorResponse(err)
   }
@@ -43,7 +44,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   const { id } = await params
   let ctx
   try {
-    ctx = await requireRole('agent')
+    ctx = await requirePermission('appointments', 'delete')
   } catch (err) {
     return toErrorResponse(err)
   }

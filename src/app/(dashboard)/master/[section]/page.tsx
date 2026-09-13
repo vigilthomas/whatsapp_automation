@@ -7,6 +7,7 @@ import { TemplateManager } from '@/components/settings/template-manager';
 import { QuickRepliesManager } from '@/components/settings/quick-replies-manager';
 import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
 import { DealsSettings } from '@/components/settings/deals-settings';
+import { MembersTab } from '@/components/settings/members-tab';
 import {
   isMasterSection,
   type MasterSection,
@@ -35,7 +36,11 @@ export default function MasterSectionPage() {
   // panel driven by the registry) and the reference panels that moved
   // out of Settings.
   let panel: React.ReactNode;
-  if (isMasterEntitySlug(params.section)) {
+  if (params.section === 'users') {
+    // Users = the account's members (invite, role, designation). Same
+    // component as Settings → Team members; this is its Master home.
+    panel = <MembersTab />;
+  } else if (isMasterEntitySlug(params.section)) {
     panel = <MasterRecordsPanel slug={params.section} />;
   } else if (isMasterSection(params.section)) {
     const section: MasterSection = params.section;

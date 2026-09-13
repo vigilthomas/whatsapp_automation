@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import type { PostgrestError } from "@supabase/supabase-js";
 
 import { requireRole, toErrorResponse } from "@/lib/auth/account";
+import { supabaseAdmin } from "@/lib/automations/admin-client";
 import { isAccountRole } from "@/lib/auth/roles";
 import {
   checkRateLimit,
@@ -58,8 +59,46 @@ export async function PATCH(
     const { userId } = await params;
 
     const body = (await request.json().catch(() => null)) as
-      | { role?: unknown }
+      | { role?: unknown; designation_id?: unknown }
       | null;
+
+    // Designation assignment. Goes through the service-role client
+    // because the 034/043 trigger blocks `authenticated` from touching
+    // `designation_id` (it is a privilege column — a member must not be
+    // able to hand themselves a broader designation). The account
+    // scope on the UPDATE keeps it inside the caller's tenant, and the
+    // designation itself must belong to that tenant too.
+    if (body && "designation_id" in body) {
+      const designationId = body.designation_id;
+      if (designationId !== null && typeof designationId !== "string") {
+        return NextResponse.json(
+          { error: "'designation_id' must be an id or null" },
+          { status: 400 },
+        );
+      }
+      const admin = supabaseAdmin();
+      if (designationId) {
+        const { data: d } = await admin
+          .from("designations")
+          .select("id")
+          .eq("id", designationId)
+          .eq("account_id", ctx.accountId)
+          .maybeSingle();
+        if (!d) {
+          return NextResponse.json({ error: "designation not found" }, { status: 400 });
+        }
+      }
+      const { error } = await admin
+        .from("profiles")
+        .update({ designation_id: designationId })
+        .eq("user_id", userId)
+        .eq("account_id", ctx.accountId);
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      if (!("role" in body)) return NextResponse.json({ ok: true });
+    }
+
     const role = body?.role;
 
     if (!isAccountRole(role)) {

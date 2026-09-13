@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getCurrentAccount, requireRole, toErrorResponse } from '@/lib/auth/account'
+import { toErrorResponse } from '@/lib/auth/account'
+import { requirePermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import {
   MASTER_ENTITIES,
@@ -10,10 +11,11 @@ import { assertClinicInAccount } from '@/lib/master/server'
 
 // Clinic master data (clinics / doctors / clinic-admins) — one route
 // for all three, driven by the registry in src/lib/master/entities.ts.
-// GET lists; POST creates. Mirrors the quick-replies route: RLS-scoped
-// read via the user client, service-role write after an explicit role
-// check + account scope (the admin client bypasses RLS, so tenancy is
-// enforced here, not by Postgres).
+// GET lists; POST creates. RLS-scoped read via the user client,
+// service-role write after the designation permission check + account
+// scope (the admin client bypasses RLS, so tenancy is enforced here,
+// not by Postgres). Every handler goes through `requirePermission`
+// so a designation's read / write matrix is honoured server-side.
 
 type Params = { params: Promise<{ entity: string }> }
 
@@ -24,7 +26,7 @@ export async function GET(_request: Request, { params }: Params) {
   }
   const entity = MASTER_ENTITIES[slug]
   try {
-    const { supabase } = await getCurrentAccount()
+    const { supabase } = await requirePermission(entity.module, 'read')
     // RLS (<table>_select) scopes to the caller's account.
     const { data, error } = await supabase
       .from(entity.table)
@@ -46,7 +48,7 @@ export async function POST(request: Request, { params }: Params) {
 
   let ctx
   try {
-    ctx = await requireRole('admin')
+    ctx = await requirePermission(entity.module, 'write')
   } catch (err) {
     return toErrorResponse(err)
   }

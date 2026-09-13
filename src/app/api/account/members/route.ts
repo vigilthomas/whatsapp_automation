@@ -25,6 +25,7 @@ interface ProfileRow {
   avatar_url: string | null;
   account_role: string;
   created_at: string;
+  designation_id?: string | null;
 }
 
 export async function GET() {
@@ -35,6 +36,8 @@ export async function GET() {
     // the caller's, so this query is naturally account-scoped.
     const { data, error } = await ctx.supabase
       .from("profiles")
+      // designation_id arrives with migration 043; on an older schema
+      // the select would fail, so it is fetched separately below.
       .select("user_id, full_name, email, avatar_url, account_role, created_at")
       .eq("account_id", ctx.accountId)
       .order("created_at", { ascending: true });
@@ -49,6 +52,18 @@ export async function GET() {
 
     const canSeeEmails = canManageMembers(ctx.role);
 
+    // Best-effort designation lookup — tolerated when 043 isn't applied.
+    const designations = new Map<string, string | null>();
+    const dRes = await ctx.supabase
+      .from("profiles")
+      .select("user_id, designation_id")
+      .eq("account_id", ctx.accountId);
+    if (!dRes.error) {
+      for (const r of dRes.data as { user_id: string; designation_id: string | null }[]) {
+        designations.set(r.user_id, r.designation_id);
+      }
+    }
+
     const members: AccountMember[] = (data as ProfileRow[]).flatMap((row) => {
       // Defensive: the DB enum should never let an unknown role
       // through, but if a migration ever broadens the enum without
@@ -62,6 +77,7 @@ export async function GET() {
           avatar_url: row.avatar_url,
           role: row.account_role,
           joined_at: row.created_at,
+          designation_id: designations.get(row.user_id) ?? null,
         },
       ];
     });

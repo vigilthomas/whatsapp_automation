@@ -14,11 +14,18 @@ import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { DEFAULT_CURRENCY } from "@/lib/currency";
 import {
-  canAccessModule as canAccessModuleFor,
   parseModuleAccess,
   type ModuleAccess,
   type ModuleId,
 } from "@/lib/auth/module-access";
+import {
+  can as canFor,
+  effectivePermissions,
+  parsePermissions,
+  visibleModules,
+  type Action,
+  type Permissions,
+} from "@/lib/auth/permissions";
 import {
   canEditSettings as canEditSettingsFor,
   canManageMembers as canManageMembersFor,
@@ -141,11 +148,22 @@ interface AuthContextValue {
   /** The account's per-role module matrix. `{}` until the account loads. */
   moduleAccess: ModuleAccess;
   /**
-   * True if the caller's role may open `module` (Settings → Access
-   * control). Owner is never restricted; while the account is still
-   * loading this is true so the sidebar doesn't flash empty.
+   * The caller's effective permissions, in sidebar order — from their
+   * designation when they have one, else the role default (see
+   * src/lib/auth/permissions.ts). Empty until the profile settles.
    */
+  permissions: Permissions;
+  /**
+   * `can(module, action)` — the one gate every button and page uses.
+   * Mirrors `requirePermission` on the server; while the profile is
+   * still loading it answers false (fail closed) except for `view`/
+   * `read`, which answer true so the sidebar doesn't flash empty.
+   */
+  can: (module: ModuleId, action: Action) => boolean;
+  /** Shorthand for `can(module, "read")`. */
   canAccessModule: (module: ModuleId) => boolean;
+  /** Modules with `view`, in sidebar order. */
+  sidebarModules: ModuleId[];
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -199,6 +217,22 @@ interface ProfileRow {
   account_role: string | null;
 }
 
+/** Best-effort designation lookup; null when the member has none or 043 isn't applied. */
+async function fetchDesignation(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<Permissions | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("designation_id, designation:designations(permissions)")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data?.designation_id) return null;
+  const d = (data as { designation: { permissions: unknown } | { permissions: unknown }[] | null }).designation;
+  const raw = Array.isArray(d) ? d[0]?.permissions : d?.permissions;
+  return raw === undefined ? null : parsePermissions(raw);
+}
+
 /**
  * AuthProvider — wrap this around the dashboard layout.
  * Makes ONE getSession() call for the whole tree instead of one per
@@ -208,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [account, setAccount] = useState<AccountSummary | null>(null);
+  const [designation, setDesignation] = useState<Permissions | null>(null);
   const [loading, setLoading] = useState(true);
   // Why the account/role couldn't be established, when it couldn't.
   // Null on the happy path.
@@ -307,6 +342,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const accountRole = isAccountRole(data.account_role)
           ? data.account_role
           : null;
+
+        setDesignation(await fetchDesignation(supabase, userId));
 
         setProfile({
           id: data.id,
@@ -455,11 +492,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [profile?.account_role, profile?.account_id]);
 
   const moduleAccess = account?.module_access ?? EMPTY_MODULE_ACCESS;
-  const canAccessModule = useCallback(
-    (module: ModuleId) =>
-      canAccessModuleFor(moduleAccess, derived.accountRole, module),
-    [moduleAccess, derived.accountRole],
+  const permissions = useMemo(
+    () => effectivePermissions({ role: derived.accountRole, designation, moduleAccess }),
+    [derived.accountRole, designation, moduleAccess],
   );
+  const can = useCallback(
+    (module: ModuleId, action: Action) => {
+      // Before the profile settles nothing is known: keep navigation
+      // visible (view/read) so the shell doesn't flash, but fail closed
+      // on anything that mutates or exports.
+      if (profileLoading) return action === "view" || action === "read";
+      return canFor(permissions, module, action);
+    },
+    [permissions, profileLoading],
+  );
+  const canAccessModule = useCallback((module: ModuleId) => can(module, "read"), [can]);
+  const sidebarModules = useMemo(() => visibleModules(permissions), [permissions]);
 
   // Signed out is not a broken account — the shell redirects to /login
   // before anything reads this.
@@ -485,7 +533,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         account,
         defaultCurrency: account?.default_currency ?? DEFAULT_CURRENCY,
         moduleAccess,
+        permissions,
+        can,
         canAccessModule,
+        sidebarModules,
         accountStatus,
         accountStatusDetail: statusDetail,
         ...derived,
@@ -532,7 +583,10 @@ export function useAuth(): AuthContextValue {
       canEditSettings: false,
       canSendMessages: false,
       moduleAccess: EMPTY_MODULE_ACCESS,
-      canAccessModule: () => true,
+      permissions: [],
+      can: () => false,
+      canAccessModule: () => false,
+      sidebarModules: [],
     };
   }
   return ctx;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { toErrorResponse } from '@/lib/auth/account'
+import { requirePermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import {
   MASTER_ENTITIES,
@@ -10,8 +11,8 @@ import { assertClinicInAccount } from '@/lib/master/server'
 
 // Update / delete one clinic master-data record. Every mutation is
 // scoped by `account_id` as well as `id` — the service-role client
-// bypasses RLS, so both the admin role check and the tenancy filter
-// live here.
+// bypasses RLS, so both the permission check (write / delete on the
+// entity's module) and the tenancy filter live here.
 
 type Params = { params: Promise<{ entity: string; id: string }> }
 
@@ -24,7 +25,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   let ctx
   try {
-    ctx = await requireRole('admin')
+    ctx = await requirePermission(entity.module, 'write')
   } catch (err) {
     return toErrorResponse(err)
   }
@@ -58,7 +59,7 @@ export async function DELETE(_request: Request, { params }: Params) {
 
   let ctx
   try {
-    ctx = await requireRole('admin')
+    ctx = await requirePermission(entity.module, 'delete')
   } catch (err) {
     return toErrorResponse(err)
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getCurrentAccount, requireRole, toErrorResponse } from '@/lib/auth/account'
+import { toErrorResponse } from '@/lib/auth/account'
+import { requirePermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { validateAppointmentInput } from '@/lib/appointments/model'
 import { APPOINTMENT_SELECT, assertRefsInAccount } from '@/lib/appointments/server'
@@ -15,7 +16,7 @@ import { APPOINTMENT_SELECT, assertRefsInAccount } from '@/lib/appointments/serv
 
 export async function GET(request: Request) {
   try {
-    const { supabase } = await getCurrentAccount()
+    const { supabase } = await requirePermission('appointments', 'read')
     const url = new URL(request.url)
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let ctx
   try {
-    ctx = await requireRole('agent')
+    ctx = await requirePermission('appointments', 'write')
   } catch (err) {
     return toErrorResponse(err)
   }
