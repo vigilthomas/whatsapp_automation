@@ -11,6 +11,7 @@ import {
   Bell,
   Bot,
   Building2,
+  CalendarDays,
   ChevronDown,
   Coins,
   Crown,
@@ -125,6 +126,7 @@ interface NavGroup {
 const navItems: NavItem[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { href: "/inbox", labelKey: "inbox", icon: MessageSquare, module: "inbox" },
+  { href: "/appointments", labelKey: "appointments", icon: CalendarDays, module: "appointments" },
   { href: "/notifications", labelKey: "notifications", icon: Bell, module: "notifications" },
 ];
 

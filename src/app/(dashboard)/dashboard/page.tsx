@@ -1,98 +1,89 @@
 "use client"
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { CalendarDays, CalendarCheck, MessageCircle, Plus, UserCheck, Users } from 'lucide-react'
+
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
-import { formatCurrency } from '@/lib/currency'
+import { loadActivity } from '@/lib/dashboard/queries'
+import type { ActivityItem } from '@/lib/dashboard/types'
 import {
-  MessageSquare,
-  UserPlus,
-  DollarSign,
-  Send,
-} from 'lucide-react'
+  loadAppointmentsTrend,
+  loadClinicToday,
+  loadDoctorLoad,
+  loadRecentConversations,
+  type ClinicTodayBundle,
+  type DoctorLoad,
+  type RecentConversation,
+  type TrendPoint,
+} from '@/lib/dashboard/clinic-queries'
 
-import {
-  loadActivity,
-  loadConversationsSeries,
-  loadMetrics,
-  loadPipelineDonut,
-  loadResponseTime,
-} from '@/lib/dashboard/queries'
-import type {
-  ActivityItem,
-  ConversationsSeriesPoint,
-  MetricsBundle,
-  PipelineDonutData,
-  ResponseTimeSummary,
-} from '@/lib/dashboard/types'
-
-import { MetricCard } from '@/components/dashboard/metric-card'
-import { SkeletonCard } from '@/components/dashboard/skeleton'
-import { QuickActions } from '@/components/dashboard/quick-actions'
-import { ConversationsChart } from '@/components/dashboard/conversations-chart'
-import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
-import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
+import { Button } from '@/components/ui/button'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import {
+  AppointmentsTrend,
+  DoctorAvailability,
+  StatTile,
+  TodayAppointments,
+  WhatsAppConversations,
+} from '@/components/dashboard/clinic-widgets'
 
-import { useTranslations } from 'next-intl'
-
-type RangeDays = 7 | 30 | 90
-
+/**
+ * Clinic dashboard — the "what's happening today" landing from the
+ * reference design: greeting + date, four headline tiles, today's
+ * appointments, doctor load, recent activity, recent WhatsApp
+ * conversations and a 7-day appointments trend.
+ *
+ * The reference also shows call handling and an AI receptionist
+ * panel; those features don't exist yet, so their tiles are not
+ * rendered rather than shown with placeholder numbers.
+ */
 export default function DashboardPage() {
-  const t = useTranslations('Dashboard.page')
-  const { defaultCurrency } = useAuth()
-  const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
-  const [metricsLoading, setMetricsLoading] = useState(true)
+  const t = useTranslations('Dashboard.clinic')
+  const tAppt = useTranslations('Appointments')
+  const { profile } = useAuth()
 
-  const [range, setRange] = useState<RangeDays>(30)
-  // Keep a cache per range so switching tabs doesn't re-fetch what we
-  // already have. Ranges the user hasn't opened yet stay null and
-  // trigger a fetch on first view.
-  const [series, setSeries] = useState<Record<RangeDays, ConversationsSeriesPoint[] | null>>({
-    7: null,
-    30: null,
-    90: null,
-  })
-  const [seriesLoading, setSeriesLoading] = useState(true)
-
-  const [pipeline, setPipeline] = useState<PipelineDonutData | null>(null)
-  const [pipelineLoading, setPipelineLoading] = useState(true)
-
-  const [responseTime, setResponseTime] = useState<ResponseTimeSummary | null>(null)
-  const [responseTimeLoading, setResponseTimeLoading] = useState(true)
-
+  const [today, setToday] = useState<ClinicTodayBundle | null>(null)
+  const [todayLoading, setTodayLoading] = useState(true)
+  const [doctors, setDoctors] = useState<DoctorLoad[] | null>(null)
+  const [doctorsLoading, setDoctorsLoading] = useState(true)
+  const [convos, setConvos] = useState<RecentConversation[] | null>(null)
+  const [convosLoading, setConvosLoading] = useState(true)
+  const [trend, setTrend] = useState<TrendPoint[] | null>(null)
+  const [trendLoading, setTrendLoading] = useState(true)
   const [activity, setActivity] = useState<ActivityItem[] | null>(null)
   const [activityLoading, setActivityLoading] = useState(true)
 
   const loadAll = useCallback(() => {
     const db = createClient()
 
-    // Kick everything off in parallel. Each block has its own
-    // setState + finally so a slow query doesn't hold up faster
-    // sections — each widget shows its own skeleton independently.
-    void loadMetrics(db)
-      .then((m) => setMetrics(m))
-      .catch((err) => console.error('[dashboard] metrics failed:', err))
-      .finally(() => setMetricsLoading(false))
+    // Each widget settles on its own so a slow query never blanks the
+    // others. Doctor load depends on today's appointments, so it
+    // chains off that one.
+    void loadClinicToday(db)
+      .then((b) => {
+        setToday(b)
+        return loadDoctorLoad(db, b.today)
+      })
+      .then((d) => setDoctors(d))
+      .catch((err) => console.error('[dashboard] today failed:', err))
+      .finally(() => {
+        setTodayLoading(false)
+        setDoctorsLoading(false)
+      })
 
-    void loadConversationsSeries(db, 30)
-      .then((s) => setSeries((prev) => ({ ...prev, 30: s })))
-      .catch((err) => console.error('[dashboard] series failed:', err))
-      .finally(() => setSeriesLoading(false))
+    void loadRecentConversations(db)
+      .then((c) => setConvos(c))
+      .catch((err) => console.error('[dashboard] conversations failed:', err))
+      .finally(() => setConvosLoading(false))
 
-    void loadPipelineDonut(db)
-      .then((p) => setPipeline(p))
-      .catch((err) => console.error('[dashboard] pipeline failed:', err))
-      .finally(() => setPipelineLoading(false))
+    void loadAppointmentsTrend(db, 7)
+      .then((p) => setTrend(p))
+      .catch((err) => console.error('[dashboard] trend failed:', err))
+      .finally(() => setTrendLoading(false))
 
-    void loadResponseTime(db)
-      .then((r) => setResponseTime(r))
-      .catch((err) => console.error('[dashboard] response time failed:', err))
-      .finally(() => setResponseTimeLoading(false))
-
-    // Fetch up to 50 so the biggest page-size option in the feed
-    // (50 rows) is already in memory — switching sizes then becomes
-    // a pure client-side slice with no extra round trip.
     void loadActivity(db, 50)
       .then((a) => setActivity(a))
       .catch((err) => console.error('[dashboard] activity failed:', err))
@@ -103,132 +94,87 @@ export default function DashboardPage() {
     loadAll()
   }, [loadAll])
 
-  // Range switch handler — kept in an event callback (not an effect)
-  // so the setState calls stay out of the react-hooks/set-state-in-effect
-  // rule's way. The cached bucket check means switching back to a
-  // previously-viewed range is instant and doesn't re-fetch.
-  const handleRangeChange = useCallback(
-    (r: RangeDays) => {
-      setRange(r)
-      if (series[r] !== null) return
-      setSeriesLoading(true)
-      const db = createClient()
-      loadConversationsSeries(db, r)
-        .then((s) => setSeries((prev) => ({ ...prev, [r]: s })))
-        .catch((err) => console.error('[dashboard] series failed:', err))
-        .finally(() => setSeriesLoading(false))
-    },
-    [series],
-  )
+  const hour = new Date().getHours()
+  const greetingKey = hour < 12 ? 'goodMorning' : hour < 17 ? 'goodAfternoon' : 'goodEvening'
+  const firstName = profile?.full_name?.trim().split(/\s+/)[0] ?? ''
+  const dateLabel = new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date())
+
+  const appts = today?.today ?? []
+  const live = appts.filter((a) => a.status !== 'cancelled')
+  const bookedByAi = live.filter((a) => a.source === 'ai').length
+  const pending = live.filter((a) => a.status === 'scheduled').length
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('description')}
-        </p>
-      </div>
-
-      {/* Metric cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {metricsLoading || !metrics ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
-        ) : (
-          <>
-            <MetricCard
-              title={t('activeConversations')}
-              value={metrics.activeConversations.current.toLocaleString()}
-              icon={MessageSquare}
-              delta={{
-                sign: metrics.activeConversations.previous,
-                label: deltaLabel(
-                  metrics.activeConversations.previous, 
-                  t('newTodayVsYesterday'), 
-                  t('noChange', { suffix: t('newTodayVsYesterday') })
-                ),
-              }}
-            />
-            <MetricCard
-              title={t('newContactsToday')}
-              value={metrics.newContactsToday.current.toLocaleString()}
-              icon={UserPlus}
-              delta={{
-                sign:
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                label: deltaLabel(
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
-              }}
-            />
-            <MetricCard
-              title={t('openDealsValue')}
-              value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
-              icon={DollarSign}
-              subtitle={t('openDeals', { count: metrics.openDealsCount })}
-            />
-            <MetricCard
-              title={t('messagesSentToday')}
-              value={metrics.messagesSentToday.current.toLocaleString()}
-              icon={Send}
-              delta={{
-                sign:
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                label: deltaLabel(
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
-              }}
-            />
-          </>
-        )}
-      </div>
-
-      {/* Quick actions */}
-      <QuickActions />
-
-      {/* Charts row */}
-      {/* items-stretch (the grid default) stretches the two columns to
-          match the tallest sibling; adding h-full on each wrapper and
-          on the inner panels makes both cards actually fill that
-          stretched height so their rounded borders line up. Without
-          this, the pipeline card rendered at its natural (shorter)
-          height while the line chart drove the row height. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="h-full lg:col-span-3">
-          <ConversationsChart
-            series={series}
-            loading={seriesLoading}
-            range={range}
-            onRangeChange={handleRangeChange}
-          />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            {t(greetingKey, { name: firstName })} 👋
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
-        <div className="h-full lg:col-span-2">
-          <PipelineDonut
-            data={pipeline}
-            loading={pipelineLoading}
-            currency={defaultCurrency}
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm">
+            <CalendarDays className="size-4 text-muted-foreground" />
+            <span className="font-medium text-foreground">{dateLabel}</span>
+          </div>
+          <Button size="lg" render={<Link href="/appointments" />}>
+            <Plus className="size-4" />
+            {tAppt('actions.add')}
+          </Button>
         </div>
       </div>
 
-      {/* Response time */}
-      <ResponseTimeChart data={responseTime} loading={responseTimeLoading} />
+      {/* Headline tiles */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatTile
+          icon={CalendarCheck}
+          label={t('appointmentsToday')}
+          value={todayLoading ? '…' : live.length}
+          sub={todayLoading ? undefined : t('bookedByAiCount', { count: bookedByAi })}
+          subTone="primary"
+        />
+        <StatTile
+          icon={UserCheck}
+          label={t('pendingConfirmations')}
+          value={todayLoading ? '…' : pending}
+          sub={todayLoading ? undefined : t('pendingHint')}
+          subTone="amber"
+        />
+        <StatTile
+          icon={MessageCircle}
+          label={t('whatsappChats')}
+          value={todayLoading ? '…' : (today?.openConversations ?? 0)}
+          sub={todayLoading ? undefined : t('openConversations')}
+        />
+        <StatTile
+          icon={Users}
+          label={t('patients')}
+          value={todayLoading ? '…' : (today?.patientsTotal ?? 0).toLocaleString()}
+          sub={todayLoading ? undefined : t('patientsHint')}
+        />
+      </div>
 
-      {/* Activity feed */}
-      <ActivityFeed items={activity} loading={activityLoading} />
+      {/* Main grid */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="xl:col-span-1">
+          <TodayAppointments items={today?.today ?? null} loading={todayLoading} />
+        </div>
+        <div className="space-y-4 xl:col-span-1">
+          <DoctorAvailability doctors={doctors} loading={doctorsLoading} />
+          <ActivityFeed items={activity} loading={activityLoading} />
+        </div>
+        <div className="space-y-4 xl:col-span-1">
+          <WhatsAppConversations items={convos} loading={convosLoading} />
+          <AppointmentsTrend points={trend} loading={trendLoading} />
+        </div>
+      </div>
     </div>
   )
-}
-
-// ------------------------------------------------------------
-
-function deltaLabel(delta: number, suffix: string, noChangeLabel: string): string {
-  if (delta === 0) return noChangeLabel
-  const sign = delta > 0 ? '+' : ''
-  return `${sign}${delta.toLocaleString()} ${suffix}`
 }

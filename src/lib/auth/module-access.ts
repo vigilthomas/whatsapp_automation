@@ -28,6 +28,7 @@ import type { AccountRole } from "./roles";
 /** Every gateable module, in sidebar order. */
 export const MODULES = [
   "inbox",
+  "appointments",
   "notifications",
   "contacts",
   "clinics",
@@ -60,6 +61,7 @@ export type ModuleAccess = Partial<Record<RestrictableRole, ModuleId[]>>;
  */
 const ROUTE_MODULES: Record<string, ModuleId> = {
   "/inbox": "inbox",
+  "/appointments": "appointments",
   "/notifications": "notifications",
   "/contacts": "contacts",
   "/master/clinics": "clinics",
