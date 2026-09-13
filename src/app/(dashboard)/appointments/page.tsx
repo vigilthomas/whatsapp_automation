@@ -17,6 +17,7 @@ import type { MasterRecord } from "@/lib/master/entities";
 import { downloadCsv, recordsToCsv } from "@/lib/master/csv";
 import { patientLabel } from "@/lib/appointments/model";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   AppointmentCalendar,
   CALENDAR_DAYS,
@@ -39,6 +40,7 @@ type View = "calendar" | "list";
  */
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
+  const confirm = useConfirm();
   // Mirrors the API's requirePermission('appointments', …) checks.
   const { can } = useAuth();
   const canEdit = can("appointments", "write");
@@ -112,6 +114,12 @@ export default function AppointmentsPage() {
 
   const patch = useCallback(
     async (a: Appointment, body: { status: AppointmentStatus }) => {
+      const ok = await confirm({
+        title: t(`confirmStatus.${body.status}`, { patient: patientLabel(a.contact) }),
+        description: t("confirmStatusDesc"),
+        tone: body.status === "cancelled" ? "danger" : "default",
+      });
+      if (!ok) return;
       const res = await fetch(`/api/appointments/${a.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -125,7 +133,7 @@ export default function AppointmentsPage() {
       toast.success(t("statusUpdated"));
       await load();
     },
-    [load, t],
+    [load, t, confirm],
   );
 
   const openDialog = (d: AppointmentDraft, mode: typeof dialogMode = "edit") => {
@@ -143,7 +151,6 @@ export default function AppointmentsPage() {
         return openDialog(draftFromAppointment(a), "changeDoctor");
       case "cancel":
         // Cancelling keeps the row (status change) — a write, not a delete.
-        if (!window.confirm(t("confirmCancel"))) return;
         return void patch(a, { status: "cancelled" });
       case "confirm":
         return void patch(a, { status: "confirmed" });

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface CustomFieldsManagerProps {
   open: boolean;
@@ -56,6 +57,7 @@ export function CustomFieldsManager({
  */
 export function CustomFieldsPanel() {
   const t = useTranslations('Contacts.customFields');
+  const confirm = useConfirm();
   const supabase = createClient();
   const { user, accountId } = useAuth();
 
@@ -151,11 +153,11 @@ export function CustomFieldsPanel() {
   }
 
   async function handleDelete(field: CustomField) {
-    if (
-      !window.confirm(
-        t('deleteConfirm', { name: field.field_name })
-      )
-    ) {
+    const ok = await confirm({
+      title: t('deleteConfirm', { name: field.field_name }),
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
     setBusyId(field.id);

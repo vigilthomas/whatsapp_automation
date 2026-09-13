@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type PatientPick = { id: string; name: string | null; phone: string };
 
@@ -110,6 +111,7 @@ interface Props {
 export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, mode = "edit" }: Props) {
   const t = useTranslations("Appointments.dialog");
   const tStatus = useTranslations("Appointments.status");
+  const confirm = useConfirm();
   const [form, setForm] = useState<AppointmentDraft | null>(draft);
   const [saving, setSaving] = useState(false);
 
@@ -169,6 +171,16 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
       return;
     }
     const end = new Date(start.getTime() + form.durationMin * 60000);
+
+    const ok = await confirm({
+      title: form.id ? t("confirmSaveTitle") : t("confirmCreateTitle"),
+      description: t("confirmSaveDesc", {
+        patient: form.contact.name?.trim() || form.contact.phone,
+        when: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(start),
+      }),
+      confirmLabel: form.id ? t("save") : t("create"),
+    });
+    if (!ok) return;
 
     setSaving(true);
     try {

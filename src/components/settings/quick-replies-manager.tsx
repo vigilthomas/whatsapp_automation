@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SettingsPanelHead } from "./settings-panel-head";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   InteractiveBuilder,
   blankButtonsPayload,
@@ -43,6 +44,7 @@ function emptyDraft(): DraftState {
 }
 
 export function QuickRepliesManager() {
+  const confirm = useConfirm();
   const [items, setItems] = useState<QuickReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<DraftState | null>(null);
@@ -112,7 +114,13 @@ export function QuickRepliesManager() {
 
   const remove = useCallback(
     async (id: string) => {
-      if (!window.confirm("Delete this quick reply?")) return;
+      const ok = await confirm({
+        title: "Delete this quick reply?",
+        description: "Agents will no longer be able to insert it from the composer. This can't be undone.",
+        tone: "danger",
+        confirmLabel: "Delete",
+      });
+      if (!ok) return;
       const res = await fetch(`/api/quick-replies/${id}`, { method: "DELETE" });
       if (!res.ok) {
         toast.error("Couldn't delete the quick reply.");
@@ -120,7 +128,7 @@ export function QuickRepliesManager() {
       }
       await load();
     },
-    [load],
+    [load, confirm],
   );
 
   return (

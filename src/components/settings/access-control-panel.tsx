@@ -37,6 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SettingsPanelHead } from "./settings-panel-head";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
  * Circular tick toggle for one matrix cell. Colours come straight from
@@ -94,6 +95,7 @@ export function AccessControlPanel() {
   const t = useTranslations("Settings.access");
   const tModules = useTranslations("Settings.access.modules");
   const tActions = useTranslations("Settings.access.actions");
+  const confirm = useConfirm();
 
   const [designations, setDesignations] = useState<MasterRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,6 +150,12 @@ export function AccessControlPanel() {
 
   async function save() {
     if (!selected || !dirty) return;
+    const ok = await confirm({
+      title: t("confirmSaveTitle", { name: String(selected.name) }),
+      description: t("confirmSaveDesc"),
+      confirmLabel: t("save"),
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/master/designations/${selected.id}`, {

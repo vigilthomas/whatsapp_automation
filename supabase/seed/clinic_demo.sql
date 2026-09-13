@@ -155,6 +155,91 @@ CROSS JOIN (VALUES
 ) AS d(name, description, permissions)
 WHERE NOT EXISTS (SELECT 1 FROM designations x WHERE x.account_id = a.id AND x.name = d.name);
 
+-- 4. Branches ------------------------------------------------------
+INSERT INTO branches (account_id, clinic_id, name, address, city, phone, notes)
+SELECT cl.account_id, cl.id, b.name, b.address, b.city, b.phone, 'demo seed'
+FROM clinics cl
+JOIN (VALUES
+  ('Sunrise Dental & Diagnostics', 'Round East (Main)', '14 MG Road, Round East', 'Thrissur', '+91 487 242 1100'),
+  ('Sunrise Dental & Diagnostics', 'Punkunnam',         'Sobha Plaza, Punkunnam',  'Thrissur', '+91 487 238 4400'),
+  ('City Clinic',                  'Kakkanad (Main)',   'Lulu Cyber Tower',        'Kochi',    '+91 484 236 5500'),
+  ('City Clinic',                  'Edappally',         'Oberon Mall Road',        'Kochi',    '+91 484 280 7700'),
+  ('Green Valley Physio',          'Kowdiar (Main)',    'Kowdiar Avenue',          'Thiruvananthapuram', '+91 471 233 8800')
+) AS b(clinic, name, address, city, phone) ON b.clinic = cl.name
+WHERE cl.notes = 'demo seed'
+  AND NOT EXISTS (SELECT 1 FROM branches x WHERE x.account_id = cl.account_id AND x.name = b.name);
+
+-- 5. Services (per account; priced in the account currency) ---------
+INSERT INTO services (account_id, name, description, duration_min, price)
+SELECT a.id, s.name, s.description || ' (demo seed)', s.duration_min, s.price
+FROM accounts a
+CROSS JOIN (VALUES
+  ('Consultation',         'General consultation with a doctor',            20,  500.00),
+  ('Follow-up',            'Review visit within 14 days of a consultation', 15,  300.00),
+  ('Dental cleaning',      'Scaling and polishing',                         45, 1500.00),
+  ('Root canal',           'Single-sitting endodontic treatment',           90, 6500.00),
+  ('Tooth extraction',     'Simple extraction under local anaesthesia',     30, 1800.00),
+  ('Check-up',             'Routine dental / health check',                 20,  400.00),
+  ('Physiotherapy session','45-minute guided session',                      45,  900.00),
+  ('Skin consultation',    'Dermatology consultation',                      20,  800.00),
+  ('Child wellness visit', 'Pediatric growth and vaccination review',       30,  600.00)
+) AS s(name, description, duration_min, price)
+WHERE NOT EXISTS (SELECT 1 FROM services x WHERE x.account_id = a.id AND x.name = s.name);
+
+-- 6. Designations (per account) with a starting permission set --------
+-- Module ids and actions match src/lib/auth/permissions.ts. Adjust
+-- under Access control afterwards; this just gives each one a
+-- sensible starting point.
+INSERT INTO designations (account_id, name, description, permissions)
+SELECT a.id, d.name, d.description || ' (demo seed)', d.permissions::jsonb
+FROM accounts a
+CROSS JOIN (VALUES
+  ('Clinic Admin', 'Runs the clinic: staff, settings, all records',
+   '[{"module":"appointments","actions":["view","read","write","delete","export"]},
+     {"module":"inbox","actions":["view","read","write","delete","export"]},
+     {"module":"contacts","actions":["view","read","write","delete","export"]},
+     {"module":"doctors","actions":["view","read","write","delete","export"]},
+     {"module":"services","actions":["view","read","write","delete","export"]},
+     {"module":"branches","actions":["view","read","write","delete","export"]},
+     {"module":"clinics","actions":["view","read","write","export"]},
+     {"module":"clinic-admins","actions":["view","read","write","delete"]},
+     {"module":"users","actions":["view","read","write","delete"]},
+     {"module":"designations","actions":["view","read","write","delete"]},
+     {"module":"templates","actions":["view","read","write","delete"]},
+     {"module":"quick-replies","actions":["view","read","write","delete"]},
+     {"module":"fields","actions":["view","read","write","delete"]},
+     {"module":"deals","actions":["view","read","write"]},
+     {"module":"pipelines","actions":["view","read","write","delete","export"]},
+     {"module":"broadcasts","actions":["view","read","write","delete","export"]},
+     {"module":"automations","actions":["view","read","write","delete"]},
+     {"module":"flows","actions":["view","read","write","delete"]},
+     {"module":"agents","actions":["view","read","write","delete"]},
+     {"module":"notifications","actions":["view","read"]}]'),
+  ('Doctor', 'Consults; owns their appointments and patient records',
+   '[{"module":"appointments","actions":["view","read","write","export"]},
+     {"module":"contacts","actions":["view","read","write"]},
+     {"module":"inbox","actions":["view","read","write"]},
+     {"module":"services","actions":["read"]},
+     {"module":"notifications","actions":["view","read"]}]'),
+  ('Receptionist', 'Front desk: bookings, WhatsApp, patient intake',
+   '[{"module":"appointments","actions":["view","read","write"]},
+     {"module":"inbox","actions":["view","read","write"]},
+     {"module":"contacts","actions":["view","read","write"]},
+     {"module":"quick-replies","actions":["view","read"]},
+     {"module":"notifications","actions":["view","read"]}]'),
+  ('Assistant', 'Chair-side support: read-only view of the day',
+   '[{"module":"appointments","actions":["view","read"]},
+     {"module":"contacts","actions":["view","read"]},
+     {"module":"notifications","actions":["view","read"]}]'),
+  ('Accounts', 'Billing and reporting: exports, no clinical edits',
+   '[{"module":"appointments","actions":["view","read","export"]},
+     {"module":"contacts","actions":["view","read","export"]},
+     {"module":"services","actions":["view","read","write"]},
+     {"module":"deals","actions":["view","read","write","export"]},
+     {"module":"pipelines","actions":["view","read","export"]}]')
+) AS d(name, description, permissions)
+WHERE NOT EXISTS (SELECT 1 FROM designations x WHERE x.account_id = a.id AND x.name = d.name);
+
 COMMIT;
 
 -- Sanity check — expect 3 / 3 / 8 / 5 / 9 / 5 per account:

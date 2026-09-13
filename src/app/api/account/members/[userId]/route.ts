@@ -59,7 +59,7 @@ export async function PATCH(
     const { userId } = await params;
 
     const body = (await request.json().catch(() => null)) as
-      | { role?: unknown; designation_id?: unknown }
+      | { role?: unknown; designation_id?: unknown; clinic_id?: unknown; staff_type?: unknown }
       | null;
 
     // Designation assignment. Goes through the service-role client
@@ -68,15 +68,36 @@ export async function PATCH(
     // able to hand themselves a broader designation). The account
     // scope on the UPDATE keeps it inside the caller's tenant, and the
     // designation itself must belong to that tenant too.
-    if (body && "designation_id" in body) {
-      const designationId = body.designation_id;
-      if (designationId !== null && typeof designationId !== "string") {
-        return NextResponse.json(
-          { error: "'designation_id' must be an id or null" },
-          { status: 400 },
-        );
+    const wantsProfileFields =
+      body && ("designation_id" in body || "clinic_id" in body || "staff_type" in body);
+    if (body && wantsProfileFields) {
+      const update: Record<string, unknown> = {};
+      const designationId = "designation_id" in body ? body.designation_id : undefined;
+      const clinicId = "clinic_id" in body ? body.clinic_id : undefined;
+      const staffType = "staff_type" in body ? body.staff_type : undefined;
+      if (designationId !== undefined && designationId !== null && typeof designationId !== "string") {
+        return NextResponse.json({ error: "'designation_id' must be an id or null" }, { status: 400 });
+      }
+      if (clinicId !== undefined && clinicId !== null && typeof clinicId !== "string") {
+        return NextResponse.json({ error: "'clinic_id' must be an id or null" }, { status: 400 });
+      }
+      if (
+        staffType !== undefined &&
+        staffType !== null &&
+        !(typeof staffType === "string" && ["doctor", "assistant", "other"].includes(staffType))
+      ) {
+        return NextResponse.json({ error: "'staff_type' must be doctor, assistant, other or null" }, { status: 400 });
       }
       const admin = supabaseAdmin();
+      if (clinicId) {
+        const { data: c } = await admin
+          .from("clinics")
+          .select("id")
+          .eq("id", clinicId)
+          .eq("account_id", ctx.accountId)
+          .maybeSingle();
+        if (!c) return NextResponse.json({ error: "clinic not found" }, { status: 400 });
+      }
       if (designationId) {
         const { data: d } = await admin
           .from("designations")
@@ -88,9 +109,12 @@ export async function PATCH(
           return NextResponse.json({ error: "designation not found" }, { status: 400 });
         }
       }
+      if (designationId !== undefined) update.designation_id = designationId;
+      if (clinicId !== undefined) update.clinic_id = clinicId;
+      if (staffType !== undefined) update.staff_type = staffType;
       const { error } = await admin
         .from("profiles")
-        .update({ designation_id: designationId })
+        .update(update)
         .eq("user_id", userId)
         .eq("account_id", ctx.accountId);
       if (error) {

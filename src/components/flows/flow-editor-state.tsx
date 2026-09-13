@@ -1,5 +1,7 @@
 "use client";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+
 /**
  * Single source of truth for the flow editor's state.
  *
@@ -239,6 +241,7 @@ export function FlowEditorProvider({
 }: ProviderProps) {
   const router = useRouter();
   const t = useTranslations("Flows.editorState");
+  const confirm = useConfirm();
 
   const [state, setStateRaw] = useState<BuilderState>(() => ({
     name: initialFlow.name,
@@ -402,9 +405,12 @@ export function FlowEditorProvider({
 
   // ---- Delete ----
   const deleteFlow = useCallback(async () => {
-    const yes = window.confirm(
-      `Delete "${state.name}"? Any active runs end immediately. This can't be undone.`,
-    );
+    const yes = await confirm({
+      title: `Delete "${state.name}"?`,
+      description: "Any active runs end immediately. This can't be undone.",
+      tone: "danger",
+      confirmLabel: "Delete",
+    });
     if (!yes) return;
     try {
       const res = await fetch(`/api/flows/${initialFlow.id}`, {
@@ -416,7 +422,7 @@ export function FlowEditorProvider({
       const msg = err instanceof Error ? err.message : "Delete failed";
       toast.error(msg);
     }
-  }, [initialFlow.id, router, state.name]);
+  }, [initialFlow.id, router, state.name, confirm]);
 
   // ---- Node mutations ----
   const updateNode = useCallback(

@@ -52,15 +52,17 @@ export async function GET() {
 
     const canSeeEmails = canManageMembers(ctx.role);
 
-    // Best-effort designation lookup — tolerated when 043 isn't applied.
-    const designations = new Map<string, string | null>();
-    const dRes = await ctx.supabase
+    // Best-effort lookup of the 043/044 columns — tolerated when those
+    // migrations aren't applied (the fields just read as null).
+    type Extra = { designation_id: string | null; clinic_id: string | null; staff_type: string | null };
+    const extras = new Map<string, Extra>();
+    const eRes = await ctx.supabase
       .from("profiles")
-      .select("user_id, designation_id")
+      .select("user_id, designation_id, clinic_id, staff_type")
       .eq("account_id", ctx.accountId);
-    if (!dRes.error) {
-      for (const r of dRes.data as { user_id: string; designation_id: string | null }[]) {
-        designations.set(r.user_id, r.designation_id);
+    if (!eRes.error) {
+      for (const r of eRes.data as ({ user_id: string } & Extra)[]) {
+        extras.set(r.user_id, { designation_id: r.designation_id, clinic_id: r.clinic_id, staff_type: r.staff_type });
       }
     }
 
@@ -77,7 +79,9 @@ export async function GET() {
           avatar_url: row.avatar_url,
           role: row.account_role,
           joined_at: row.created_at,
-          designation_id: designations.get(row.user_id) ?? null,
+          designation_id: extras.get(row.user_id)?.designation_id ?? null,
+          clinic_id: extras.get(row.user_id)?.clinic_id ?? null,
+          staff_type: extras.get(row.user_id)?.staff_type ?? null,
         },
       ];
     });

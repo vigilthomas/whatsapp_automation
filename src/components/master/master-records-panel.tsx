@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SettingsPanelHead } from "@/components/settings/settings-panel-head";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
  * Generic list + add/edit/delete UI for one clinic master-data entity.
@@ -48,6 +49,7 @@ import { SettingsPanelHead } from "@/components/settings/settings-panel-head";
 export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
   const entity = MASTER_ENTITIES[slug];
   const t = useTranslations("Master");
+  const confirm = useConfirm();
   // Every button here mirrors a server-side `requirePermission` on the
   // same module — the UI hides what the API would refuse.
   const { can, defaultCurrency } = useAuth();
@@ -113,6 +115,13 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
 
   const save = useCallback(async () => {
     if (!draft) return;
+    const singular = t(`entitySingular.${entity.labelKey}`);
+    const ok = await confirm({
+      title: draft.id ? t("confirmSaveTitle", { entity: singular }) : t("confirmCreateTitle", { entity: singular }),
+      description: t("confirmSaveDesc"),
+      confirmLabel: draft.id ? t("saveChanges") : t("create"),
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       const { id, ...values } = draft;
@@ -137,11 +146,17 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
     } finally {
       setSaving(false);
     }
-  }, [draft, slug, load, t]);
+  }, [draft, slug, load, t, confirm, entity.labelKey]);
 
   const remove = useCallback(
     async (id: string) => {
-      if (!window.confirm(t("confirmDelete"))) return;
+      const ok = await confirm({
+        title: t("confirmDeleteTitle", { entity: t(`entitySingular.${entity.labelKey}`) }),
+        description: t("confirmDelete"),
+        tone: "danger",
+        confirmLabel: t("delete"),
+      });
+      if (!ok) return;
       const res = await fetch(`/api/master/${slug}/${id}`, { method: "DELETE" });
       if (!res.ok) {
         toast.error(t("deleteFailed"));
@@ -149,7 +164,7 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
       }
       await load();
     },
-    [slug, load, t],
+    [slug, load, t, confirm, entity.labelKey],
   );
 
   const renderCell = (field: MasterField, record: MasterRecord) => {

@@ -77,6 +77,10 @@ export interface AccountMember {
   joined_at: string;
   /** Designation (043) driving the member's permissions; null = role default. */
   designation_id: string | null;
+  /** Clinic the member works at (044). */
+  clinic_id: string | null;
+  /** 'doctor' | 'assistant' | 'other' (044). */
+  staff_type: string | null;
 }
 
 /**

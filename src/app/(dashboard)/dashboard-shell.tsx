@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { AccountAccessAlert } from "@/components/layout/account-access-alert";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 
 // Auth-gated dashboard shell. Extracted from the layout so the layout
 // itself can stay a server component and export metadata (noindex) —
@@ -85,7 +86,10 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <DashboardShellInner>{children}</DashboardShellInner>
+      {/* One confirmation modal for the whole app — see useConfirm(). */}
+      <ConfirmProvider>
+        <DashboardShellInner>{children}</DashboardShellInner>
+      </ConfirmProvider>
     </AuthProvider>
   );
 }

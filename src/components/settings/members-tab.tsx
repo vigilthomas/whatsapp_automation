@@ -74,6 +74,7 @@ import {
 } from '@/components/presence/presence-dot';
 import { InviteMemberDialog } from './invite-member-dialog';
 import { SettingsPanelHead } from './settings-panel-head';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { ROLE_META } from './role-meta';
 
 interface Member {
@@ -136,6 +137,7 @@ export function MembersTab() {
   const tRoles = useTranslations('Settings.roles');
   const { user, canManageMembers } = useAuth();
   const { getPresence, getRow, now } = usePresence();
+  const confirm = useConfirm();
 
   const [members, setMembers] = useState<Member[]>([]);
   const [designations, setDesignations] = useState<Designation[]>([]);
@@ -197,6 +199,12 @@ export function MembersTab() {
   }, [loadEverything]);
 
   async function handleDesignationChange(member: Member, designationId: string | null) {
+    const next = designations.find((d) => d.id === designationId)?.name ?? t('noDesignation');
+    const ok = await confirm({
+      title: t('confirmDesignationTitle', { name: member.full_name || t('unnamed') }),
+      description: t('confirmDesignationDesc', { designation: next }),
+    });
+    if (!ok) return;
     setPendingMemberAction(member.user_id);
     try {
       const res = await fetch(`/api/account/members/${member.user_id}`, {
