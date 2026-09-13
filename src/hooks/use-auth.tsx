@@ -14,6 +14,12 @@ import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { DEFAULT_CURRENCY } from "@/lib/currency";
 import {
+  canAccessModule as canAccessModuleFor,
+  parseModuleAccess,
+  type ModuleAccess,
+  type ModuleId,
+} from "@/lib/auth/module-access";
+import {
   canEditSettings as canEditSettingsFor,
   canManageMembers as canManageMembersFor,
   canSendMessages as canSendMessagesFor,
@@ -43,6 +49,8 @@ interface AccountSummary {
   /** Default deal currency (ISO-4217). NOT NULL DEFAULT 'USD' in the
    *  DB (migration 021); narrowed to DEFAULT_CURRENCY when absent. */
   default_currency: string;
+  /** Per-role module deny-list (migration 037). `{}` = no restrictions. */
+  module_access: ModuleAccess;
 }
 
 interface AuthContextValue {
@@ -102,9 +110,46 @@ interface AuthContextValue {
   canEditSettings: boolean;
   /** True if the caller can send messages and edit operational data (agent+). */
   canSendMessages: boolean;
+  /** The account's per-role module matrix. `{}` until the account loads. */
+  moduleAccess: ModuleAccess;
+  /**
+   * True if the caller's role may open `module` (Settings → Access
+   * control). Owner is never restricted; while the account is still
+   * loading this is true so the sidebar doesn't flash empty.
+   */
+  canAccessModule: (module: ModuleId) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// Stable empty matrix so `moduleAccess` keeps one identity across
+// renders while the account row is still loading.
+const EMPTY_MODULE_ACCESS: ModuleAccess = {};
+
+/**
+ * Flatten an unknown thrown/returned error into something console.error
+ * renders usefully.
+ *
+ * Why this exists: logging `{ message: err.message, details: err.details,
+ * ... }` assumes a PostgrestError shape. When the failure is anything else
+ * — a fetch-level TypeError, an AuthError, an aborted request — every one
+ * of those fields is `undefined` and the dev overlay prints a bare `{}`,
+ * which tells you nothing about what actually broke. Falling back to the
+ * error's own keys plus its string form keeps the log honest whatever the
+ * shape turns out to be.
+ */
+function describeError(err: unknown): Record<string, unknown> {
+  if (!err || typeof err !== "object") return { raw: String(err) };
+  const e = err as Record<string, unknown>;
+  const described: Record<string, unknown> = {};
+  for (const field of ["message", "details", "hint", "code", "status", "name"]) {
+    if (e[field] !== undefined) described[field] = e[field];
+  }
+  if (Object.keys(described).length > 0) return described;
+  // Nothing recognizable — dump whatever the object does carry so the
+  // log points somewhere instead of rendering as `{}`.
+  return { raw: String(err), keys: Object.keys(e), value: e };
+}
 
 /**
  * AuthProvider — wrap this around the dashboard layout.
@@ -144,12 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) {
-        console.error("[AuthProvider] fetchProfile error:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
+        console.error("[AuthProvider] fetchProfile error:", describeError(error));
         lastFetchedUserIdRef.current = null;
         return;
       }
@@ -171,21 +211,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .from("accounts")
             // default_currency added in migration 021; narrowed to the
             // USD fallback below for older schemas where it reads null.
-            .select("id, name, default_currency")
+            // module_access added in 037; parseModuleAccess turns a
+            // missing/null value into "no restrictions".
+            .select("id, name, default_currency, module_access")
             .eq("id", data.account_id)
             .maybeSingle();
           if (accountErr) {
-            console.error("[AuthProvider] fetchAccount error:", {
-              message: accountErr.message,
-              details: accountErr.details,
-              hint: accountErr.hint,
-              code: accountErr.code,
-            });
+            console.error(
+              "[AuthProvider] fetchAccount error:",
+              describeError(accountErr),
+            );
           } else if (account) {
             accountRow = {
               id: account.id,
               name: account.name,
               default_currency: account.default_currency ?? DEFAULT_CURRENCY,
+              module_access: parseModuleAccess(account.module_access),
             };
           }
         }
@@ -333,6 +374,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [profile?.account_role, profile?.account_id]);
 
+  const moduleAccess = account?.module_access ?? EMPTY_MODULE_ACCESS;
+  const canAccessModule = useCallback(
+    (module: ModuleId) =>
+      canAccessModuleFor(moduleAccess, derived.accountRole, module),
+    [moduleAccess, derived.accountRole],
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -344,6 +392,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshProfile,
         account,
         defaultCurrency: account?.default_currency ?? DEFAULT_CURRENCY,
+        moduleAccess,
+        canAccessModule,
         ...derived,
       }}
     >
@@ -383,6 +433,8 @@ export function useAuth(): AuthContextValue {
       canManageMembers: false,
       canEditSettings: false,
       canSendMessages: false,
+      moduleAccess: EMPTY_MODULE_ACCESS,
+      canAccessModule: () => true,
     };
   }
   return ctx;

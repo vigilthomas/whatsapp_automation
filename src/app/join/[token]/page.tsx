@@ -246,11 +246,17 @@ export default function JoinPage() {
         <CardContent className="flex flex-col gap-2">
           {/* For server_error the failure is transient — the network
               flapped or the peek endpoint hiccupped. Try-again is
-              the right primary action; the "create account" /
-              "sign in" links stay as secondary options. Other
-              failure reasons (not_found / used / expired) are
-              terminal for this token, so no retry — just the
-              signup/sign-in escape hatches. */}
+              the right primary action, with sign-in as the secondary
+              option. Other failure reasons (not_found / used /
+              expired) are terminal for this token, so no retry —
+              just the sign-in escape hatch.
+
+              There is deliberately no "create an account" option
+              here: sign-ups are invite-only (see the /signup gate in
+              middleware.ts), and this branch only renders when the
+              token is unusable. Someone who lands here needs a fresh
+              invite, not a registration form that would bounce them
+              straight back to /login. */}
           {peek.reason === 'server_error' ? (
             <>
               <Button
@@ -259,27 +265,19 @@ export default function JoinPage() {
               >
                 Try again
               </Button>
-              <Link href="/signup">
-                <Button
-                  variant="outline"
-                  className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  Create a new account instead
-                </Button>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/signup">
-                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  Create a new account instead
-                </Button>
-              </Link>
               <Link href="/login">
                 <Button
                   variant="outline"
                   className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
+                  Sign in
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
                   Sign in
                 </Button>
               </Link>

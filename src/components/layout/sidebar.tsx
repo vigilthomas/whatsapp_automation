@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
@@ -10,14 +10,24 @@ import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import {
   Bell,
   Bot,
+  Building2,
+  ChevronDown,
+  Coins,
   Crown,
+  Database,
+  FileText,
   GitBranch,
   LayoutDashboard,
+  LockKeyhole,
   LogOut,
   MessageSquare,
   Radio,
   Settings,
   Shield,
+  ShieldCheck,
+  SlidersHorizontal,
+  Stethoscope,
+  Tags,
   User,
   UserCog,
   Users,
@@ -27,6 +37,8 @@ import {
   Zap,
 } from "lucide-react";
 import type { AccountRole } from "@/lib/auth/roles";
+import type { ModuleId } from "@/lib/auth/module-access";
+import { Logo } from "@/components/brand/logo";
 
 // Per-role chip metadata used in the sidebar's account strip + the
 // Members tab roster. Keeping this near both consumers in a single
@@ -87,18 +99,72 @@ interface NavItem {
    * Purely informational — doesn't affect routing or access.
    */
   beta?: boolean;
+  /**
+   * Module this row belongs to for Access control. Rows without one
+   * (dashboard, settings) are always shown.
+   */
+  module?: ModuleId;
+  /** Only render for roles that can manage members (admin+). */
+  adminOnly?: boolean;
+}
+
+/**
+ * A collapsible parent row with its own sub-items. It has no route of
+ * its own — clicking it only toggles the children — so it never reads
+ * as "active"; the active child does, and the group auto-expands to
+ * reveal it (see `openGroups` below). A group whose children are all
+ * hidden by access control disappears entirely.
+ */
+interface NavGroup {
+  id: string;
+  labelKey: string;
+  icon: typeof LayoutDashboard;
+  children: NavItem[];
 }
 
 const navItems: NavItem[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
-  { href: "/inbox", labelKey: "inbox", icon: MessageSquare },
-  { href: "/notifications", labelKey: "notifications", icon: Bell },
-  { href: "/contacts", labelKey: "contacts", icon: Users },
-  { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
-  { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },
-  { href: "/automations", labelKey: "automations", icon: Zap },
-  { href: "/flows", labelKey: "flows", icon: Workflow, beta: true },
-  { href: "/agents", labelKey: "aiAgents", icon: Bot },
+  { href: "/inbox", labelKey: "inbox", icon: MessageSquare, module: "inbox" },
+  { href: "/notifications", labelKey: "notifications", icon: Bell, module: "notifications" },
+];
+
+const navGroups: NavGroup[] = [
+  // Master data — the records everything else refers to.
+  {
+    id: "master",
+    labelKey: "master",
+    icon: Database,
+    children: [
+      { href: "/master/clinics", labelKey: "clinics", icon: Building2, module: "clinics" },
+      { href: "/master/clinic-admins", labelKey: "clinicAdmins", icon: ShieldCheck, module: "clinic-admins" },
+      { href: "/master/doctors", labelKey: "doctors", icon: Stethoscope, module: "doctors" },
+      { href: "/contacts", labelKey: "contacts", icon: Users, module: "contacts" },
+    ],
+  },
+  // Everything that *configures* how the account behaves — the
+  // reference panels that used to live under Settings → Workspace
+  // (still served from /master/<section>) plus the engines.
+  {
+    id: "controls",
+    labelKey: "controls",
+    icon: SlidersHorizontal,
+    children: [
+      { href: "/pipelines", labelKey: "pipelines", icon: GitBranch, module: "pipelines" },
+      { href: "/broadcasts", labelKey: "broadcasts", icon: Radio, module: "broadcasts" },
+      { href: "/automations", labelKey: "automations", icon: Zap, module: "automations" },
+      { href: "/flows", labelKey: "flows", icon: Workflow, beta: true, module: "flows" },
+      { href: "/agents", labelKey: "aiAgents", icon: Bot, module: "agents" },
+      { href: "/master/templates", labelKey: "templates", icon: FileText, module: "templates" },
+      { href: "/master/quick-replies", labelKey: "quickReplies", icon: Zap, module: "quick-replies" },
+      { href: "/master/fields", labelKey: "fields", icon: Tags, module: "fields" },
+      { href: "/master/deals", labelKey: "deals", icon: Coins, module: "deals" },
+    ],
+  },
+];
+
+// Rendered after the collapsible groups, before the divider.
+const afterGroupItems: NavItem[] = [
+  { href: "/access-control", labelKey: "accessControl", icon: LockKeyhole, adminOnly: true },
 ];
 
 const bottomNavItems = [
@@ -116,9 +182,52 @@ import { useTranslations } from "next-intl";
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
-  const { profile, profileLoading, account, accountRole, signOut } = useAuth();
+  const {
+    profile,
+    profileLoading,
+    account,
+    accountRole,
+    signOut,
+    canAccessModule,
+    canManageMembers,
+  } = useAuth();
   const totalUnread = useTotalUnread();
   const unreadNotifications = useUnreadNotifications();
+
+  const isItemActive = (href: string) =>
+    pathname === href ||
+    (href !== "/dashboard" && pathname.startsWith(href));
+
+  const isItemVisible = (item: NavItem) =>
+    (!item.module || canAccessModule(item.module)) &&
+    (!item.adminOnly || canManageMembers);
+
+  // Groups with their access-filtered children; a group with nothing
+  // left to show is dropped rather than rendered as an empty toggle.
+  const visibleGroups = navGroups
+    .map((g) => ({ ...g, children: g.children.filter(isItemVisible) }))
+    .filter((g) => g.children.length > 0);
+
+  // A group starts expanded whenever one of its children is the
+  // current page (otherwise the active row would be hidden), and
+  // collapsed on any other page. The user can still toggle it by
+  // hand; navigating into a child re-opens it so the active row is
+  // never out of sight.
+  const activeGroupId =
+    navGroups.find((g) => g.children.some((c) => isItemActive(c.href)))?.id ??
+    null;
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    activeGroupId ? { [activeGroupId]: true } : {},
+  );
+  useEffect(() => {
+    if (activeGroupId) {
+      setOpenGroups((prev) =>
+        prev[activeGroupId] ? prev : { ...prev, [activeGroupId]: true },
+      );
+    }
+  }, [activeGroupId]);
+  const toggleGroup = (id: string) =>
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   // Only surface the account-name strip when it actually carries
   // information. A solo user's personal account is named after them
   // (the 017 signup trigger seeds it from `full_name`), so showing it
@@ -188,9 +297,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             close button is hidden since the sidebar is always-visible. */}
         <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <MessageSquare className="h-4 w-4" />
-            </div>
+            <Logo className="h-8 w-8" title="" />
             <span className="text-sm font-semibold text-foreground">
               {t("title")}
             </span>
@@ -208,10 +315,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         {/* Main navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-1">
-            {navItems.map((item) => {
-              const isActive =
-                pathname === item.href ||
-                (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            {navItems.filter(isItemVisible).map((item) => {
+              const isActive = isItemActive(item.href);
 
               const showUnreadDot =
                 item.href === "/inbox" && totalUnread > 0 && !isActive;
@@ -267,6 +372,98 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               );
             })}
           </ul>
+
+          {/* Collapsible groups — a toggle row plus an indented sub-list. */}
+          {visibleGroups.map((group) => {
+            const isOpen = !!openGroups[group.id];
+            const childActive = group.id === activeGroupId;
+            const listId = `sidebar-group-${group.id}`;
+            return (
+              <ul key={group.id} className="mt-1 flex flex-col gap-1">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    aria-expanded={isOpen}
+                    aria-controls={listId}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:py-2",
+                      childActive
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <group.icon className="h-4 w-4" />
+                    <span className="flex-1 text-left">{t(group.labelKey)}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 transition-transform",
+                        isOpen ? "rotate-180" : "rotate-0",
+                      )}
+                    />
+                  </button>
+                  {isOpen && (
+                    <ul
+                      id={listId}
+                      className="mt-1 ml-4 flex flex-col gap-1 border-l border-border pl-2"
+                    >
+                      {group.children.map((item) => {
+                        const isActive = isItemActive(item.href);
+                        return (
+                          <li key={item.href}>
+                            <Link
+                              href={item.href}
+                              className={cn(
+                                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:py-2",
+                                isActive
+                                  ? "bg-primary/10 text-primary"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                              )}
+                            >
+                              <item.icon className="h-4 w-4" />
+                              <span className="flex-1">{t(item.labelKey)}</span>
+                              {item.beta && (
+                                <span
+                                  aria-label={t("beta")}
+                                  className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300"
+                                >
+                                  {t("beta")}
+                                </span>
+                              )}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </li>
+              </ul>
+            );
+          })}
+
+          {afterGroupItems.filter(isItemVisible).length > 0 && (
+            <ul className="mt-1 flex flex-col gap-1">
+              {afterGroupItems.filter(isItemVisible).map((item) => {
+                const isActive = isItemActive(item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:py-2",
+                        isActive
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span className="flex-1">{t(item.labelKey)}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
           <div className="my-4 border-t border-border" />
 

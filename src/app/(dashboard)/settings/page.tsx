@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -18,7 +18,9 @@ import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel'
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
+import { AccessControlPanel } from '@/components/settings/access-control-panel';
 import {
+  movedSectionHref,
   resolveSection,
   type SettingsSection,
 } from '@/components/settings/settings-sections';
@@ -52,7 +54,21 @@ function SettingsPageInner() {
   // resolve onto their new home; unknown/empty → the Overview landing.
   const section = resolveSection(searchParams.get('tab'));
 
+  // Some sections moved to their own routes (/master/<section>,
+  // /access-control). A legacy `?tab=` deep link (or an Overview tile)
+  // forwards there instead of rendering inline, so one URL owns each
+  // panel.
+  const movedHref = movedSectionHref(section);
+  useEffect(() => {
+    if (movedHref) router.replace(movedHref);
+  }, [movedHref, router]);
+
   const go = (next: SettingsSection) => {
+    const href = movedSectionHref(next);
+    if (href) {
+      router.push(href);
+      return;
+    }
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', next);
     router.replace(`/settings?${params.toString()}`, { scroll: false });
@@ -80,6 +96,7 @@ function SettingsPageInner() {
     fields: <FieldsAndTagsPanel />,
     deals: <DealsSettings />,
     members: <MembersTab />,
+    access: <AccessControlPanel />,
     api: <ApiKeysSettings />,
   };
 

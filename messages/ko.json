@@ -15,7 +15,17 @@
     "createAccount": "계정 만들기"
   },
   "Sidebar": {
-    "title": "WhatsApp용 CRM 템플릿",
+    "title": "Clinicoro",
+    "controls": "컨트롤",
+    "accessControl": "접근 제어",
+    "master": "마스터",
+    "clinics": "클리닉",
+    "clinicAdmins": "클리닉 관리자",
+    "doctors": "의사",
+    "templates": "템플릿",
+    "quickReplies": "빠른 답장",
+    "fields": "필드 및 태그",
+    "deals": "거래 및 통화",
     "dashboard": "대시보드",
     "inbox": "인박스",
     "notifications": "알림",
@@ -48,6 +58,10 @@
     "pipelines": "파이프라인",
     "broadcasts": "브로드캐스트",
     "automations": "자동화",
+    "master": "마스터",
+    "flows": "플로우",
+    "aiAgents": "AI 에이전트",
+    "accessControl": "접근 제어",
     "settings": "설정",
     "openMenu": "메뉴 열기",
     "openAccountMenu": "계정 메뉴 열기",
@@ -881,6 +895,7 @@
       "scheduleHint": "Cron 표현식 (예: 0 9 * * 1-5)",
       "active": "활성",
       "activeAria": "활성",
+      "delete": "삭제",
       "save": "저장",
       "saveDraft": "초안 저장",
       "untitled": "제목 없는 자동화",
@@ -1197,6 +1212,60 @@
       "tagNone": "태그 {mode} (선택된 태그 없음)"
     }
   },
+  "AccessControl": {
+    "pageTitle": "접근 제어",
+    "pageDesc": "각 역할이 열 수 있는 모듈을 선택하세요."
+  },
+  "Master": {
+    "pageTitle": "마스터",
+    "pageDesc": "Clinicoro의 나머지 기능이 기반으로 하는 참조 데이터입니다.",
+    "entities": {
+      "clinics": "클리닉",
+      "doctors": "의사",
+      "clinicAdmins": "클리닉 관리자"
+    },
+    "entitySingular": {
+      "clinics": "클리닉",
+      "doctors": "의사",
+      "clinicAdmins": "클리닉 관리자"
+    },
+    "entityDesc": {
+      "clinics": "이 워크스페이스가 관리하는 클리닉입니다. 의사와 클리닉 관리자는 클리닉에 연결됩니다.",
+      "doctors": "클리닉에서 진료하는 의료진입니다.",
+      "clinicAdmins": "클리닉 측 행정 담당자입니다."
+    },
+    "fields": {
+      "name": "이름",
+      "phone": "전화",
+      "email": "이메일",
+      "address": "주소",
+      "city": "도시",
+      "notes": "메모",
+      "isActive": "상태",
+      "clinic": "클리닉",
+      "speciality": "전문 분야",
+      "whatsappNumber": "WhatsApp 번호"
+    },
+    "add": "{entity} 추가",
+    "addTitle": "{entity} 추가",
+    "editTitle": "{entity} 편집",
+    "dialogDesc": "* 표시된 항목은 필수입니다.",
+    "empty": "아직 {entity}이(가) 없습니다. 추가하여 시작하세요.",
+    "noClinic": "— 클리닉 없음 —",
+    "active": "활성",
+    "inactive": "비활성",
+    "edit": "편집",
+    "delete": "삭제",
+    "cancel": "취소",
+    "create": "생성",
+    "saveChanges": "변경 사항 저장",
+    "created": "생성되었습니다.",
+    "updated": "업데이트되었습니다.",
+    "confirmDelete": "이 레코드를 삭제할까요? 되돌릴 수 없습니다.",
+    "loadFailed": "레코드를 불러오지 못했습니다.",
+    "saveFailed": "레코드를 저장하지 못했습니다.",
+    "deleteFailed": "레코드를 삭제하지 못했습니다."
+  },
   "Settings": {
     "pageTitle": "설정",
     "pageDesc": "계정과 워크스페이스에 관한 모든 것을 한곳에서 관리하세요. 관리할 섹션을 선택하세요.",
@@ -1274,7 +1343,7 @@
       "labelTooLong": "라벨은 {max}자 이하여야 합니다",
       "copied": "초대 링크가 복사되었습니다",
       "clipboardBlocked": "클립보드 접근이 차단되었습니다 — 링크를 직접 복사하세요",
-      "whatsappMessage": "이 링크(유효 기간 {expiresInDays}일)로 wacrm의 {accountName}에 참여하세요: {url}"
+      "whatsappMessage": "이 링크(유효 기간 {expiresInDays}일)로 Clinicoro의 {accountName}에 참여하세요: {url}"
     },
     "tagsAndFields": {
       "title": "필드 & 태그",
@@ -1394,8 +1463,8 @@
       "submitApproval": "승인 요청",
 
       "deleteDialogTitle": "템플릿을 삭제하시겠습니까?",
-      "deleteMetaDesc": "\"{name}\"이(가) Meta와 wacrm에서 삭제됩니다. 이 템플릿을 사용하는 활성 브로드캐스트는 다음 전송부터 실패하기 시작합니다. 되돌릴 수 없습니다.",
-      "deleteLocalDesc": "\"{name}\"이(가) wacrm에서 삭제됩니다. Meta에 제출된 적이 없으므로 별도의 원격 정리가 필요하지 않습니다.",
+      "deleteMetaDesc": "\"{name}\"이(가) Meta와 Clinicoro에서 삭제됩니다. 이 템플릿을 사용하는 활성 브로드캐스트는 다음 전송부터 실패하기 시작합니다. 되돌릴 수 없습니다.",
+      "deleteLocalDesc": "\"{name}\"이(가) Clinicoro에서 삭제됩니다. Meta에 제출된 적이 없으므로 별도의 원격 정리가 필요하지 않습니다.",
       "deleting": "삭제 중…",
       "delete": "삭제",
 
@@ -1437,7 +1506,7 @@
       "notConnected": "연결되지 않음",
       "connectedDesc": "액세스 토큰으로 Meta 인증이 완료되었습니다. 웹훅이 실제로 연결되었는지는 아래 등록 상태를 확인하세요.",
       "notConnectedDesc": "아래에서 Meta API 자격 증명을 설정해 WhatsApp 비즈니스 계정을 연결하세요.",
-      "registered": "등록됨 — Meta가 wacrm으로 이벤트를 전달합니다",
+      "registered": "등록됨 — Meta가 Clinicoro로 이벤트를 전달합니다",
       "notRegistered": "등록되지 않음 — Meta가 이벤트를 전달하지 않습니다",
       "verifyWithMeta": "Meta로 확인",
       "subscribedSince": "{date}부터 구독 중입니다. 이벤트가 더 이상 도착하지 않으면 Meta로 확인을 클릭하세요.",
@@ -1461,7 +1530,7 @@
       "twoStepPin": "2단계 인증 PIN",
       "optional": "(선택)",
       "pinPlaceholder": "Meta WhatsApp 관리자에서 발급받은 6자리 PIN",
-      "pinHint": "프로덕션 번호의 수신 메시지를 연결하려면 필요합니다. Meta 비즈니스 관리자 → WhatsApp 계정 → 전화번호 → 2단계 인증에서 설정한 뒤 여기에 붙여넣으면 wacrm이 해당 번호를 구독할 수 있습니다 — 그렇지 않으면 Meta는 마지막으로 이 번호를 등록한 앱으로 수신 이벤트를 보냅니다(공유 WABA 하의 두 번째 번호에서 흔히 발생하는 증상입니다). Meta 테스트 번호는 PIN이 없고 이미 등록되어 있으므로 이 필드를 비워두세요. 비워두면 기존 등록도 그대로 유지됩니다.",
+      "pinHint": "프로덕션 번호의 수신 메시지를 연결하려면 필요합니다. Meta 비즈니스 관리자 → WhatsApp 계정 → 전화번호 → 2단계 인증에서 설정한 뒤 여기에 붙여넣으면 Clinicoro가 해당 번호를 구독할 수 있습니다 — 그렇지 않으면 Meta는 마지막으로 이 번호를 등록한 앱으로 수신 이벤트를 보냅니다(공유 WABA 하의 두 번째 번호에서 흔히 발생하는 증상입니다). Meta 테스트 번호는 PIN이 없고 이미 등록되어 있으므로 이 필드를 비워두세요. 비워두면 기존 등록도 그대로 유지됩니다.",
       "webhookTitle": "웹훅 설정",
       "webhookDesc": "Meta 앱 대시보드의 웹훅 콜백으로 이 URL을 사용하세요.",
       "webhookUrl": "웹훅 콜백 URL",
@@ -1482,14 +1551,14 @@
       "step2_3": "설정 마법사를 따라 비즈니스를 연결",
       "step3": "API 자격 증명 가져오기",
       "step3_1": "WhatsApp > API Setup으로 이동",
-      "step3_2": "<strong class=\"text-foreground\">전화번호 ID</strong> 복사",
-      "step3_3": "<strong class=\"text-foreground\">WhatsApp 비즈니스 계정 ID</strong> 복사",
-      "step3_4": "Business Settings > System Users에서 <strong class=\"text-foreground\">영구 액세스 토큰</strong> 생성",
+      "step3_2": "<strong>전화번호 ID</strong> 복사",
+      "step3_3": "<strong>WhatsApp 비즈니스 계정 ID</strong> 복사",
+      "step3_4": "Business Settings > System Users에서 <strong>영구 액세스 토큰</strong> 생성",
       "step4": "웹훅 설정",
       "step4_1": "WhatsApp > Configuration으로 이동",
       "step4_2": "웹훅 섹션에서 \"Edit\" 클릭",
-      "step4_3": "위의 <strong class=\"text-foreground\">웹훅 콜백 URL</strong>을 붙여넣기",
-      "step4_4": "여기서 설정한 것과 동일한 <strong class=\"text-foreground\">인증 토큰</strong>을 입력",
+      "step4_3": "위의 <strong>웹훅 콜백 URL</strong>을 붙여넣기",
+      "step4_4": "여기서 설정한 것과 동일한 <strong>인증 토큰</strong>을 입력",
       "step4_5": "\"messages\" 웹훅 필드를 구독",
       "metaDocs": "Meta WhatsApp API 문서"
     },
@@ -1503,6 +1572,7 @@
       "fields": "필드 & 태그",
       "deals": "딜 & 통화",
       "members": "팀원",
+      "access": "접근 제어",
       "api": "API 키"
     },
     "groups": {
@@ -1613,6 +1683,37 @@
       "done": "완료",
       "networkError": "서버에 연결할 수 없습니다"
     },
+    "access": {
+      "title": "접근 제어",
+      "description": "각 역할이 열 수 있는 모듈을 선택하세요. 소유자는 항상 모든 모듈을 볼 수 있습니다.",
+      "matrixTitle": "역할별 모듈 접근",
+      "matrixDesc": "체크를 해제하면 해당 역할의 모든 구성원에게 그 모듈이 사이드바에서 숨겨지고, 직접 열면 대시보드로 돌아갑니다. 데이터 권한(전송, 편집, 구성원 관리)은 여전히 역할 자체를 따릅니다.",
+      "moduleColumn": "모듈",
+      "cellAria": "{role}이(가) {module}을(를) 열 수 있음",
+      "ownerNote": "소유자는 제한되지 않으므로 잠금을 해제할 수 있는 사람이 항상 있습니다.",
+      "adminOnlyHint": "계정 관리자만 모듈 접근을 변경할 수 있습니다.",
+      "save": "변경 사항 저장",
+      "saving": "저장 중...",
+      "saveFailed": "접근 설정 저장에 실패했습니다",
+      "saveSuccess": "접근 설정이 업데이트되었습니다",
+      "modules": {
+        "inbox": "인박스",
+        "notifications": "알림",
+        "contacts": "연락처",
+        "clinics": "클리닉",
+        "doctors": "의사",
+        "clinic-admins": "클리닉 관리자",
+        "templates": "템플릿",
+        "quick-replies": "빠른 답장",
+        "fields": "필드 및 태그",
+        "deals": "거래 및 통화",
+        "pipelines": "파이프라인",
+        "broadcasts": "브로드캐스트",
+        "automations": "자동화",
+        "flows": "플로우",
+        "agents": "AI 에이전트"
+      }
+    },
     "deals": {
       "title": "딜 & 통화",
       "description": "새 딜과 파이프라인, 대시보드 합계에 사용되는 통화입니다.",
@@ -1627,7 +1728,7 @@
     },
     "aiConfig": {
       "title": "에이전트 설정",
-      "description": "직접 발급받은 OpenAI 또는 Anthropic 키를 사용하세요. wacrm은 회원님의 키로 공급자에 직접 요청하므로 좌석당 AI 비용이 없고 데이터도 온전히 회원님의 것입니다. 인박스의 AI 답장 초안, 자동 응답 봇, 플레이그라운드에 사용됩니다.",
+      "description": "직접 발급받은 OpenAI 또는 Anthropic 키를 사용하세요. Clinicoro는 회원님의 키로 공급자에 직접 요청하므로 좌석당 AI 비용이 없고 데이터도 온전히 회원님의 것입니다. 인박스의 AI 답장 초안, 자동 응답 봇, 플레이그라운드에 사용됩니다.",
       "adminOnlyConfig": "관리자와 소유자만 AI 설정을 변경할 수 있습니다.",
       "loadFailed": "AI 설정을 불러오지 못했습니다",
       "providerAndKey": "공급자 & 키",

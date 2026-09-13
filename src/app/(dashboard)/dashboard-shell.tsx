@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { moduleForPath } from "@/lib/auth/module-access";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
@@ -10,6 +11,27 @@ import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
 // Auth-gated dashboard shell. Extracted from the layout so the layout
 // itself can stay a server component and export metadata (noindex) —
 // client components can't export Next's metadata object.
+
+// Settings → Access control: a role denied a module gets its sidebar
+// entry hidden, but a bookmarked or hand-typed URL still resolves the
+// route — so bounce it to /dashboard. Runs only once the profile has
+// settled; before that `canAccessModule` answers "yes" for everything
+// and we'd otherwise flash the page before the redirect.
+function ModuleGuard({ children }: { children: React.ReactNode }) {
+  const { profileLoading, canAccessModule } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const gated = moduleForPath(pathname);
+  const denied = !profileLoading && gated !== null && !canAccessModule(gated);
+
+  useEffect(() => {
+    if (denied) router.replace("/dashboard");
+  }, [denied, router]);
+
+  if (denied) return null;
+  return <>{children}</>;
+}
 
 function DashboardShellInner({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -48,7 +70,9 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onOpenSidebar={() => setSidebarOpen(true)} />
         {/* Thinner horizontal padding on mobile so cards have room to breathe. */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <ModuleGuard>{children}</ModuleGuard>
+        </main>
       </div>
     </div>
   );

@@ -69,8 +69,30 @@ export async function middleware(request: NextRequest) {
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
+  // Sign-ups are invite-only. `/signup` is still reachable, but only
+  // when it carries the `?invite=<token>` that `/join/<token>` hands
+  // it — that's the path an invited teammate takes, and it must keep
+  // working. A bare visit is public self-registration, which this
+  // deployment doesn't offer, so bounce it to /login.
+  //
+  // Note this also closes the door on a brand-new self-host's first
+  // owner registering through the UI: seed that account directly in
+  // Supabase (or lift this block temporarily) before inviting anyone.
+  // The token is not validated here — an invalid or expired one still
+  // fails at the /join redeem step, which is where that error belongs.
+  if (
+    !user &&
+    request.nextUrl.pathname === '/signup' &&
+    !request.nextUrl.searchParams.get('invite')
+  ) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.search = ''
+    return withRefreshedCookies(NextResponse.redirect(url))
+  }
+
   // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings']
+  const protectedPaths = ['/dashboard', '/inbox', '/notifications', '/contacts', '/master', '/pipelines', '/broadcasts', '/automations', '/flows', '/agents', '/access-control', '/settings']
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

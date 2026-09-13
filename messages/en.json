@@ -15,7 +15,17 @@
     "createAccount": "Create account"
   },
   "Sidebar": {
-    "title": "CRM Template for WhatsApp",
+    "title": "Clinicoro",
+    "controls": "Controls",
+    "accessControl": "Access control",
+    "master": "Master",
+    "clinics": "Clinics",
+    "clinicAdmins": "Clinic admins",
+    "doctors": "Doctors",
+    "templates": "Templates",
+    "quickReplies": "Quick replies",
+    "fields": "Fields & tags",
+    "deals": "Deals & currency",
     "dashboard": "Dashboard",
     "inbox": "Inbox",
     "notifications": "Notifications",
@@ -48,6 +58,10 @@
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
+    "master": "Master",
+    "flows": "Flows",
+    "aiAgents": "AI Agents",
+    "accessControl": "Access control",
     "settings": "Settings",
     "openMenu": "Open menu",
     "openAccountMenu": "Open account menu",
@@ -882,6 +896,7 @@
       "scheduleHint": "Cron expression (e.g. 0 9 * * 1-5)",
       "active": "Active",
       "activeAria": "Active",
+      "delete": "Delete",
       "save": "Save",
       "saveDraft": "Save Draft",
       "untitled": "Untitled automation",
@@ -1198,6 +1213,60 @@
       "tagNone": "{mode} tag (none picked)"
     }
   },
+  "AccessControl": {
+    "pageTitle": "Access control",
+    "pageDesc": "Choose which modules each role can open."
+  },
+  "Master": {
+    "pageTitle": "Master",
+    "pageDesc": "Reference data the rest of Clinicoro is built on.",
+    "entities": {
+      "clinics": "Clinics",
+      "doctors": "Doctors",
+      "clinicAdmins": "Clinic admins"
+    },
+    "entitySingular": {
+      "clinics": "clinic",
+      "doctors": "doctor",
+      "clinicAdmins": "clinic admin"
+    },
+    "entityDesc": {
+      "clinics": "The clinics this workspace serves. Doctors and clinic admins are linked to a clinic.",
+      "doctors": "Practitioners who consult at your clinics.",
+      "clinicAdmins": "Clinic-side administrative contacts."
+    },
+    "fields": {
+      "name": "Name",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address",
+      "city": "City",
+      "notes": "Notes",
+      "isActive": "Status",
+      "clinic": "Clinic",
+      "speciality": "Speciality",
+      "whatsappNumber": "WhatsApp number"
+    },
+    "add": "Add {entity}",
+    "addTitle": "Add {entity}",
+    "editTitle": "Edit {entity}",
+    "dialogDesc": "Fields marked * are required.",
+    "empty": "No {entity} yet. Add one to get started.",
+    "noClinic": "— No clinic —",
+    "active": "Active",
+    "inactive": "Inactive",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "create": "Create",
+    "saveChanges": "Save changes",
+    "created": "Created.",
+    "updated": "Updated.",
+    "confirmDelete": "Delete this record? This can't be undone.",
+    "loadFailed": "Couldn't load records.",
+    "saveFailed": "Couldn't save the record.",
+    "deleteFailed": "Couldn't delete the record."
+  },
   "Settings": {
     "pageTitle": "Settings",
     "pageDesc": "Everything in one place — your account and your workspace. Pick a section to manage it.",
@@ -1275,7 +1344,7 @@
       "labelTooLong": "Label must be {max} characters or fewer",
       "copied": "Invite link copied",
       "clipboardBlocked": "Clipboard blocked — copy the link manually",
-      "whatsappMessage": "Join {accountName} on wacrm using this link (valid for {expiresInDays} days): {url}"
+      "whatsappMessage": "Join {accountName} on Clinicoro using this link (valid for {expiresInDays} days): {url}"
     },
     "tagsAndFields": {
       "title": "Fields & tags",
@@ -1395,8 +1464,8 @@
       "submitApproval": "Submit for Approval",
       
       "deleteDialogTitle": "Delete template?",
-      "deleteMetaDesc": "\"{name}\" will be deleted from Meta and from wacrm. Active broadcasts using this template will start failing on their next send. This can't be undone.",
-      "deleteLocalDesc": "\"{name}\" will be deleted from wacrm. It was never submitted to Meta, so no remote cleanup is needed.",
+      "deleteMetaDesc": "\"{name}\" will be deleted from Meta and from Clinicoro. Active broadcasts using this template will start failing on their next send. This can't be undone.",
+      "deleteLocalDesc": "\"{name}\" will be deleted from Clinicoro. It was never submitted to Meta, so no remote cleanup is needed.",
       "deleting": "Deleting…",
       "delete": "Delete",
       
@@ -1438,7 +1507,7 @@
       "notConnected": "Not Connected",
       "connectedDesc": "Your access token authenticates with Meta. See Registration status below for whether webhooks are actually wired.",
       "notConnectedDesc": "Configure your Meta API credentials below to connect your WhatsApp Business account.",
-      "registered": "Registered — Meta will deliver events to wacrm",
+      "registered": "Registered — Meta will deliver events to Clinicoro",
       "notRegistered": "Not registered — Meta will not deliver events",
       "verifyWithMeta": "Verify with Meta",
       "subscribedSince": "Subscribed since {date}. Click Verify with Meta if events stop arriving.",
@@ -1462,7 +1531,7 @@
       "twoStepPin": "Two-step verification PIN",
       "optional": "(optional)",
       "pinPlaceholder": "6-digit PIN from Meta WhatsApp Manager",
-      "pinHint": "Needed only to wire inbound messages for a production number. Set it in Meta Business Manager → WhatsApp Accounts → Phone Numbers → Two-step verification, then paste it here so wacrm can subscribe the number — otherwise Meta routes inbound events to whichever app last claimed it (the symptom that hits second numbers under a shared WABA). Meta test numbers have no PIN and are pre-registered — leave this blank for them. Leaving it blank also keeps an existing registration untouched.",
+      "pinHint": "Needed only to wire inbound messages for a production number. Set it in Meta Business Manager → WhatsApp Accounts → Phone Numbers → Two-step verification, then paste it here so Clinicoro can subscribe the number — otherwise Meta routes inbound events to whichever app last claimed it (the symptom that hits second numbers under a shared WABA). Meta test numbers have no PIN and are pre-registered — leave this blank for them. Leaving it blank also keeps an existing registration untouched.",
       "webhookTitle": "Webhook Configuration",
       "webhookDesc": "Use this URL as your webhook callback in the Meta App Dashboard.",
       "webhookUrl": "Webhook Callback URL",
@@ -1483,14 +1552,14 @@
       "step2_3": "Follow the setup wizard to link your business",
       "step3": "Get API Credentials",
       "step3_1": "Go to WhatsApp > API Setup",
-      "step3_2": "Copy your <strong class=\"text-foreground\">Phone Number ID</strong>",
-      "step3_3": "Copy your <strong class=\"text-foreground\">WhatsApp Business Account ID</strong>",
-      "step3_4": "Generate a <strong class=\"text-foreground\">Permanent Access Token</strong> from Business Settings > System Users",
+      "step3_2": "Copy your <strong>Phone Number ID</strong>",
+      "step3_3": "Copy your <strong>WhatsApp Business Account ID</strong>",
+      "step3_4": "Generate a <strong>Permanent Access Token</strong> from Business Settings > System Users",
       "step4": "Configure Webhooks",
       "step4_1": "Go to WhatsApp > Configuration",
       "step4_2": "Click \"Edit\" on the Webhook section",
-      "step4_3": "Paste the <strong class=\"text-foreground\">Webhook Callback URL</strong> from above",
-      "step4_4": "Enter the same <strong class=\"text-foreground\">Verify Token</strong> you set here",
+      "step4_3": "Paste the <strong>Webhook Callback URL</strong> from above",
+      "step4_4": "Enter the same <strong>Verify Token</strong> you set here",
       "step4_5": "Subscribe to \"messages\" webhook field",
       "metaDocs": "Meta WhatsApp API Documentation"
     },
@@ -1505,6 +1574,7 @@
       "fields": "Fields & tags",
       "deals": "Deals & currency",
       "members": "Team members",
+      "access": "Access control",
       "api": "API keys"
     },
     "groups": {
@@ -1615,6 +1685,37 @@
       "done": "Done",
       "networkError": "Could not reach the server"
     },
+    "access": {
+      "title": "Access control",
+      "description": "Choose which modules each role can open. Owners always see everything.",
+      "matrixTitle": "Module access by role",
+      "matrixDesc": "Unticking a box hides that module from the sidebar for everyone with that role and sends them back to the dashboard if they open it directly. Data permissions (who can send, edit, or manage members) still follow the role itself.",
+      "moduleColumn": "Module",
+      "cellAria": "{role} can open {module}",
+      "ownerNote": "Owners are never restricted, so there is always someone who can undo a lock-out.",
+      "adminOnlyHint": "Only account admins can change module access.",
+      "save": "Save changes",
+      "saving": "Saving...",
+      "saveFailed": "Failed to save access settings",
+      "saveSuccess": "Access settings updated",
+      "modules": {
+        "inbox": "Inbox",
+        "notifications": "Notifications",
+        "contacts": "Contacts",
+        "clinics": "Clinics",
+        "doctors": "Doctors",
+        "clinic-admins": "Clinic admins",
+        "templates": "Templates",
+        "quick-replies": "Quick replies",
+        "fields": "Fields & tags",
+        "deals": "Deals & currency",
+        "pipelines": "Pipelines",
+        "broadcasts": "Broadcasts",
+        "automations": "Automations",
+        "flows": "Flows",
+        "agents": "AI Agents"
+      }
+    },
     "deals": {
       "title": "Deals & currency",
       "description": "The currency used for new deals and for pipeline and dashboard totals.",
@@ -1629,7 +1730,7 @@
     },
     "aiConfig": {
       "title": "Agent setup",
-      "description": "Bring your own OpenAI or Anthropic key. wacrm calls the provider directly with your key — no per-seat AI fees, and your data stays yours. This powers AI-drafted replies in the inbox, the auto-reply bot, and the Playground.",
+      "description": "Bring your own OpenAI or Anthropic key. Clinicoro calls the provider directly with your key — no per-seat AI fees, and your data stays yours. This powers AI-drafted replies in the inbox, the auto-reply bot, and the Playground.",
       "adminOnlyConfig": "Only admins and owners can change the AI configuration.",
       "loadFailed": "Failed to load AI configuration",
       "providerAndKey": "Provider & key",
