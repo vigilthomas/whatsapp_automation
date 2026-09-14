@@ -15,7 +15,6 @@
     "createAccount": "Create account"
   },
   "Sidebar": {
-    "title": "Clinicoro",
     "tagline": "Your clinic's AI receptionist",
     "aiReceptionist": "AI Receptionist",
     "aiOnline": "Online",
@@ -213,15 +212,16 @@
   },
   "Inbox": {
     "title": "WhatsApp",
-    "filterAi": "AI replying",
-    "filterStaff": "Needs staff",
-    "status": "Status",
-    "aiReplying": "AI replying",
     "state": {"ai": "AI replying", "staff": "Needs staff", "assigned": "Assigned", "pending": "Waiting", "closed": "Closed", "open": "Open"},
     "page": {
       "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account."
     },
     "conversationList": {
+      "title": "WhatsApp",
+      "filterAi": "AI replying",
+      "filterStaff": "Needs staff",
+      "status": "Status",
+      "state": {"ai": "AI replying", "staff": "Needs staff", "assigned": "Assigned", "pending": "Waiting", "closed": "Closed", "open": "Open"},
       "searchPlaceholder": "Search conversations...",
       "filterAll": "All",
       "filterUnread": "Unread",
@@ -237,6 +237,7 @@
       "unknown": "Unknown"
     },
     "messageThread": {
+      "aiReplying": "AI replying",
       "backToConversations": "Back to conversations",
       "hideContactPanel": "Hide contact panel",
       "showContactPanel": "Show contact panel",
