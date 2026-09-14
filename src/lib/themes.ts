@@ -14,6 +14,7 @@
  */
 
 export const THEME_IDS = [
+  "clinicoro",
   "violet",
   "emerald",
   "cobalt",
@@ -23,7 +24,7 @@ export const THEME_IDS = [
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
-export const DEFAULT_THEME: ThemeId = "violet";
+export const DEFAULT_THEME: ThemeId = "clinicoro";
 
 export const STORAGE_KEY = "wacrm.theme";
 
@@ -43,9 +44,11 @@ export const MODES = ["light", "dark"] as const;
 
 export type Mode = (typeof MODES)[number];
 
-export const DEFAULT_MODE: Mode = "dark";
+export const DEFAULT_MODE: Mode = "light";
 
-export const MODE_STORAGE_KEY = "wacrm.mode";
+// Bumped to v2 with the Clinicoro redesign so browsers that had saved the
+// old dark default pick up the new light default once.
+export const MODE_STORAGE_KEY = "wacrm.mode.v2";
 
 export function isMode(value: unknown): value is Mode {
   return (
@@ -67,6 +70,12 @@ export interface ThemeMeta {
 }
 
 export const THEMES: ReadonlyArray<ThemeMeta> = [
+  {
+    id: "clinicoro",
+    name: "Clinicoro",
+    tagline: "The clinic default — navy actions, teal accents, mint tints.",
+    swatch: "#0e9f9a",
+  },
   {
     id: "violet",
     name: "Violet",

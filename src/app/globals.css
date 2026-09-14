@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-sans), "Segoe UI", system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading), var(--font-sans), system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,6 +48,26 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-2: var(--primary-soft-2);
+  /* Semantic status pairs from the Clinicoro reference (badge / slot /
+   * icon-box tints). Exposed as bg-success-bg / text-success-fg etc. */
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-fg: var(--warn-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-neutral-fg: var(--neutral-fg);
+  /* Brand extras the redesigned chrome leans on directly. */
+  --color-navy: var(--navy);
+  --color-teal: var(--teal);
+  --color-teal-700: var(--teal-700);
+  --color-mint: var(--mint);
+  --color-sunken: var(--sunken);
+  --shadow-card: var(--sh-sm);
+  --shadow-float: var(--sh-md);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -114,40 +134,81 @@ html[data-mode="dark"] {
   --sidebar-accent: oklch(0.22 0.01 260);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.28 0.01 260);
+  --success-bg: oklch(0.3 0.05 175 / 0.5); --success-fg: oklch(0.8 0.12 175);
+  --info-bg: oklch(0.3 0.06 275 / 0.5);    --info-fg: oklch(0.8 0.12 275);
+  --warn-bg: oklch(0.32 0.06 70 / 0.5);    --warn-fg: oklch(0.82 0.14 80);
+  --danger-bg: oklch(0.32 0.1 20 / 0.5);   --danger-fg: oklch(0.78 0.16 20);
+  --neutral-bg: oklch(0.25 0.01 260);      --neutral-fg: oklch(0.72 0.01 260);
+  --navy: #0b2740; --teal: #0e9f9a; --teal-700: #4fd1c9; --mint: oklch(0.3 0.05 175 / 0.5); --sunken: oklch(0.22 0.01 260);
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-md: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
+/* Light mode carries the Clinicoro reference palette verbatim
+ * (public/Main-html): cool-grey ground, white cards, ink text. */
 html[data-mode="light"] {
-  --background: oklch(0.99 0.002 260);
-  --foreground: oklch(0.21 0.01 260);
-  --card: oklch(1 0 0);
-  --card-2: oklch(0.985 0.002 260);
-  --card-foreground: oklch(0.21 0.01 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.01 260);
-  --secondary: oklch(0.967 0.003 260);
-  --secondary-foreground: oklch(0.25 0.01 260);
-  --muted: oklch(0.967 0.003 260);
-  --muted-foreground: oklch(0.52 0.015 260);
-  --accent: oklch(0.96 0.004 260);
-  --accent-foreground: oklch(0.25 0.01 260);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0.004 260);
-  --input: oklch(0.922 0.004 260);
-  --chart-2: oklch(0.6 0.1 260);
-  --chart-3: oklch(0.7 0.06 260);
-  --chart-4: oklch(0.8 0.04 260);
-  --chart-5: oklch(0.87 0.03 260);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.002 260);
-  --sidebar-foreground: oklch(0.21 0.01 260);
-  --sidebar-accent: oklch(0.96 0.004 260);
-  --sidebar-accent-foreground: oklch(0.25 0.01 260);
-  --sidebar-border: oklch(0.922 0.004 260);
+  --background: #f4f8fa;
+  --foreground: #172b3a;
+  --card: #ffffff;
+  --card-2: #fafcfd;
+  --card-foreground: #172b3a;
+  --popover: #ffffff;
+  --popover-foreground: #172b3a;
+  --secondary: #eef3f6;
+  --secondary-foreground: #172b3a;
+  --muted: #eef3f6;
+  --muted-foreground: #627485;
+  --accent: #eef3f6;
+  --accent-foreground: #172b3a;
+  --destructive: #b4232b;
+  --border: #e3eaef;
+  --input: #d5dfe6;
+  --chart-2: #6b7be0;
+  --chart-3: #d9776a;
+  --chart-4: #b9e3dd;
+  --chart-5: #dce4ea;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #627485;
+  --sidebar-accent: #eef3f6;
+  --sidebar-accent-foreground: #172b3a;
+  --sidebar-border: #e3eaef;
+  --success-bg: #e7f6f3; --success-fg: #0b7a76;
+  --info-bg: #eef0fc;    --info-fg: #3b4fc4;
+  --warn-bg: #fdf3e2;    --warn-fg: #8a5300;
+  --danger-bg: #fdeced;  --danger-fg: #b4232b;
+  --neutral-bg: #eef2f5; --neutral-fg: #4b6478;
+  --navy: #0b2740; --teal: #0e9f9a; --teal-700: #0b7a76; --mint: #e7f6f3; --sunken: #eef3f6;
+  --sh-sm: 0 1px 2px rgba(11, 39, 64, 0.05), 0 2px 8px rgba(11, 39, 64, 0.05);
+  --sh-md: 0 2px 4px rgba(11, 39, 64, 0.05), 0 8px 24px rgba(11, 39, 64, 0.08);
 }
 
 /* ---- ACCENT: primary color ---- */
 
+/* Clinicoro (default): navy actions, teal highlights, mint tints.
+ * Primary = navy for buttons/CTAs (`.btn.primary` in the reference);
+ * ring / chart-1 / sidebar-primary = teal for focus and accents. */
 :root,
+html[data-theme="clinicoro"] {
+  --primary: #0b2740;
+  --primary-foreground: #ffffff;
+  --primary-hover: #143a5c;
+  --primary-soft: #e7f6f3;
+  --primary-soft-2: #cdede9;
+  --ring: #0e9f9a;
+  --chart-1: #0e9f9a;
+  --sidebar-primary: #0e9f9a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-ring: #0e9f9a;
+}
+html[data-theme="clinicoro"][data-mode="dark"] {
+  --primary: #0e9f9a;
+  --primary-foreground: #06201f;
+  --primary-hover: #12b5af;
+  --primary-soft: oklch(0.62 0.12 180 / 0.14);
+  --primary-soft-2: oklch(0.62 0.12 180 / 0.24);
+}
+
 html[data-theme="violet"] {
   --primary: oklch(0.526 0.247 293);
   --primary-foreground: oklch(0.985 0 0);
@@ -227,4 +288,23 @@ html[data-theme="rose"] {
   html {
     @apply font-sans;
   }
+  h1, h2, h3, h4 {
+    @apply font-heading;
+  }
+}
+
+/* Reference-only motion bits used by the AI receptionist status card. */
+@keyframes clinicoro-pulse {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.ai-pulse { position: relative; }
+.ai-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: var(--teal);
+  opacity: 0.35;
+  animation: clinicoro-pulse 1.8s ease-out infinite;
 }
