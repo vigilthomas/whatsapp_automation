@@ -315,7 +315,10 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
           // Default ON: the column is NOT NULL DEFAULT TRUE, but a row
           // read before migration 039 lands would have it undefined,
           // and losing attachments is the failure mode worth avoiding.
-          config.mirror_inbound_media !== false
+          config.mirror_inbound_media !== false,
+          // Lets the AI auto-reply resolve the clinic bound to this
+          // number and take the tool-calling receptionist path.
+          phoneNumberId
         )
       }
     }
@@ -586,7 +589,10 @@ async function processMessage(
   accessToken: string,
   // Per-account opt-out for the inbound-media mirror (migration 039).
   // See parseMessageContent for what it turns off.
-  mirrorMedia: boolean
+  mirrorMedia: boolean,
+  // Meta phone_number_id the inbound arrived on. Forwarded to the AI
+  // auto-reply so it can resolve a bound clinic (clinic AI gateway).
+  phoneNumberId?: string
 ) {
   const senderPhone = normalizePhone(message.from)
   const contactName = contact.profile.name
@@ -877,6 +883,7 @@ async function processMessage(
       conversationId: conversation.id,
       contactId: contactRecord.id,
       configOwnerUserId,
+      phoneNumberId,
     })
   }
 
