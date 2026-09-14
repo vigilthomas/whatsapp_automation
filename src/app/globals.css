@@ -2,7 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* `dark:` utilities follow the app's mode attribute (see THEMING below),
+ * not a `.dark` class — the boot script and ThemeProvider only ever set
+ * `html[data-mode]`. */
+@custom-variant dark (&:where(html[data-mode="dark"], html[data-mode="dark"] *));
 
 @theme inline {
   --color-background: var(--background);

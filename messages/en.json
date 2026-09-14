@@ -15,6 +15,7 @@
     "createAccount": "Create account"
   },
   "Sidebar": {
+    "title": "Clinicoro",
     "tagline": "Your clinic's AI receptionist",
     "aiReceptionist": "AI Receptionist",
     "aiOnline": "Online",

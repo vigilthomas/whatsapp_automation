@@ -26,7 +26,9 @@ export type ThemeId = (typeof THEME_IDS)[number];
 
 export const DEFAULT_THEME: ThemeId = "clinicoro";
 
-export const STORAGE_KEY = "wacrm.theme";
+// v2: reset once with the Clinicoro redesign so saved accents from the old
+// palette (violet/rose/…) don't override the new brand default.
+export const STORAGE_KEY = "wacrm.theme.v2";
 
 /**
  * MODE — the light/dark dimension, orthogonal to the accent theme.

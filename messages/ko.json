@@ -15,6 +15,7 @@
     "createAccount": "계정 만들기"
   },
   "Sidebar": {
+    "title": "Clinicoro",
     "tagline": "클리닉의 AI 리셉셔니스트",
     "aiReceptionist": "AI 리셉셔니스트",
     "aiOnline": "온라인",
