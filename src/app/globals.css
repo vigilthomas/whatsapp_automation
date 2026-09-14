@@ -106,42 +106,45 @@
 
 /* ---- MODE: neutral surfaces ---- */
 
+/* Dark mode is the same Clinicoro system on deep-navy surfaces: the
+ * brand navy becomes the ground, cards lift one step, teal stays the
+ * accent and the status tints are translucent so they sit on any card. */
 :root,
 html[data-mode="dark"] {
-  --background: oklch(0.13 0.01 260);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.18 0.01 260);
-  --card-2: oklch(0.205 0.01 260);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.18 0.01 260);
-  --popover-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.22 0.01 260);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.22 0.01 260);
-  --muted-foreground: oklch(0.65 0.01 260);
-  --accent: oklch(0.22 0.01 260);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.28 0.01 260);
-  --input: oklch(0.28 0.01 260);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.16 0.01 260);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.22 0.01 260);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.28 0.01 260);
-  --success-bg: oklch(0.3 0.05 175 / 0.5); --success-fg: oklch(0.8 0.12 175);
-  --info-bg: oklch(0.3 0.06 275 / 0.5);    --info-fg: oklch(0.8 0.12 275);
-  --warn-bg: oklch(0.32 0.06 70 / 0.5);    --warn-fg: oklch(0.82 0.14 80);
-  --danger-bg: oklch(0.32 0.1 20 / 0.5);   --danger-fg: oklch(0.78 0.16 20);
-  --neutral-bg: oklch(0.25 0.01 260);      --neutral-fg: oklch(0.72 0.01 260);
-  --navy: #0b2740; --teal: #0e9f9a; --teal-700: #4fd1c9; --mint: oklch(0.3 0.05 175 / 0.5); --sunken: oklch(0.22 0.01 260);
-  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --sh-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --background: #0b1622;
+  --foreground: #e6edf3;
+  --card: #112233;
+  --card-2: #14273a;
+  --card-foreground: #e6edf3;
+  --popover: #112233;
+  --popover-foreground: #e6edf3;
+  --secondary: #1a2f44;
+  --secondary-foreground: #e6edf3;
+  --muted: #1a2f44;
+  --muted-foreground: #8a9aa8;
+  --accent: #1a2f44;
+  --accent-foreground: #e6edf3;
+  --destructive: #f3a097;
+  --border: #1e3247;
+  --input: #27405a;
+  --chart-2: #8b97e8;
+  --chart-3: #e0958a;
+  --chart-4: #2f5f6b;
+  --chart-5: #1e3247;
+  --radius: 0.75rem;
+  --sidebar: #0f1d2c;
+  --sidebar-foreground: #8a9aa8;
+  --sidebar-accent: #1a2f44;
+  --sidebar-accent-foreground: #e6edf3;
+  --sidebar-border: #1e3247;
+  --success-bg: rgba(14, 159, 154, 0.18); --success-fg: #5fd3cc;
+  --info-bg: rgba(107, 123, 224, 0.22);   --info-fg: #aeb7f2;
+  --warn-bg: rgba(217, 138, 59, 0.2);     --warn-fg: #f0c27c;
+  --danger-bg: rgba(224, 83, 62, 0.2);    --danger-fg: #f3a097;
+  --neutral-bg: #1a2f44;                  --neutral-fg: #a7b6c4;
+  --navy: #0b2740; --teal: #0e9f9a; --teal-700: #4fd1c9; --mint: rgba(14, 159, 154, 0.16); --sunken: #16293c;
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --sh-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 /* Light mode carries the Clinicoro reference palette verbatim

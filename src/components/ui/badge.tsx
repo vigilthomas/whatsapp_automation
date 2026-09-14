@@ -25,7 +25,7 @@ const badgeVariants = cva(
         warn: "bg-warn-bg text-warn-fg",
         danger: "bg-danger-bg text-danger-fg",
         neutral: "bg-neutral-bg text-neutral-fg",
-        navy: "bg-navy text-white",
+        navy: "bg-navy text-white dark:bg-teal dark:text-[#06201f]",
       },
     },
     defaultVariants: {

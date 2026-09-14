@@ -565,7 +565,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                     alt={profile.full_name ?? t("defaultAvatar")}
                   />
                 ) : null}
-                <AvatarFallback className="bg-[#E9EEF4] text-xs font-bold text-navy">
+                <AvatarFallback className="bg-[#E9EEF4] text-xs font-bold text-navy dark:bg-sunken dark:text-foreground">
                   {profile?.full_name?.charAt(0)?.toUpperCase() ??
                     profile?.email?.charAt(0)?.toUpperCase() ??
                     "U"}
