@@ -1399,6 +1399,17 @@
       "source": "Source"
     },
     "dialog": {
+      "quickHint": "About 20 seconds",
+      "otherService": "Other…",
+      "pickService": "Pick from list",
+      "nextDays": "Next days",
+      "pickDate": "Pick a date",
+      "slots": "Available slots",
+      "slotsFrom": "live from {doctor}'s calendar",
+      "slotsAll": "live from the clinic calendar",
+      "customTime": "Custom time",
+      "bookWith": "Book {time} with {doctor}",
+      "bookAt": "Book {time}",
       "addTitle": "Add appointment",
       "editTitle": "Edit appointment",
       "rescheduleTitle": "Reschedule appointment",

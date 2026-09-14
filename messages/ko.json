@@ -1399,6 +1399,17 @@
       "source": "출처"
     },
     "dialog": {
+      "quickHint": "약 20초",
+      "otherService": "기타…",
+      "pickService": "목록에서 선택",
+      "nextDays": "다음 날짜",
+      "pickDate": "날짜 선택",
+      "slots": "가능한 시간",
+      "slotsFrom": "{doctor} 일정 기준",
+      "slotsAll": "클리닉 일정 기준",
+      "customTime": "직접 입력",
+      "bookWith": "{doctor} · {time} 예약",
+      "bookAt": "{time} 예약",
       "addTitle": "예약 추가",
       "editTitle": "예약 편집",
       "rescheduleTitle": "예약 일정 변경",
