@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { CalendarDays, ChevronLeft, ChevronRight, Download, List, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus, Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,6 +25,7 @@ import {
   type CalendarAction,
 } from "@/components/appointments/appointment-calendar";
 import { AppointmentList } from "@/components/appointments/appointment-list";
+import { AppointmentActions } from "@/components/appointments/appointment-actions";
 import {
   AppointmentDialog,
   draftFromAppointment,
@@ -31,23 +33,41 @@ import {
   type AppointmentDraft,
 } from "@/components/appointments/appointment-dialog";
 
-type View = "calendar" | "list";
+type View = "day" | "week";
 
 /**
- * Appointments — weekly calendar (the reference design) with a list
- * view of the same window, filterable by clinic and doctor. Both views
- * share one fetch per visible week, one selection, and one dialog.
+ * Appointments — Day (table) / Week (calendar) views of one fetched
+ * week, filterable by clinic, doctor and a patient/phone search. Both
+ * views share one selection and one action bar, mirroring the
+ * reference Appointments page.
  */
 export default function AppointmentsPage() {
+  // useSearchParams() needs a Suspense boundary for the static build.
+  return (
+    <Suspense fallback={null}>
+      <AppointmentsPageInner />
+    </Suspense>
+  );
+}
+
+function AppointmentsPageInner() {
   const t = useTranslations("Appointments");
+  const searchParams = useSearchParams();
   const confirm = useConfirm();
   // Mirrors the API's requirePermission('appointments', …) checks.
   const { can } = useAuth();
   const canEdit = can("appointments", "write");
   const canExport = can("appointments", "export");
 
-  const [view, setView] = useState<View>("calendar");
+  const [view, setView] = useState<View>("day");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  // Day view cursor — always inside the fetched week.
+  const [day, setDay] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [search, setSearch] = useState("");
   const [clinicId, setClinicId] = useState("");
   const [doctorId, setDoctorId] = useState("");
 
@@ -58,6 +78,12 @@ export default function AppointmentsPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AppointmentDraft | null>(null);
+
+  // `/appointments?new=1` (dashboard CTA) opens the booking dialog.
+  const wantsNew = searchParams.get("new") === "1";
+  useEffect(() => {
+    if (wantsNew) setDraft(emptyDraft());
+  }, [wantsNew]);
   const [dialogMode, setDialogMode] = useState<"edit" | "reschedule" | "changeDoctor">("edit");
 
   // Master lists — once.
@@ -181,105 +207,154 @@ export default function AppointmentsPage() {
   };
 
   const weekLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(weekStart);
+  const dayLabel = new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(day);
+
+  const q = search.trim().toLowerCase();
+  const matches = (a: Appointment) =>
+    !q ||
+    patientLabel(a.contact).toLowerCase().includes(q) ||
+    (a.contact?.phone ?? "").replace(/\D/g, "").includes(q.replace(/\D/g, "") || "\u0000");
+  const dayRows = useMemo(() => {
+    const start = day.getTime();
+    const end = start + 86_400_000;
+    return appointments
+      .filter((a) => {
+        const s = new Date(a.starts_at).getTime();
+        return s >= start && s < end && matches(a);
+      })
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointments, day, q]);
+  const selected = appointments.find((a) => a.id === selectedId) ?? null;
+  const live = (view === "day" ? dayRows : appointments).filter((a) => a.status !== "cancelled");
+  const aiCount = live.filter((a) => a.source === "ai").length;
+
+  const step = (dir: -1 | 1) => {
+    if (view === "day") {
+      const next = addDays(day, dir);
+      setDay(next);
+      const ws = startOfWeek(next);
+      if (ws.getTime() !== weekStart.getTime()) setWeekStart(ws);
+    } else {
+      setWeekStart((w) => addDays(w, dir * 7));
+    }
+  };
+  const goToday = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    setDay(d);
+    setWeekStart(startOfWeek(d));
+  };
   const selectCls =
-    "h-8 rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary";
+    "h-8 rounded-full border border-input bg-card px-3 text-[12.5px] font-semibold text-foreground outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/20";
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <div className="flex flex-col gap-[22px]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("pageTitle")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("pageDesc")}</p>
+          <h1 className="font-heading text-[26px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
+            {t("pageTitle")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {view === "day" ? dayLabel : weekLabel} · {t("countSummary", { count: live.length })}
+            {aiCount > 0 ? ` · ${t("aiSummary", { count: aiCount })}` : ""}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {canExport && appointments.length > 0 && (
             <Button variant="outline" onClick={exportCsv}>
-              <Download className="size-4" />
+              <Download className="size-4" strokeWidth={1.75} />
               {t("actions.export")}
             </Button>
           )}
           {canEdit && (
-            <Button onClick={() => openDialog(emptyDraft())}>
-              <Plus className="size-4" />
+            <Button variant="outline" onClick={() => openDialog(emptyDraft())}>
+              <Plus className="size-4" strokeWidth={2.2} />
               {t("actions.add")}
             </Button>
           )}
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" aria-label={t("prevWeek")} onClick={() => setWeekStart((w) => addDays(w, -7))}>
+      {/* Toolbar — reference `.toolbar`: segmented view, date nav, filters, search. */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="inline-flex gap-0.5 rounded-[9px] bg-sunken p-[3px]" role="tablist">
+          {(["day", "week"] as View[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={cn(
+                "h-7 rounded-[7px] px-3 text-[12.5px] font-semibold transition-colors",
+                view === v ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t(`view.${v}`)}
+            </button>
+          ))}
+        </div>
+        <div className="ml-1 flex items-center gap-1">
+          <Button variant="outline" size="icon-sm" aria-label={t("prev")} onClick={() => step(-1)}>
             <ChevronLeft className="size-4" />
           </Button>
-          <Button variant="outline" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+          <Button variant="outline" size="sm" onClick={goToday}>
             {t("today")}
           </Button>
-          <Button variant="outline" size="icon" aria-label={t("nextWeek")} onClick={() => setWeekStart((w) => addDays(w, 7))}>
+          <Button variant="outline" size="icon-sm" aria-label={t("next")} onClick={() => step(1)}>
             <ChevronRight className="size-4" />
           </Button>
-          <span className="ml-2 text-sm font-medium text-foreground">{weekLabel}</span>
         </div>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <select
-            value={clinicId}
-            onChange={(e) => {
-              setClinicId(e.target.value);
-              setDoctorId("");
-            }}
-            className={selectCls}
-            aria-label={t("filterClinic")}
-          >
-            <option value="">{t("allClinics")}</option>
-            {clinics.map((c) => (
-              <option key={c.id} value={c.id}>
-                {String(c.name)}
-              </option>
-            ))}
-          </select>
-          <select
-            value={doctorId}
-            onChange={(e) => setDoctorId(e.target.value)}
-            className={selectCls}
-            aria-label={t("filterDoctor")}
-          >
-            <option value="">{t("allDoctors")}</option>
-            {doctorOptions.map((d) => (
-              <option key={d.id} value={d.id}>
-                {String(d.name)}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex rounded-lg border border-border bg-card p-0.5" role="tablist">
-            {(["calendar", "list"] as View[]).map((v) => (
-              <button
-                key={v}
-                type="button"
-                role="tab"
-                aria-selected={view === v}
-                onClick={() => setView(v)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
-                  view === v
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {v === "calendar" ? <CalendarDays className="size-4" /> : <List className="size-4" />}
-                {t(`view.${v}`)}
-              </button>
-            ))}
-          </div>
-        </div>
+        <select
+          value={clinicId}
+          onChange={(e) => {
+            setClinicId(e.target.value);
+            setDoctorId("");
+          }}
+          className={selectCls}
+          aria-label={t("filterClinic")}
+        >
+          <option value="">{t("allClinics")}</option>
+          {clinics.map((c) => (
+            <option key={c.id} value={c.id}>
+              {String(c.name)}
+            </option>
+          ))}
+        </select>
+        <select
+          value={doctorId}
+          onChange={(e) => setDoctorId(e.target.value)}
+          className={selectCls}
+          aria-label={t("filterDoctor")}
+        >
+          <option value="">{t("allDoctors")}</option>
+          {doctorOptions.map((d) => (
+            <option key={d.id} value={d.id}>
+              {String(d.name)}
+            </option>
+          ))}
+        </select>
+        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-[10px] border border-input bg-card px-3 text-[13.5px] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20 sm:w-[260px]">
+          <Search className="size-4 shrink-0 text-muted-foreground/70" strokeWidth={1.75} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("searchPlaceholder")}
+            className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground/70"
+          />
+        </label>
       </div>
 
-      {view === "calendar" ? (
+      {view === "week" ? (
         <AppointmentCalendar
           weekStart={weekStart}
-          appointments={appointments}
+          appointments={appointments.filter(matches)}
           loading={loading}
           subject={subject}
           selectedId={selectedId}
@@ -291,14 +366,22 @@ export default function AppointmentsPage() {
         />
       ) : (
         <AppointmentList
-          appointments={appointments}
+          appointments={dayRows}
           loading={loading}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          onEdit={(a) => openDialog(draftFromAppointment(a))}
+          onAction={onAction}
           canEdit={canEdit}
+          emptyLabel={t("emptyDay")}
         />
       )}
+
+      <AppointmentActions
+        selected={selected}
+        canEdit={canEdit}
+        onAdd={() => openDialog(emptyDraft())}
+        onAction={onAction}
+      />
 
       <AppointmentDialog
         draft={draft}

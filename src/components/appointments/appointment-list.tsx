@@ -1,132 +1,157 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, MoreHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { chipTone, patientLabel, type Appointment, type ChipTone } from "@/lib/appointments/model";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import type { CalendarAction } from "@/components/appointments/appointment-calendar";
 
-const BADGE: Record<ChipTone, string> = {
-  blue: "bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200",
-  green: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
-  amber: "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
-  grey: "bg-muted text-muted-foreground",
+const TONE_VARIANT: Record<ChipTone, "info" | "success" | "warn" | "neutral"> = {
+  blue: "info",
+  green: "success",
+  amber: "warn",
+  grey: "neutral",
 };
 
 interface Props {
   appointments: Appointment[];
   loading?: boolean;
+  /** Show the date column (week window); the day view hides it. */
+  showDate?: boolean;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onEdit: (a: Appointment) => void;
+  onAction: (action: CalendarAction, a: Appointment) => void;
   canEdit: boolean;
+  emptyLabel: string;
 }
 
-/** Tabular view of the same window the calendar shows. */
-export function AppointmentList({ appointments, loading, selectedId, onSelect, onEdit, canEdit }: Props) {
+/**
+ * Reference Appointments table: Time · Patient (+ masked phone) ·
+ * Service · Doctor · Duration · Status · inline Reschedule / Confirm.
+ * Clicking a row selects it for the shared action bar.
+ */
+export function AppointmentList({
+  appointments,
+  loading,
+  showDate = false,
+  selectedId,
+  onSelect,
+  onAction,
+  canEdit,
+  emptyLabel,
+}: Props) {
   const t = useTranslations("Appointments");
   const tStatus = useTranslations("Appointments.status");
-  const tSource = useTranslations("Appointments.source");
   const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" });
   const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-10">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (appointments.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-        {t("emptyWeek")}
-      </p>
-    );
-  }
+  const th = "px-5 py-2.5 text-left text-[11.5px] font-semibold tracking-[0.04em] text-muted-foreground/80 uppercase bg-card-2 border-b border-border";
+  const td = "px-5 py-[13px] border-b border-border align-middle";
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-muted-foreground">{t("list.when")}</TableHead>
-            <TableHead className="text-muted-foreground">{t("list.patient")}</TableHead>
-            <TableHead className="text-muted-foreground">{t("list.service")}</TableHead>
-            <TableHead className="text-muted-foreground">{t("list.doctor")}</TableHead>
-            <TableHead className="text-muted-foreground">{t("list.clinic")}</TableHead>
-            <TableHead className="text-muted-foreground">{t("list.status")}</TableHead>
-            <TableHead className="text-muted-foreground">{t("list.source")}</TableHead>
-            {canEdit && <TableHead className="w-12" />}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {appointments.map((a) => {
-            const s = new Date(a.starts_at);
-            const e = new Date(a.ends_at);
-            const isSel = a.id === selectedId;
-            return (
-              <TableRow
-                key={a.id}
-                onClick={() => onSelect(isSel ? null : a.id)}
-                aria-selected={isSel}
-                className={cn("cursor-pointer", isSel && "bg-primary/5")}
-              >
-                <TableCell className="whitespace-nowrap">
-                  <div className="font-medium text-foreground">{dateFmt.format(s)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {timeFmt.format(s)} – {timeFmt.format(e)}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="font-medium text-foreground">{patientLabel(a.contact)}</div>
-                  {a.contact?.name ? (
-                    <div className="text-xs text-muted-foreground">{a.contact.phone}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="text-foreground">{a.service}</TableCell>
-                <TableCell className="text-muted-foreground">{a.doctor?.name ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{a.clinic?.name ?? "—"}</TableCell>
-                <TableCell>
-                  <span
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr>
+              {showDate && <th className={cn(th, "w-[120px]")}>{t("list.date")}</th>}
+              <th className={cn(th, "w-[110px]")}>{t("list.time")}</th>
+              <th className={th}>{t("list.patient")}</th>
+              <th className={th}>{t("list.service")}</th>
+              <th className={th}>{t("list.doctor")}</th>
+              <th className={th}>{t("list.duration")}</th>
+              <th className={th}>{t("list.status")}</th>
+              {canEdit && <th className={cn(th, "w-[230px]")}>{t("list.actions")}</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="py-10 text-center">
+                  <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
+                </td>
+              </tr>
+            ) : appointments.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                  {emptyLabel}
+                </td>
+              </tr>
+            ) : (
+              appointments.map((a) => {
+                const s = new Date(a.starts_at);
+                const e = new Date(a.ends_at);
+                const mins = Math.max(0, Math.round((e.getTime() - s.getTime()) / 60000));
+                const isSel = a.id === selectedId;
+                const phone = a.contact?.phone ?? "";
+                const maskedPhone = phone.length > 6 ? `${phone.slice(0, -6)}••• ••${phone.slice(-3)}` : phone;
+                return (
+                  <tr
+                    key={a.id}
+                    onClick={() => onSelect(isSel ? null : a.id)}
+                    aria-selected={isSel}
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-xs font-medium",
-                      BADGE[chipTone(a)],
+                      "cursor-pointer transition-colors last:[&>td]:border-b-0 hover:[&>td]:bg-card-2",
+                      isSel && "[&>td]:bg-mint/60 dark:[&>td]:bg-mint",
                     )}
                   >
-                    {tStatus(a.status)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-muted-foreground">{tSource(a.source)}</TableCell>
-                {canEdit && (
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={t("actions.edit")}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit(a);
-                      }}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                  </TableCell>
-                )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                    {showDate && (
+                      <td className={cn(td, "whitespace-nowrap font-medium text-foreground")}>{dateFmt.format(s)}</td>
+                    )}
+                    <td className={cn(td, "whitespace-nowrap font-medium text-muted-foreground tabular-nums")}>
+                      {timeFmt.format(s)}
+                    </td>
+                    <td className={td}>
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-foreground">{patientLabel(a.contact)}</span>
+                        {a.contact?.name && phone ? (
+                          <span className="text-[11px] text-muted-foreground">{maskedPhone}</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className={cn(td, "text-foreground")}>{a.service}</td>
+                    <td className={cn(td, "text-foreground")}>{a.doctor?.name ?? "—"}</td>
+                    <td className={cn(td, "text-muted-foreground")}>{t("list.minutes", { count: mins })}</td>
+                    <td className={td}>
+                      <Badge variant={TONE_VARIANT[chipTone(a)]}>
+                        {a.status === "scheduled" && a.source === "ai" ? t("bookedByAi") : tStatus(a.status)}
+                      </Badge>
+                    </td>
+                    {canEdit && (
+                      <td className={td}>
+                        <div className="flex items-center gap-1.5" onClick={(ev) => ev.stopPropagation()}>
+                          <Button size="sm" variant="outline" onClick={() => onAction("reschedule", a)}>
+                            {t("actions.reschedule")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={a.status !== "scheduled"}
+                            onClick={() => onAction("confirm", a)}
+                          >
+                            {t("actions.confirm")}
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            aria-label={t("actions.edit")}
+                            onClick={() => onAction("edit", a)}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

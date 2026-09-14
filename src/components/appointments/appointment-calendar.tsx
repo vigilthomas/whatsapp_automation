@@ -15,7 +15,6 @@ import {
   type Appointment,
   type ChipTone,
 } from "@/lib/appointments/model";
-import { Button } from "@/components/ui/button";
 
 /** Columns per week. Mon–Fri matches the reference design. */
 export const CALENDAR_DAYS = 5;
@@ -66,18 +65,20 @@ interface Props {
   subject: string;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onAdd: () => void;
-  onAction: (action: CalendarAction, appointment: Appointment) => void;
+  /** Kept for API compatibility; the page now renders the action bar
+   *  (AppointmentActions) beneath whichever view is showing. */
+  onAdd?: () => void;
+  onAction?: (action: CalendarAction, appointment: Appointment) => void;
   canEdit: boolean;
   /** Click on an empty hour cell — pre-fills the add dialog. */
   onSlotClick?: (start: Date) => void;
 }
 
 /**
- * Weekly schedule grid, matching the reference design: a window-
- * chrome card, a time column, one column per weekday with "Mon / 13
- * Jan" headers, chips per hour row, and an action bar underneath that
- * operates on the selected chip.
+ * Weekly schedule grid, matching the reference design: a card with a
+ * time column, one column per weekday with "Mon / 13 Jan" headers and
+ * chips per hour row. Selection is lifted to the page, which renders
+ * the shared action bar underneath.
  */
 export function AppointmentCalendar({
   weekStart,
@@ -86,8 +87,6 @@ export function AppointmentCalendar({
   subject,
   selectedId,
   onSelect,
-  onAdd,
-  onAction,
   canEdit,
   onSlotClick,
 }: Props) {
@@ -100,7 +99,6 @@ export function AppointmentCalendar({
     [appointments],
   );
   const buckets = useMemo(() => bucketByDayHour(appointments, days), [appointments, days]);
-  const selected = appointments.find((a) => a.id === selectedId) ?? null;
   const today = new Date();
 
   const statusLabels = {
@@ -116,22 +114,14 @@ export function AppointmentCalendar({
   const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
   const hourFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
-  const act = (action: CalendarAction) => selected && onAction(action, selected);
-  const disabled = !canEdit || !selected;
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm">
-      {/* Window chrome header */}
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <div className="flex gap-1.5" aria-hidden>
-          <span className="size-2.5 rounded-full bg-red-400" />
-          <span className="size-2.5 rounded-full bg-amber-400" />
-          <span className="size-2.5 rounded-full bg-emerald-400" />
-        </div>
-        <span className="text-sm font-medium text-foreground">
+    <div className="rounded-2xl border border-border bg-card shadow-card">
+      <div className="flex items-center gap-3 px-5 pt-[18px] pb-3.5">
+        <h3 className="font-heading text-[15px] font-semibold text-foreground">
           {t("weeklySchedule")} · {subject}
-        </span>
-        <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+        </h3>
+        <span className="ml-auto inline-flex h-[22px] items-center rounded-full bg-neutral-bg px-2.5 text-[11.5px] font-semibold text-neutral-fg">
           {dateFmt.format(days[0])} – {dateFmt.format(days[days.length - 1])}
         </span>
       </div>
@@ -229,49 +219,6 @@ export function AppointmentCalendar({
         </div>
       </div>
 
-      {/* Action bar */}
-      {canEdit && (
-        <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-          <Button onClick={onAdd}>{t("actions.add")}</Button>
-          <Button variant="outline" disabled={disabled} onClick={() => act("edit")}>
-            {t("actions.edit")}
-          </Button>
-          <Button variant="outline" disabled={disabled} onClick={() => act("reschedule")}>
-            {t("actions.reschedule")}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={disabled || selected?.status === "cancelled"}
-            onClick={() => act("cancel")}
-          >
-            {t("actions.cancel")}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={disabled || selected?.status !== "scheduled"}
-            onClick={() => act("confirm")}
-          >
-            {t("actions.confirm")}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={disabled || selected?.status === "completed"}
-            onClick={() => act("complete")}
-          >
-            {t("actions.complete")}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={disabled || selected?.status === "no_show"}
-            onClick={() => act("noShow")}
-          >
-            {t("actions.noShow")}
-          </Button>
-          <Button variant="outline" disabled={disabled} onClick={() => act("changeDoctor")}>
-            {t("actions.changeDoctor")}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
