@@ -3,7 +3,8 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { validateAiCredentials } from '@/lib/ai/validate'
-import { AiError, type AiProvider } from '@/lib/ai/types'
+import { AiError, AI_PROVIDERS, type AiProvider } from '@/lib/ai/types'
+import { isKeylessProvider } from '@/lib/ai/config'
 
 /**
  * POST /api/ai/test  (admin+)
@@ -27,9 +28,9 @@ export async function POST(request: Request) {
     }
 
     const provider = body.provider as AiProvider
-    if (provider !== 'openai' && provider !== 'anthropic') {
+    if (!AI_PROVIDERS.includes(provider)) {
       return NextResponse.json(
-        { error: 'provider must be "openai" or "anthropic"' },
+        { error: `provider must be one of ${AI_PROVIDERS.join(', ')}` },
         { status: 400 },
       )
     }
@@ -47,13 +48,17 @@ export async function POST(request: Request) {
         .eq('account_id', accountId)
         .maybeSingle()
       if (!existing?.api_key) {
-        return NextResponse.json(
-          { error: 'Enter an API key to test.' },
-          { status: 400 },
-        )
+        if (!isKeylessProvider(provider)) {
+          return NextResponse.json(
+            { error: 'Enter an API key to test.' },
+            { status: 400 },
+          )
+        }
+        // Keyless provider with nothing stored — test with the platform /
+        // no key.
       }
       try {
-        apiKeyPlain = decrypt(existing.api_key)
+        apiKeyPlain = existing?.api_key ? decrypt(existing.api_key) : ''
       } catch {
         return NextResponse.json(
           { error: 'Stored API key could not be decrypted — re-enter your key.' },

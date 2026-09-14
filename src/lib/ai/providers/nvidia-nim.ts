@@ -103,9 +103,9 @@ export interface NimProviderResult extends ProviderResult {
  * is responsible for executing tools and feeding results back (see
  * `generate-with-tools.ts`).
  *
- * The `args.apiKey` field is ignored — NIM uses the platform key from
- * the environment — but accepted for interface compatibility with
- * ProviderArgs.
+ * `args.apiKey`, when non-empty, is used as the bearer (an account's
+ * own NIM key from the AI Agents setup page); otherwise the platform
+ * key from `NVIDIA_NIM_API_KEY` is used.
  */
 export type NimProviderArgs = Omit<ProviderArgs, 'messages'> & {
   /** May include assistant tool_calls and tool-result messages. */
@@ -116,7 +116,7 @@ export async function generateNvidiaNim(
   args: NimProviderArgs,
 ): Promise<NimProviderResult> {
   const { model, systemPrompt, messages, timeoutMs, tools, toolChoice } = args
-  const apiKey = nimApiKey()
+  const apiKey = args.apiKey?.trim() || nimApiKey()
   const url = `${nimBaseUrl()}/chat/completions`
   const isDeepSeek = model.startsWith('deepseek')
 

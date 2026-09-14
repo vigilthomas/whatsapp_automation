@@ -1984,7 +1984,7 @@
     },
     "aiConfig": {
       "title": "에이전트 설정",
-      "description": "직접 발급받은 OpenAI 또는 Anthropic 키를 사용하세요. Clinicoro는 회원님의 키로 공급자에 직접 요청하므로 좌석당 AI 비용이 없고 데이터도 온전히 회원님의 것입니다. 인박스의 AI 답장 초안, 자동 응답 봇, 플레이그라운드에 사용됩니다.",
+      "description": "공급자를 선택하세요: 직접 발급받은 OpenAI/Anthropic 키, 기본 제공 NVIDIA NIM(DeepSeek) 서비스, 또는 자체 호스팅 Ollama 서버. BYO 키는 공급자에 직접 요청하므로 좌석당 AI 비용이 없고 데이터도 온전히 회원님의 것입니다. 인박스의 AI 답장 초안, 자동 응답 봇, 플레이그라운드에 사용됩니다.",
       "adminOnlyConfig": "관리자와 소유자만 AI 설정을 변경할 수 있습니다.",
       "loadFailed": "AI 설정을 불러오지 못했습니다",
       "providerAndKey": "공급자 & 키",
@@ -1993,6 +1993,7 @@
       "model": "모델",
       "apiKey": "API 키",
       "testKey": "키 테스트",
+      "keyOptional": "이 공급자에는 선택 사항",
       "testSuccess": "키가 정상 작동합니다 — 공급자가 응답했습니다.",
       "testRejected": "공급자가 요청을 거부했습니다.",
       "testNetworkError": "공급자에 연결할 수 없습니다.",

@@ -1984,7 +1984,7 @@
     },
     "aiConfig": {
       "title": "Agent setup",
-      "description": "Bring your own OpenAI or Anthropic key. Clinicoro calls the provider directly with your key — no per-seat AI fees, and your data stays yours. This powers AI-drafted replies in the inbox, the auto-reply bot, and the Playground.",
+      "description": "Pick a provider: bring your own OpenAI or Anthropic key, use the built-in NVIDIA NIM (DeepSeek) service, or point at a self-hosted Ollama server. BYO keys are called directly — no per-seat AI fees, and your data stays yours. This powers AI-drafted replies in the inbox, the auto-reply bot, and the Playground.",
       "adminOnlyConfig": "Only admins and owners can change the AI configuration.",
       "loadFailed": "Failed to load AI configuration",
       "providerAndKey": "Provider & key",
@@ -1993,6 +1993,7 @@
       "model": "Model",
       "apiKey": "API key",
       "testKey": "Test key",
+      "keyOptional": "optional for this provider",
       "testSuccess": "Key works — the provider responded.",
       "testRejected": "The provider rejected the request.",
       "testNetworkError": "Could not reach the provider.",

@@ -6,7 +6,8 @@
 // whether the account is on OpenAI or Anthropic.
 // ============================================================
 
-export type AiProvider = 'openai' | 'anthropic' | 'nvidia_nim' | 'ollama'
+export const AI_PROVIDERS = ['openai', 'anthropic', 'nvidia_nim', 'ollama'] as const
+export type AiProvider = (typeof AI_PROVIDERS)[number]
 
 /**
  * Account AI setup, decrypted and ready to use. Produced by

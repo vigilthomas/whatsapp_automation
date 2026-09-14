@@ -44,15 +44,19 @@ const HANDOFF_QUEUE = '__queue__';
 const PROVIDER_LABEL: Record<AiProvider, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic (Claude)',
-  nvidia_nim: 'NVIDIA NIM',
-  ollama: 'Ollama (local)',
+  nvidia_nim: 'NVIDIA NIM (DeepSeek)',
+  ollama: 'Ollama (self-hosted)',
 };
+
+// NIM and Ollama don't need an account key: NIM uses the server's
+// NVIDIA_NIM_API_KEY unless one is entered here, Ollama has no auth.
+const KEYLESS: ReadonlySet<AiProvider> = new Set(['nvidia_nim', 'ollama']);
 
 const KEY_PLACEHOLDER: Record<AiProvider, string> = {
   openai: 'sk-...',
   anthropic: 'sk-ant-...',
-  nvidia_nim: 'nvapi-...',
-  ollama: '',
+  nvidia_nim: 'nvapi-... (optional — server key used if blank)',
+  ollama: 'No key needed',
 };
 
 export function AiConfig() {
@@ -288,6 +292,10 @@ export function AiConfig() {
                     <SelectItem value="anthropic">
                       {PROVIDER_LABEL.anthropic}
                     </SelectItem>
+                    <SelectItem value="nvidia_nim">
+                      {PROVIDER_LABEL.nvidia_nim}
+                    </SelectItem>
+                    <SelectItem value="ollama">{PROVIDER_LABEL.ollama}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -305,7 +313,14 @@ export function AiConfig() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ai-key">{t('apiKey')}</Label>
+              <Label htmlFor="ai-key">
+                {t('apiKey')}
+                {KEYLESS.has(provider) && (
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    ({t('keyOptional')})
+                  </span>
+                )}
+              </Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
@@ -323,7 +338,7 @@ export function AiConfig() {
                       }
                     }}
                     placeholder={KEY_PLACEHOLDER[provider]}
-                    disabled={disabled}
+                    disabled={disabled || provider === 'ollama'}
                     autoComplete="off"
                   />
                   <button

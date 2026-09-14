@@ -1,11 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/whatsapp/encryption'
+import type { AiProvider } from './types'
+
+/** Providers that work without an account-level API key: NIM uses the
+ *  platform key from the environment, Ollama has no auth at all. */
+export function isKeylessProvider(p: AiProvider): boolean {
+  return p === 'nvidia_nim' || p === 'ollama'
+}
 import type { AiConfig } from './types'
 
 interface AiConfigRow {
-  provider: 'openai' | 'anthropic'
+  provider: AiProvider
   model: string
-  api_key: string
+  api_key: string | null
   system_prompt: string | null
   is_active: boolean
   auto_reply_enabled: boolean
@@ -47,10 +54,10 @@ export async function loadAiConfig(
   // The Playground passes requireActive:false so an admin can test the
   // agent before flipping the master switch on.
   if (requireActive && !row.is_active) return null
-  // Defensive: the column is NOT NULL, but a partial write / manual DB
-  // edit could leave it empty. Treat a missing key as "not configured"
-  // rather than letting decrypt() throw on null.
-  if (!row.api_key) return null
+  // nvidia_nim / ollama don't need a stored key (migration 048 made the
+  // column nullable for them). For BYO providers a missing key means
+  // "not configured" rather than letting decrypt() throw on null.
+  if (!row.api_key && !isKeylessProvider(row.provider)) return null
 
   // The embeddings key is optional and independent of the chat key —
   // a corrupt/undecryptable one should downgrade to lexical KB, not
@@ -72,7 +79,7 @@ export async function loadAiConfig(
   return {
     provider: row.provider,
     model: row.model,
-    apiKey: decrypt(row.api_key),
+    apiKey: row.api_key ? decrypt(row.api_key) : '',
     systemPrompt: row.system_prompt,
     isActive: row.is_active,
     autoReplyEnabled: row.auto_reply_enabled,

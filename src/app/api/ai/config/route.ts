@@ -6,9 +6,10 @@ import {
 } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
+import { isKeylessProvider } from '@/lib/ai/config'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { embedTexts } from '@/lib/ai/embeddings'
-import { AiError, type AiProvider } from '@/lib/ai/types'
+import { AiError, AI_PROVIDERS, type AiProvider } from '@/lib/ai/types'
 
 function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 })
@@ -78,8 +79,8 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object') return bad('Invalid request body')
 
     const provider = body.provider as AiProvider
-    if (provider !== 'openai' && provider !== 'anthropic') {
-      return bad('provider must be "openai" or "anthropic"')
+    if (!AI_PROVIDERS.includes(provider)) {
+      return bad(`provider must be one of ${AI_PROVIDERS.join(', ')}`)
     }
     const model = typeof body.model === 'string' ? body.model.trim() : ''
     if (!model) return bad('model is required')
@@ -141,6 +142,8 @@ export async function POST(request: Request) {
       } catch {
         return bad('Stored API key could not be decrypted — re-enter your key.')
       }
+    } else if (isKeylessProvider(provider)) {
+      apiKeyPlain = '' // NIM falls back to NVIDIA_NIM_API_KEY; Ollama has no key
     } else {
       return bad('api_key is required')
     }
@@ -231,7 +234,7 @@ export async function POST(request: Request) {
       const { error: insErr } = await supabase.from('ai_configs').insert({
         account_id: accountId,
         created_by: userId,
-        api_key: encryptedKey, // guaranteed non-null: rawKey required when no existing row
+        api_key: encryptedKey, // null only for keyless providers (048 made the column nullable)
         ...shared,
       })
       if (insErr) {

@@ -8,6 +8,8 @@ import {
 import { HANDOFF_SENTINEL, aiRequestTimeoutMs } from './defaults'
 import { generateOpenAi } from './providers/openai'
 import { generateAnthropic } from './providers/anthropic'
+import { generateNvidiaNim } from './providers/nvidia-nim'
+import { generateOllama } from './providers/ollama'
 
 export interface GenerateArgs {
   config: AiConfig
@@ -40,6 +42,16 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
       break
     case 'anthropic':
       result = await generateAnthropic(providerArgs)
+      break
+    // Platform / self-hosted providers. Neither needs a BYO key: NIM
+    // falls back to NVIDIA_NIM_API_KEY, Ollama is keyless. A key saved
+    // on the account (NIM) is honoured as an override.
+    case 'nvidia_nim':
+      result = await generateNvidiaNim(providerArgs)
+      break
+    case 'ollama':
+      // The chat reply needs more room than the small-talk tier's default.
+      result = await generateOllama({ ...providerArgs, numPredict: 1024 })
       break
     default:
       throw new AiError(`Unsupported AI provider: ${config.provider}`, {
