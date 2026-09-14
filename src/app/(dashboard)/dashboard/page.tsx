@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import {
+  AiReceptionistCard,
   AppointmentsTrend,
   DoctorAvailability,
   StatTile,
@@ -110,42 +111,40 @@ export default function DashboardPage() {
   const pending = live.filter((a) => a.status === 'scheduled').length
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-[22px]">
+      {/* Page head — greeting, date block, primary CTA (reference `.page-head`). */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {t(greetingKey, { name: firstName })} 👋
+          <h1 className="font-heading text-[26px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
+            {t(greetingKey, { name: firstName })} <span className="font-sans">👋</span>
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm">
-            <CalendarDays className="size-4 text-muted-foreground" />
-            <span className="font-medium text-foreground">{dateLabel}</span>
+        <div className="flex flex-wrap items-center gap-3.5">
+          <div className="hidden items-center gap-2.5 border-r border-border pr-3.5 sm:flex">
+            <span className="flex size-9 items-center justify-center rounded-[9px] bg-[#E9EEF4] text-navy dark:bg-sunken dark:text-foreground">
+              <CalendarDays className="size-[18px]" strokeWidth={1.75} />
+            </span>
+            <span className="flex flex-col">
+              <span className="text-[13.5px] font-semibold text-foreground">{dateLabel}</span>
+              <span className="text-[11px] text-muted-foreground">{t('hours')}</span>
+            </span>
           </div>
-          <Button size="lg" render={<Link href="/appointments" />}>
-            <Plus className="size-4" />
+          <Button size="lg" render={<Link href="/appointments?new=1" />}>
+            <Plus className="size-4" strokeWidth={2.2} />
             {tAppt('actions.add')}
           </Button>
         </div>
       </div>
 
       {/* Headline tiles */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
           icon={CalendarCheck}
           label={t('appointmentsToday')}
           value={todayLoading ? '…' : live.length}
           sub={todayLoading ? undefined : t('bookedByAiCount', { count: bookedByAi })}
           subTone="primary"
-        />
-        <StatTile
-          icon={UserCheck}
-          label={t('pendingConfirmations')}
-          value={todayLoading ? '…' : pending}
-          sub={todayLoading ? undefined : t('pendingHint')}
-          subTone="amber"
         />
         <StatTile
           icon={MessageCircle}
@@ -159,21 +158,31 @@ export default function DashboardPage() {
           value={todayLoading ? '…' : (today?.patientsTotal ?? 0).toLocaleString()}
           sub={todayLoading ? undefined : t('patientsHint')}
         />
+        <StatTile
+          icon={UserCheck}
+          tone="info"
+          label={t('pendingConfirmations')}
+          value={todayLoading ? '…' : pending}
+          sub={todayLoading ? undefined : t('pendingHint')}
+          subTone="amber"
+        />
       </div>
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-1">
-          <TodayAppointments items={today?.today ?? null} loading={todayLoading} />
-        </div>
-        <div className="space-y-4 xl:col-span-1">
+      {/* Main grid — reference: 1.3fr / 1.05fr / .95fr */}
+      <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-[1.3fr_1.05fr_.95fr] xl:items-start">
+        <TodayAppointments items={today?.today ?? null} loading={todayLoading} />
+        <div className="flex flex-col gap-[18px]">
           <DoctorAvailability doctors={doctors} loading={doctorsLoading} />
           <ActivityFeed items={activity} loading={activityLoading} />
         </div>
-        <div className="space-y-4 xl:col-span-1">
+        <div className="flex flex-col gap-[18px]">
+          <AiReceptionistCard bookedByAi={bookedByAi} loading={todayLoading} />
           <WhatsAppConversations items={convos} loading={convosLoading} />
-          <AppointmentsTrend points={trend} loading={trendLoading} />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-[1.3fr_2fr]">
+        <AppointmentsTrend points={trend} loading={trendLoading} />
       </div>
     </div>
   )

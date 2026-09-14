@@ -116,7 +116,21 @@
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}"
     },
+    "ai": {
+      "title": "AI Receptionist",
+      "online": "Online",
+      "autoReplying": "Auto-replying",
+      "off": "Off",
+      "configure": "Configure",
+      "bookedToday": "{count, plural, =0 {No AI bookings yet today} =1 {1 appointment booked by AI today} other {# appointments booked by AI today}}",
+      "handling": "Answering WhatsApp messages around the clock.",
+      "draftsOnly": "Drafting replies for staff — auto-reply is off.",
+      "setupHint": "Connect a provider to start handling messages.",
+      "openPlayground": "Open playground",
+      "setUp": "Set up the assistant"
+    },
     "clinic": {
+      "hours": "Working hours per clinic",
       "goodMorning": "Good morning, {name}",
       "goodAfternoon": "Good afternoon, {name}",
       "goodEvening": "Good evening, {name}",

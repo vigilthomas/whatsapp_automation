@@ -57,12 +57,12 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
     i === 0 || totalLoaded > PAGE_SIZES[i - 1]
 
   return (
-    <section className="rounded-xl border border-border bg-card">
-      <header className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>
+    <section className="rounded-2xl border border-border bg-card shadow-card">
+      <header className="flex items-center justify-between px-5 pt-[18px] pb-3.5">
+        <h3 className="font-heading text-[15px] font-semibold text-foreground">{t('title')}</h3>
         <Link
           href="/inbox"
-          className="text-xs font-medium text-primary hover:text-primary/80"
+          className="text-[13px] font-semibold text-teal-700 hover:text-teal"
         >
           {t('viewAll')}
         </Link>
@@ -84,34 +84,34 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
         </div>
       ) : (
         <>
-          <ul className="divide-y divide-border">
+          <ul>
             {visible.map((it, i) => {
               const theme = KIND_THEME[it.kind]
               const Icon = theme.icon
               // Alternating row background for scanability. bg-muted/40
               // keeps the stripe visible in both light and dark modes
               // (bg-card/40 vanishes against a white card surface in light).
-              const stripe = i % 2 === 0 ? 'bg-transparent' : 'bg-muted/40'
               const row = (
                 <div className="flex items-center gap-3 px-5 py-2.5">
                   <span
                     className={cn(
-                      'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full',
+                      'flex size-[34px] flex-shrink-0 items-center justify-center rounded-[9px]',
                       theme.badge,
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="size-4" />
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-foreground">
                     {it.text}
                   </span>
-                  <span className="flex-shrink-0 text-xs text-muted-foreground tabular-nums">
+                  <span className="flex-shrink-0 text-[11px] text-muted-foreground/80 tabular-nums">
                     {relativeTime(it.at, t)}
                   </span>
                 </div>
               )
+              void i
               return (
-                <li key={it.id} className={cn(stripe, 'transition-colors hover:bg-muted/40')}>
+                <li key={it.id} className="transition-colors hover:bg-card-2">
                   {it.href ? (
                     <Link href={it.href} className="block">
                       {row}
