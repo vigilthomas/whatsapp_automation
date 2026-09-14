@@ -246,9 +246,6 @@ export function MessageBubble({
             : "border-border bg-card text-foreground",
         )}
       >
-        {message.ai_generated && (
-          <span className="mb-0.5 block text-[11px] font-bold text-[#7FE0DB]">{t("aiAuthor")}</span>
-        )}
         {reply && (
           <ReplyQuote
             authorLabel={reply.authorLabel}
@@ -268,10 +265,6 @@ export function MessageBubble({
             isAgent ? "justify-end" : "justify-start",
           )}
         >
-          {/* AI badge — only on replies the auto-reply bot generated
-              (always outbound, so it sits on the primary fill). Lets
-              agents tell an AI reply from their own / a Flow's at a
-              glance. */}
           <span
             className={cn(
               "text-[10px]",

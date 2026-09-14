@@ -15,7 +15,7 @@ export interface TrendPoint {
   day: string
   label: string
   inClinic: number
-  bookedByAi: number
+  viaWhatsApp: number
   cancelled: number
 }
 
@@ -88,13 +88,13 @@ export async function loadAppointmentsTrend(db: SupabaseClient, days = 7): Promi
   const points = new Map<string, TrendPoint>()
   for (let i = 0; i < days; i++) {
     const d = addDays(start, i)
-    points.set(localKey(d), { day: localKey(d), label: fmt.format(d), inClinic: 0, bookedByAi: 0, cancelled: 0 })
+    points.set(localKey(d), { day: localKey(d), label: fmt.format(d), inClinic: 0, viaWhatsApp: 0, cancelled: 0 })
   }
   for (const row of data ?? []) {
     const p = points.get(localKey(new Date(row.starts_at)))
     if (!p) continue
     if (row.status === 'cancelled' || row.status === 'no_show') p.cancelled++
-    else if (row.source === 'ai') p.bookedByAi++
+    else if (row.source === 'whatsapp') p.viaWhatsApp++
     else p.inClinic++
   }
   return [...points.values()]

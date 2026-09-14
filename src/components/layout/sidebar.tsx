@@ -10,7 +10,6 @@ import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import {
   Bell,
   BadgeCheck,
-  Bot,
   Building2,
   CalendarDays,
   ChevronDown,
@@ -43,8 +42,6 @@ import {
 import type { AccountRole } from "@/lib/auth/roles";
 import type { ModuleId } from "@/lib/auth/module-access";
 import { Logo } from "@/components/brand/logo";
-import { useAiStatus } from "@/hooks/use-ai-status";
-import { Sparkles } from "lucide-react";
 
 // Per-role chip metadata used in the sidebar's account strip + the
 // Members tab roster. Keeping this near both consumers in a single
@@ -160,7 +157,6 @@ const navGroups: NavGroup[] = [
       { href: "/broadcasts", labelKey: "broadcasts", icon: Radio, module: "broadcasts" },
       { href: "/automations", labelKey: "automations", icon: Zap, module: "automations" },
       { href: "/flows", labelKey: "flows", icon: Workflow, beta: true, module: "flows" },
-      { href: "/agents", labelKey: "aiAgents", icon: Bot, module: "agents" },
       { href: "/master/templates", labelKey: "templates", icon: FileText, module: "templates" },
       { href: "/master/quick-replies", labelKey: "quickReplies", icon: Zap, module: "quick-replies" },
       { href: "/master/fields", labelKey: "fields", icon: Tags, module: "fields" },
@@ -200,7 +196,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   } = useAuth();
   const totalUnread = useTotalUnread();
   const unreadNotifications = useUnreadNotifications();
-  const ai = useAiStatus();
 
   const isItemActive = (href: string) =>
     pathname === href ||
@@ -488,37 +483,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Footer: AI receptionist status, account strip, user menu —
-            the three stacked cards at the foot of the reference sidebar. */}
+        {/* Footer: account strip + user menu — the stacked cards at the
+            foot of the reference sidebar. */}
         <div className="flex shrink-0 flex-col gap-3 px-3.5 pb-4">
-          <Link
-            href="/agents"
-            className="flex gap-2.5 rounded-[14px] border border-border bg-card-2 p-3 transition-colors hover:bg-sunken"
-          >
-            <span
-              className={cn(
-                "flex size-[34px] shrink-0 items-center justify-center rounded-full bg-mint text-teal",
-                ai.active && "ai-pulse",
-              )}
-            >
-              <Sparkles className="relative size-4" strokeWidth={1.75} />
-            </span>
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-[13px] font-semibold text-foreground">{t("aiReceptionist")}</span>
-              <span
-                className={cn(
-                  "flex items-center gap-1.5 text-xs font-semibold",
-                  ai.active ? "text-teal-700" : "text-muted-foreground",
-                )}
-              >
-                <i className="size-[7px] rounded-full bg-current" />
-                {!ai.loaded ? "…" : ai.active ? t("aiOnline") : t("aiOffline")}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                {ai.autoReply ? t("aiHandling") : t("aiIdle")}
-              </span>
-            </span>
-          </Link>
           {/* Account name display — surfaced only when the account
               name differs from the user's own name (see
               `showAccountStrip`). For a default solo account the two

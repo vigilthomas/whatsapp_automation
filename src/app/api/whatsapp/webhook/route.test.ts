@@ -4,7 +4,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => ({
   runAutomationsForTrigger: vi.fn(),
   dispatchInboundToFlows: vi.fn(),
-  dispatchInboundToAiReply: vi.fn(),
   dispatchWebhookEvent: vi.fn(),
   state: {
     // Result the message upsert's .select() resolves to. A genuine insert
@@ -195,9 +194,6 @@ vi.mock('@/lib/automations/engine', () => ({
 vi.mock('@/lib/flows/engine', () => ({
   dispatchInboundToFlows: h.dispatchInboundToFlows,
 }))
-vi.mock('@/lib/ai/auto-reply', () => ({
-  dispatchInboundToAiReply: h.dispatchInboundToAiReply,
-}))
 vi.mock('@/lib/webhooks/deliver', () => ({
   dispatchWebhookEvent: h.dispatchWebhookEvent,
 }))
@@ -270,7 +266,6 @@ beforeEach(() => {
     contentType: 'image/jpeg',
   })
   h.dispatchInboundToFlows.mockResolvedValue({ consumed: false })
-  h.dispatchInboundToAiReply.mockResolvedValue(undefined)
   h.dispatchWebhookEvent.mockResolvedValue(undefined)
   h.runAutomationsForTrigger.mockImplementation(() => {
     h.state.automationStarted++
@@ -311,7 +306,6 @@ describe('inbound webhook: idempotent insert (#367)', () => {
     expect(h.state.rpcCalls).toHaveLength(0)
     expect(h.dispatchInboundToFlows).not.toHaveBeenCalled()
     expect(h.runAutomationsForTrigger).not.toHaveBeenCalled()
-    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled()
     expect(h.dispatchWebhookEvent).not.toHaveBeenCalled()
   })
 })
@@ -371,9 +365,6 @@ describe('inbound webhook: template quick-reply buttons (#478)', () => {
       (call) => (call[0] as { triggerType: string }).triggerType,
     )
     expect(triggers).toContain('interactive_reply')
-    // The AI auto-reply must stay out of it — a button tap is not a
-    // free-text question.
-    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled()
   })
 
   it('falls back to the label when the template button carries no payload', async () => {

@@ -9,7 +9,6 @@ import { reopenClosedConversation } from '@/lib/conversations/reopen'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
-import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import {
   handleTemplateWebhookChange,
@@ -315,10 +314,7 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
           // Default ON: the column is NOT NULL DEFAULT TRUE, but a row
           // read before migration 039 lands would have it undefined,
           // and losing attachments is the failure mode worth avoiding.
-          config.mirror_inbound_media !== false,
-          // Lets the AI auto-reply resolve the clinic bound to this
-          // number and take the tool-calling receptionist path.
-          phoneNumberId
+          config.mirror_inbound_media !== false
         )
       }
     }
@@ -589,10 +585,7 @@ async function processMessage(
   accessToken: string,
   // Per-account opt-out for the inbound-media mirror (migration 039).
   // See parseMessageContent for what it turns off.
-  mirrorMedia: boolean,
-  // Meta phone_number_id the inbound arrived on. Forwarded to the AI
-  // auto-reply so it can resolve a bound clinic (clinic AI gateway).
-  phoneNumberId?: string
+  mirrorMedia: boolean
 ) {
   const senderPhone = normalizePhone(message.from)
   const contactName = contact.profile.name
@@ -735,7 +728,7 @@ async function processMessage(
 
   // Replayed delivery: the message already exists, so acknowledge it as a
   // no-op. Returning here is what keeps a retry from double-bumping unread,
-  // re-advancing flows, re-firing automations, re-invoking AI handling, and
+  // re-advancing flows, re-firing automations, and
   // re-dispatching public webhooks (issue #367).
   if (!insertedRows || insertedRows.length === 0) {
     console.info(
@@ -870,22 +863,6 @@ async function processMessage(
         interactive_reply_id: interactiveReplyId ?? undefined,
       },
     }).catch((err) => console.error('[automations] dispatch failed:', err))
-  }
-
-  // AI auto-reply. Runs only for plain-text inbound the deterministic
-  // flow runner did NOT consume (flows win over the LLM), and only when
-  // the account has enabled it. Awaited inside `after()` (same reason as
-  // the webhook dispatch below); `dispatchInboundToAiReply` owns its
-  // eligibility gates + try/catch and never throws.
-  if (!flowConsumed && !interactiveReplyId && inboundText.trim()) {
-    await dispatchInboundToAiReply({
-      accountId,
-      conversationId: conversation.id,
-      contactId: contactRecord.id,
-      configOwnerUserId,
-      phoneNumberId,
-      inboundMessageId: message.id,
-    })
   }
 
   // message.received webhook (public API). Awaited — not fire-and-forget

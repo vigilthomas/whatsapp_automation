@@ -299,18 +299,3 @@ html[data-theme="rose"] {
   }
 }
 
-/* Reference-only motion bits used by the AI receptionist status card. */
-@keyframes clinicoro-pulse {
-  0% { transform: scale(0.6); opacity: 0.5; }
-  100% { transform: scale(1.8); opacity: 0; }
-}
-.ai-pulse { position: relative; }
-.ai-pulse::before {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  background: var(--teal);
-  opacity: 0.35;
-  animation: clinicoro-pulse 1.8s ease-out infinite;
-}

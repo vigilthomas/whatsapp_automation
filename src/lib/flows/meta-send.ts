@@ -3,7 +3,6 @@ import {
   sendInteractiveList,
   sendMediaMessage,
   sendTextMessage,
-  sendTypingIndicator,
   type InteractiveButton,
   type InteractiveListSection,
   type MediaKind,
@@ -45,10 +44,6 @@ interface SendTextEngineArgs {
   conversationId: string
   contactId: string
   text: string
-  /** Marks the persisted message row `ai_generated = true` so the inbox
-   *  badges it as an AI reply. Only the auto-reply bot sets this;
-   *  deterministic Flow/automation sends leave it false. */
-  aiGenerated?: boolean
 }
 
 /**
@@ -133,7 +128,6 @@ export async function engineSendText(
     content_text: args.text,
     message_id: waMessageId,
     status: 'sent',
-    ai_generated: args.aiGenerated ?? false,
   })
   if (msgErr) {
     throw new Error(`sent to Meta but DB insert failed: ${msgErr.message}`)
@@ -459,57 +453,4 @@ async function sendInteractiveViaMeta(
     .eq('id', input.conversationId)
 
   return { whatsapp_message_id: waMessageId }
-}
-
-// ============================================================
-// Typing indicator (AI auto-reply)
-// ============================================================
-
-/**
- * Show "typing…" to the customer while the AI generates a reply. Meta
- * clears the indicator after ~25s, so this re-sends it every 20s until
- * `stop()` is called (the caller does that right before/after sending
- * the actual reply — sending a message clears it anyway).
- *
- * Purely cosmetic: every failure is logged and swallowed. A missing
- * config, a bad token or a Meta 4xx must never block the reply itself.
- */
-export function engineTypingKeepalive(args: {
-  accountId: string
-  inboundMessageId: string
-}): { stop: () => void } {
-  let stopped = false
-  let timer: ReturnType<typeof setInterval> | null = null
-
-  const send = async () => {
-    try {
-      const db = supabaseAdmin()
-      const { data: config } = await db
-        .from('whatsapp_config')
-        .select('phone_number_id, access_token')
-        .eq('account_id', args.accountId)
-        .single()
-      if (!config || stopped) return
-      await sendTypingIndicator({
-        phoneNumberId: config.phone_number_id,
-        accessToken: decrypt(config.access_token),
-        inboundMessageId: args.inboundMessageId,
-      })
-    } catch (err) {
-      console.warn(
-        '[typing] indicator failed (ignored):',
-        err instanceof Error ? err.message : err,
-      )
-    }
-  }
-
-  void send()
-  timer = setInterval(() => void send(), 20_000)
-
-  return {
-    stop: () => {
-      stopped = true
-      if (timer) clearInterval(timer)
-    },
-  }
 }

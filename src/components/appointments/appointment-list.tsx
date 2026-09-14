@@ -117,7 +117,7 @@ export function AppointmentList({
                     <td className={cn(td, "text-muted-foreground")}>{t("list.minutes", { count: mins })}</td>
                     <td className={td}>
                       <Badge variant={TONE_VARIANT[chipTone(a)]}>
-                        {a.status === "scheduled" && a.source === "ai" ? t("bookedByAi") : tStatus(a.status)}
+                        {a.status === "scheduled" && a.source === "whatsapp" ? t("viaWhatsApp") : tStatus(a.status)}
                       </Badge>
                     </td>
                     {canEdit && (

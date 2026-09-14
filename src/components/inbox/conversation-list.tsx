@@ -38,24 +38,20 @@ interface ConversationListProps {
   resyncToken?: number;
 }
 
-type InboxFilter = ConversationStatus | "all" | "unread" | "ai" | "staff";
+type InboxFilter = ConversationStatus | "all" | "unread" | "unassigned";
 
 /**
- * Reference conversation states. Derived, not stored: the bot owns a
- * thread while auto-reply is on and nobody is assigned; "needs staff"
- * once the bot has paused/handed off or the thread is pending.
+ * Reference conversation states. Derived, not stored: a thread is
+ * "open" until someone is assigned to it, "waiting" while pending.
  */
-export type ConversationState = "ai" | "staff" | "assigned" | "pending" | "closed" | "open";
+export type ConversationState = "assigned" | "pending" | "closed" | "open";
 export function conversationState(c: Conversation): ConversationState {
   if (c.status === "closed") return "closed";
   if (c.assigned_agent_id) return "assigned";
   if (c.status === "pending") return "pending";
-  if (c.ai_autoreply_disabled) return "staff";
-  return "ai";
+  return "open";
 }
 const STATE_VARIANT: Record<ConversationState, "info" | "warn" | "neutral" | "success" | "danger"> = {
-  ai: "info",
-  staff: "warn",
   assigned: "neutral",
   pending: "warn",
   closed: "neutral",
@@ -71,12 +67,11 @@ export function ConversationList({
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
   
-  // Chips (reference): All · AI replying · Needs staff · Unread. The
-  // status filters stay reachable from the dropdown next to them.
+  // Chips (reference): All · Unassigned · Unread. The status filters
+  // stay reachable from the dropdown next to them.
   const CHIP_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterAll"), value: "all" },
-    { label: t("filterAi"), value: "ai" },
-    { label: t("filterStaff"), value: "staff" },
+    { label: t("filterUnassigned"), value: "unassigned" },
     { label: t("filterUnread"), value: "unread" },
   ], [t]);
   const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
@@ -185,10 +180,8 @@ export function ConversationList({
 
     if (filter === "unread") {
       result = result.filter((c) => c.unread_count > 0);
-    } else if (filter === "ai") {
-      result = result.filter((c) => conversationState(c) === "ai");
-    } else if (filter === "staff") {
-      result = result.filter((c) => ["staff", "pending", "assigned"].includes(conversationState(c)));
+    } else if (filter === "unassigned") {
+      result = result.filter((c) => ["open", "pending"].includes(conversationState(c)));
     } else if (filter !== "all") {
       result = result.filter((c) => c.status === filter);
     }

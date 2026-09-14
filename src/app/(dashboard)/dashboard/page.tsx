@@ -23,7 +23,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import {
-  AiReceptionistCard,
   AppointmentsTrend,
   DoctorAvailability,
   StatTile,
@@ -37,9 +36,9 @@ import {
  * appointments, doctor load, recent activity, recent WhatsApp
  * conversations and a 7-day appointments trend.
  *
- * The reference also shows call handling and an AI receptionist
- * panel; those features don't exist yet, so their tiles are not
- * rendered rather than shown with placeholder numbers.
+ * The reference also shows call handling; that feature doesn't exist
+ * yet, so its tile is not rendered rather than shown with placeholder
+ * numbers.
  */
 export default function DashboardPage() {
   const t = useTranslations('Dashboard.clinic')
@@ -107,7 +106,7 @@ export default function DashboardPage() {
 
   const appts = today?.today ?? []
   const live = appts.filter((a) => a.status !== 'cancelled')
-  const bookedByAi = live.filter((a) => a.source === 'ai').length
+  const viaWhatsApp = live.filter((a) => a.source === 'whatsapp').length
   const pending = live.filter((a) => a.status === 'scheduled').length
 
   return (
@@ -143,7 +142,7 @@ export default function DashboardPage() {
           icon={CalendarCheck}
           label={t('appointmentsToday')}
           value={todayLoading ? '…' : live.length}
-          sub={todayLoading ? undefined : t('bookedByAiCount', { count: bookedByAi })}
+          sub={todayLoading ? undefined : t('viaWhatsAppCount', { count: viaWhatsApp })}
           subTone="primary"
         />
         <StatTile
@@ -176,7 +175,6 @@ export default function DashboardPage() {
           <ActivityFeed items={activity} loading={activityLoading} />
         </div>
         <div className="flex flex-col gap-[18px]">
-          <AiReceptionistCard bookedByAi={bookedByAi} loading={todayLoading} />
           <WhatsAppConversations items={convos} loading={convosLoading} />
         </div>
       </div>

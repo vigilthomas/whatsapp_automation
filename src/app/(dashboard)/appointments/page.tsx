@@ -232,7 +232,7 @@ function AppointmentsPageInner() {
   }, [appointments, day, q]);
   const selected = appointments.find((a) => a.id === selectedId) ?? null;
   const live = (view === "day" ? dayRows : appointments).filter((a) => a.status !== "cancelled");
-  const aiCount = live.filter((a) => a.source === "ai").length;
+  const waCount = live.filter((a) => a.source === "whatsapp").length;
 
   const step = (dir: -1 | 1) => {
     if (view === "day") {
@@ -262,7 +262,7 @@ function AppointmentsPageInner() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {view === "day" ? dayLabel : weekLabel} · {t("countSummary", { count: live.length })}
-            {aiCount > 0 ? ` · ${t("aiSummary", { count: aiCount })}` : ""}
+            {waCount > 0 ? ` · ${t("whatsappSummary", { count: waCount })}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2.5">

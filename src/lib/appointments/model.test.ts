@@ -124,8 +124,8 @@ describe("week maths", () => {
 describe("chipTone", () => {
   it("maps status/source to the mockup palette", () => {
     expect(chipTone({ status: "scheduled", source: "manual" })).toBe("blue");
-    expect(chipTone({ status: "scheduled", source: "ai" })).toBe("green");
-    expect(chipTone({ status: "confirmed", source: "ai" })).toBe("blue");
+    expect(chipTone({ status: "scheduled", source: "whatsapp" })).toBe("green");
+    expect(chipTone({ status: "confirmed", source: "whatsapp" })).toBe("blue");
     expect(chipTone({ status: "completed", source: "manual" })).toBe("green");
     expect(chipTone({ status: "no_show", source: "manual" })).toBe("amber");
     expect(chipTone({ status: "cancelled", source: "manual" })).toBe("grey");

@@ -15,7 +15,7 @@ export const APPOINTMENT_STATUSES = [
 ] as const;
 export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
 
-export const APPOINTMENT_SOURCES = ["manual", "ai", "whatsapp"] as const;
+export const APPOINTMENT_SOURCES = ["manual", "whatsapp"] as const;
 export type AppointmentSource = (typeof APPOINTMENT_SOURCES)[number];
 
 /** Row as returned by /api/appointments — joined display names included. */
@@ -250,16 +250,16 @@ export function chipTone(a: Pick<Appointment, "status" | "source">): ChipTone {
     case "confirmed":
       return "blue";
     case "scheduled":
-      return a.source === "ai" ? "green" : "blue";
+      return a.source === "whatsapp" ? "green" : "blue";
   }
 }
 
 /** Short subtitle for a chip / list row. */
 export function chipSubtitle(
   a: Pick<Appointment, "status" | "source" | "contact">,
-  labels: Record<AppointmentStatus | "bookedByAi", string>,
+  labels: Record<AppointmentStatus | "viaWhatsApp", string>,
 ): string {
-  if (a.status === "scheduled" && a.source === "ai") return labels.bookedByAi;
+  if (a.status === "scheduled" && a.source === "whatsapp") return labels.viaWhatsApp;
   if (a.status === "scheduled") return a.contact?.name ?? a.contact?.phone ?? "";
   return labels[a.status];
 }

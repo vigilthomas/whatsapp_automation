@@ -17,11 +17,6 @@
   "Sidebar": {
     "title": "Clinicoro",
     "tagline": "Your clinic's AI receptionist",
-    "aiReceptionist": "AI Receptionist",
-    "aiOnline": "Online",
-    "aiOffline": "Off",
-    "aiHandling": "Handling messages 24/7",
-    "aiIdle": "Drafts only — auto-reply is off",
     "controls": "Controls",
     "accessControl": "Access control",
     "master": "Master",
@@ -45,7 +40,6 @@
     "broadcasts": "Broadcasts",
     "automations": "Automations",
     "flows": "Flows",
-    "aiAgents": "AI Agents",
     "settings": "Settings",
     "beta": "Beta",
     "unreadConversations": "{count} unread {count, plural, =1 {conversation} other {conversations}}",
@@ -82,7 +76,6 @@
     "automations": "Automations",
     "master": "Master",
     "flows": "Flows",
-    "aiAgents": "AI Agents",
     "accessControl": "Access control",
     "settings": "Settings",
     "openMenu": "Open menu",
@@ -116,19 +109,6 @@
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}"
     },
-    "ai": {
-      "title": "AI Receptionist",
-      "online": "Online",
-      "autoReplying": "Auto-replying",
-      "off": "Off",
-      "configure": "Configure",
-      "bookedToday": "{count, plural, =0 {No AI bookings yet today} =1 {1 appointment booked by AI today} other {# appointments booked by AI today}}",
-      "handling": "Answering WhatsApp messages around the clock.",
-      "draftsOnly": "Drafting replies for staff — auto-reply is off.",
-      "setupHint": "Connect a provider to start handling messages.",
-      "openPlayground": "Open playground",
-      "setUp": "Set up the assistant"
-    },
     "clinic": {
       "hours": "Working hours per clinic",
       "goodMorning": "Good morning, {name}",
@@ -136,7 +116,7 @@
       "goodEvening": "Good evening, {name}",
       "subtitle": "Here's what's happening at your clinic today.",
       "appointmentsToday": "Appointments today",
-      "bookedByAiCount": "{count} booked by AI",
+      "viaWhatsAppCount": "{count} via WhatsApp",
       "pendingConfirmations": "Pending confirmations",
       "pendingHint": "Awaiting patient confirmation",
       "whatsappChats": "WhatsApp chats",
@@ -156,7 +136,7 @@
       "unread": "{count} new",
       "appointmentsTrend": "Appointments Trend",
       "inClinic": "In-clinic",
-      "bookedByAi": "Booked by AI",
+      "viaWhatsApp": "Via WhatsApp",
       "cancelled": "Cancelled"
     },
     "quickActions": {
@@ -213,16 +193,15 @@
   },
   "Inbox": {
     "title": "WhatsApp",
-    "state": {"ai": "AI replying", "staff": "Needs staff", "assigned": "Assigned", "pending": "Waiting", "closed": "Closed", "open": "Open"},
+    "state": { "assigned": "Assigned", "pending": "Waiting", "closed": "Closed", "open": "Open"},
     "page": {
       "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account."
     },
     "conversationList": {
       "title": "WhatsApp",
-      "filterAi": "AI replying",
-      "filterStaff": "Needs staff",
+      "filterUnassigned": "Unassigned",
       "status": "Status",
-      "state": {"ai": "AI replying", "staff": "Needs staff", "assigned": "Assigned", "pending": "Waiting", "closed": "Closed", "open": "Open"},
+      "state": { "assigned": "Assigned", "pending": "Waiting", "closed": "Closed", "open": "Open"},
       "searchPlaceholder": "Search conversations...",
       "filterAll": "All",
       "filterUnread": "Unread",
@@ -238,7 +217,6 @@
       "unknown": "Unknown"
     },
     "messageThread": {
-      "aiReplying": "AI replying",
       "backToConversations": "Back to conversations",
       "hideContactPanel": "Hide contact panel",
       "showContactPanel": "Show contact panel",
@@ -285,7 +263,6 @@
       "document": "Document",
       "voiceNote": "Voice note",
       "sendTemplate": "Send template",
-      "draftWithAI": "Draft a reply with AI",
       "addCaption": "Add a caption…",
       "removeAttachment": "Remove attachment",
       "moreActions": "More",
@@ -299,7 +276,6 @@
       "quickReplySaveError": "Couldn't save the quick reply."
     },
     "bubble": {
-      "aiAuthor": "Clinicoro AI",
       "photo": "Photo",
       "video": "Video",
       "audio": "Audio",
@@ -369,13 +345,10 @@
     },
     "sidebar": {
       "appointment": "Appointment",
-      "bookedByAi": "Booked by AI",
+      "viaWhatsApp": "Via WhatsApp",
       "openCalendar": "Open calendar",
       "noAppointment": "No upcoming appointment.",
       "conversation": "Conversation",
-      "handledBy": "Handled by",
-      "clinicoroAi": "Clinicoro AI",
-      "staff": "Staff",
       "stateLabel": "State",
       "contactInfo": "Contact info",
       "tags": "Tags",
@@ -384,16 +357,6 @@
       "noTags": "No tags",
       "noDeals": "No deals",
       "addNotePlaceholder": "Add a note..."
-    },
-    "aiBanner": {
-      "pausedTitle": "AI assistant is paused here",
-      "activeText": "AI assistant is replying automatically",
-      "takeOver": "Take over",
-      "resume": "Resume AI",
-      "tookOver": "You’ve taken over this chat.",
-      "resumed": "AI resumed.",
-      "updateError": "Couldn’t update the AI assistant.",
-      "networkError": "Couldn’t reach the server."
     }
   },
   "Contacts": {
@@ -1349,7 +1312,7 @@
     "today": "Today",
     "prevWeek": "Previous week",
     "nextWeek": "Next week",
-    "bookedByAi": "Booked by AI",
+    "viaWhatsApp": "Via WhatsApp",
     "emptyWeek": "No appointments this week.",
     "loadFailed": "Couldn't load appointments.",
     "updateFailed": "Couldn't update the appointment.",
@@ -1363,7 +1326,7 @@
     "emptyDay": "No appointments on this day.",
     "searchPlaceholder": "Search patient or phone",
     "countSummary": "{count, plural, =1 {1 appointment} other {# appointments}}",
-    "aiSummary": "{count} booked by AI",
+    "whatsappSummary": "{count} via WhatsApp",
     "selectedActions": "Actions on a selected appointment",
     "selectedLabel": "Selected: {patient} · {time}",
     "noneSelected": "Select a row to act on it",
@@ -1374,7 +1337,7 @@
       "cancelled": "Cancelled",
       "no_show": "No-show"
     },
-    "source": { "manual": "Staff", "ai": "AI", "whatsapp": "WhatsApp" },
+    "source": { "manual": "Staff", "whatsapp": "WhatsApp" },
     "actions": {
       "add": "Add appointment",
       "edit": "Edit",
@@ -2039,8 +2002,7 @@
         "pipelines": "Pipelines",
         "broadcasts": "Broadcasts",
         "automations": "Automations",
-        "flows": "Flows",
-        "agents": "AI Agents"
+        "flows": "Flows"
       }
     },
     "deals": {
@@ -2054,74 +2016,6 @@
       "saving": "Saving...",
       "saveFailed": "Failed to save default currency",
       "saveSuccess": "Default currency updated"
-    },
-    "aiConfig": {
-      "title": "Agent setup",
-      "description": "Pick a provider: bring your own OpenAI or Anthropic key, use the built-in NVIDIA NIM (DeepSeek) service, or point at a self-hosted Ollama server. BYO keys are called directly — no per-seat AI fees, and your data stays yours. This powers AI-drafted replies in the inbox, the auto-reply bot, and the Playground.",
-      "adminOnlyConfig": "Only admins and owners can change the AI configuration.",
-      "loadFailed": "Failed to load AI configuration",
-      "providerAndKey": "Provider & key",
-      "encryptionNotice": "Your key is encrypted at rest (AES-256-GCM) and never shown again after saving.",
-      "provider": "Provider",
-      "model": "Model",
-      "apiKey": "API key",
-      "testKey": "Test key",
-      "keyOptional": "optional for this provider",
-      "testSuccess": "Key works — the provider responded.",
-      "testRejected": "The provider rejected the request.",
-      "testNetworkError": "Could not reach the provider.",
-      "embeddingsKey": "Embeddings key",
-      "optionalSemanticSearch": "(optional — enables semantic knowledge-base search)",
-      "embeddingsHint": "An OpenAI key used only to embed your knowledge base (text-embedding-3-small){sameKeyText}. Leave blank to use keyword search instead. Clear it to turn semantic search off.",
-      "sameKeyText": " — can be the same key as above",
-      "behaviour": "Behaviour",
-      "behaviourDesc": "Tell the assistant about your business — products, tone, what it may and may not promise. This context feeds both drafts and auto-replies.",
-      "businessContext": "Business context & instructions",
-      "promptPlaceholder": "e.g. We are Acme, a coffee-equipment store. Be warm and concise. Never quote prices or delivery dates — hand off to a human for those.",
-      "enableAssistant": "Enable AI assistant",
-      "enableAssistantDesc": "Master switch. Turns on the “Draft with AI” button in the inbox.",
-      "autoReply": "Auto-reply to inbound messages",
-      "autoReplyDesc": "The bot answers new inbound messages automatically (only when no flow handles them and no agent is assigned). Hands off to a human when it can’t help.",
-      "maxAutoReplies": "Max auto-replies per conversation",
-      "maxAutoRepliesDesc": "After this many bot replies in one thread, the bot goes quiet.",
-      "handoffTo": "Hand off to",
-      "handoffToDesc": "When the bot can’t help — or hits the reply cap — it pauses and routes the chat here, with a short note on what happened.",
-      "handoffQueue": "Unassigned queue (any agent can pick it up)",
-      "remove": "Remove",
-      "save": "Save",
-      "missingModel": "Enter a model name.",
-      "missingApiKey": "Enter your API key.",
-      "saveSuccess": "AI assistant saved.",
-      "saveFailed": "Failed to save.",
-      "removeSuccess": "AI configuration removed.",
-      "removeFailed": "Failed to remove."
-    },
-    "aiKnowledge": {
-      "loadFailed": "Failed to load knowledge base",
-      "openFailed": "Failed to open document",
-      "titleContentRequired": "Title and content are required.",
-      "saveSuccessNew": "Document added.",
-      "saveSuccessUpdate": "Document updated.",
-      "saveFailed": "Failed to save.",
-      "removeSuccess": "Document removed.",
-      "removeFailed": "Failed to remove.",
-      "reindexSuccess": "Reindexed {count} document(s).",
-      "reindexFailed": "Reindex failed.",
-      "title": "Knowledge base",
-      "description": "Add FAQs, policies, or product details. The assistant retrieves the relevant pieces when drafting and auto-replying, so it can answer instead of handing off.{searchType}",
-      "semanticSearchOn": " Semantic search is on (embeddings key set).",
-      "keywordSearchOn": " Using keyword search — add an embeddings key above for semantic search.",
-      "noDocs": "No documents yet.",
-      "editDocTitle": "Title",
-      "editDocTitlePlaceholder": "e.g. Returns & refunds policy",
-      "editDocContent": "Content",
-      "editDocContentPlaceholder": "Paste the FAQ answer, policy text, or product details…",
-      "cancel": "Cancel",
-      "saveDoc": "Save document",
-      "addDoc": "Add document",
-      "reindex": "Reindex",
-      "reindexTooltip": "Re-embed all documents (e.g. after adding an embeddings key)",
-      "loading": "Loading…"
     }
   }
 }

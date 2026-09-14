@@ -107,7 +107,7 @@ export function AppointmentCalendar({
     completed: tStatus("completed"),
     cancelled: tStatus("cancelled"),
     no_show: tStatus("no_show"),
-    bookedByAi: t("bookedByAi"),
+    viaWhatsApp: t("viaWhatsApp"),
   };
 
   const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });

@@ -206,9 +206,9 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
               <div className="mt-2.5 rounded-[10px] bg-mint p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-foreground">{apptTime}</span>
-                  {nextAppt.source === "ai" ? (
+                  {nextAppt.source === "whatsapp" ? (
                     <span className="inline-flex h-[22px] items-center rounded-full bg-info-bg px-2.5 text-[11.5px] font-semibold text-info-fg">
-                      {tSidebar("bookedByAi")}
+                      {tSidebar("viaWhatsApp")}
                     </span>
                   ) : null}
                 </div>
@@ -238,20 +238,9 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
               </span>
               <div className="mt-2.5 flex flex-col gap-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{tSidebar("handledBy")}</span>
-                  <span className="font-semibold text-foreground">
-                    {state === "ai" ? tSidebar("clinicoroAi") : tSidebar("staff")}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{tSidebar("stateLabel")}</span>
                   <span className="font-semibold text-foreground">{tState(state)}</span>
                 </div>
-                {conversation.ai_handoff_summary ? (
-                  <p className="rounded-lg bg-warn-bg px-2.5 py-2 text-[11.5px] text-warn-fg">
-                    {conversation.ai_handoff_summary}
-                  </p>
-                ) : null}
               </div>
             </div>
           ) : null}

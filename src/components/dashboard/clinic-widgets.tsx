@@ -7,10 +7,8 @@ import {
   ArrowRight,
   ArrowUpRight,
   ArrowDownRight,
-  ChevronRight,
   Loader2,
   Plus,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,7 +18,6 @@ import type { DoctorLoad, RecentConversation, TrendPoint } from "@/lib/dashboard
 import { WORK_END_HOUR, WORK_START_HOUR } from "@/components/appointments/appointment-calendar";
 import { BarChart } from "@/components/tremor/bar-chart";
 import { Badge } from "@/components/ui/badge";
-import { useAiStatus } from "@/hooks/use-ai-status";
 
 // Widgets for the clinic dashboard, one per card in the reference
 // layout (public/Main-html). Each is presentational: the page loads
@@ -200,7 +197,7 @@ export function TodayAppointments({
         <ul>
           {items.map((a) => {
             const label =
-              a.status === "scheduled" && a.source === "ai" ? tAppt("bookedByAi") : tStatus(a.status);
+              a.status === "scheduled" && a.source === "whatsapp" ? tAppt("viaWhatsApp") : tStatus(a.status);
             return (
               <li key={a.id} className="flex items-center gap-4 border-t border-border px-5 py-3">
                 <span className="min-w-[72px] shrink-0 text-sm font-medium text-muted-foreground tabular-nums">
@@ -349,66 +346,6 @@ export function WhatsAppConversations({
 
 // ---------------------------------------------------------------
 
-/**
- * AI Receptionist panel (reference: the highlighted card with the
- * teal halo). Reads the account's AI config; shows whether the
- * assistant is live, whether it auto-replies, and today's AI-booked
- * count. Links into the AI Agents page.
- */
-export function AiReceptionistCard({ bookedByAi, loading }: { bookedByAi: number; loading: boolean }) {
-  const t = useTranslations("Dashboard.ai");
-  const ai = useAiStatus();
-  const live = ai.loaded && ai.active;
-
-  return (
-    <section className="rounded-2xl border border-[#CDEDE9] bg-card p-5 shadow-[0_0_0_4px_rgba(14,159,154,.06),var(--sh-sm)] dark:border-teal/40">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-heading text-[15px] font-semibold text-foreground">{t("title")}</h3>
-        <div className="flex items-center gap-2">
-          {!ai.loaded ? null : live ? (
-            <Badge variant="success">
-              <i className="size-[7px] rounded-full bg-current" />
-              {ai.autoReply ? t("autoReplying") : t("online")}
-            </Badge>
-          ) : (
-            <Badge variant="neutral">{t("off")}</Badge>
-          )}
-          <Link href="/agents" aria-label={t("configure")} className="text-muted-foreground/80 hover:text-foreground">
-            <ChevronRight className="size-4" strokeWidth={1.75} />
-          </Link>
-        </div>
-      </div>
-      <div className="mb-3.5 flex items-center gap-3.5">
-        <span
-          className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-mint text-teal-700",
-            live && "ai-pulse",
-          )}
-        >
-          <Sparkles className="relative size-5" strokeWidth={1.75} />
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">
-            {loading ? "…" : t("bookedToday", { count: bookedByAi })}
-          </p>
-          <p className="text-[13px] text-muted-foreground">
-            {!ai.loaded ? "…" : live ? (ai.autoReply ? t("handling") : t("draftsOnly")) : t("setupHint")}
-          </p>
-        </div>
-      </div>
-      <Link
-        href="/agents"
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input bg-card px-3 text-[12.5px] font-semibold text-foreground hover:bg-sunken"
-      >
-        {live ? t("openPlayground") : t("setUp")}
-        <ArrowRight className="size-3.5" strokeWidth={1.75} />
-      </Link>
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------
-
 export function AppointmentsTrend({
   points,
   loading,
@@ -420,7 +357,7 @@ export function AppointmentsTrend({
   const data = (points ?? []).map((p) => ({
     day: p.label,
     [t("inClinic")]: p.inClinic,
-    [t("bookedByAi")]: p.bookedByAi,
+    [t("viaWhatsApp")]: p.viaWhatsApp,
     [t("cancelled")]: p.cancelled,
   }));
 
@@ -433,7 +370,7 @@ export function AppointmentsTrend({
           className="h-56"
           data={data}
           index="day"
-          categories={[t("inClinic"), t("bookedByAi"), t("cancelled")]}
+          categories={[t("inClinic"), t("viaWhatsApp"), t("cancelled")]}
           colors={["emerald", "blue", "pink"]}
           type="stacked"
           showLegend

@@ -46,7 +46,6 @@ export const MODULES = [
   "broadcasts",
   "automations",
   "flows",
-  "agents",
 ] as const;
 
 export type ModuleId = (typeof MODULES)[number];
@@ -83,7 +82,6 @@ const ROUTE_MODULES: Record<string, ModuleId> = {
   "/broadcasts": "broadcasts",
   "/automations": "automations",
   "/flows": "flows",
-  "/agents": "agents",
 };
 
 export function isModuleId(value: unknown): value is ModuleId {
