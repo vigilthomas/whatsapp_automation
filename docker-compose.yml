@@ -1,5 +1,3 @@
-name: wacrm
-
 services:
   app:
     build:
