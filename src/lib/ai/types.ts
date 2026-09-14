@@ -6,7 +6,7 @@
 // whether the account is on OpenAI or Anthropic.
 // ============================================================
 
-export type AiProvider = 'openai' | 'anthropic'
+export type AiProvider = 'openai' | 'anthropic' | 'nvidia_nim' | 'ollama'
 
 /**
  * Account AI setup, decrypted and ready to use. Produced by
@@ -35,6 +35,46 @@ export interface AiConfig {
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+}
+
+/** A tool call the model wants to execute. */
+export interface ToolCallRequest {
+  id: string
+  type: 'function'
+  function: {
+    name: string
+    arguments: string
+  }
+}
+
+/** Chat message that may carry tool-call requests or a tool result. */
+export interface ChatMessageWithRole {
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  content: string | null
+  tool_calls?: ToolCallRequest[]
+  /** Set when role === 'tool' — references the tool_call.id. */
+  tool_call_id?: string
+}
+
+/** Result of executing a single tool call. */
+export interface ToolCallResult {
+  toolCallId: string
+  toolName: string
+  args: Record<string, unknown>
+  result: unknown
+  executionMs: number
+}
+
+/** Outcome of a generation call that may include tool calls. */
+export interface GenerateWithToolsResult {
+  /** The final reply text, with any handoff sentinel stripped. */
+  text: string
+  /** True when the model asked to hand off to a human. */
+  handoff: boolean
+  /** Aggregated provider token usage across all rounds. */
+  usage: AiUsage | null
+  /** Tool calls that were executed during this generation. */
+  toolCalls: ToolCallResult[]
 }
 
 /**

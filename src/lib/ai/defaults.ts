@@ -13,6 +13,8 @@ import type { AiProvider } from './types'
 export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
   openai: 'gpt-5.4-mini',
   anthropic: 'claude-haiku-4-5-20251001',
+  nvidia_nim: 'deepseek-ai/deepseek-v4-flash-0731',
+  ollama: 'gemma:2b',
 }
 
 /**
@@ -25,6 +27,11 @@ export const HANDOFF_SENTINEL = '[[HANDOFF]]'
 /** Cap on generated reply length — keeps WhatsApp replies short and
  *  bounds token spend on the caller's own key. */
 export const MAX_OUTPUT_TOKENS = 1024
+
+/** Max rounds of tool calling before we force a text response.
+ *  Prevents infinite loops and bounds token spend on any single
+ *  inbound. */
+export const MAX_TOOL_CALL_ROUNDS = 3
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 const DEFAULT_CONTEXT_MESSAGE_LIMIT = 20

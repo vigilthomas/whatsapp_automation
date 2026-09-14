@@ -44,12 +44,19 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  // Base UI expects `nativeButton={false}` whenever `render` swaps in a
+  // non-<button> element (e.g. `render={<Link />}`), otherwise it logs a
+  // console error about lost native button semantics. Infer it from the
+  // presence of `render` so call sites don't have to remember.
+  const isNative = nativeButton ?? props.render === undefined
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      nativeButton={isNative}
       {...props}
     />
   )

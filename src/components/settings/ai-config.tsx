@@ -38,14 +38,21 @@ const MASKED_KEY = '••••••••••••••••';
 // unassigned" choice gets a sentinel that maps to null in the payload.
 const HANDOFF_QUEUE = '__queue__';
 
+// nvidia_nim / ollama are platform-level (env-configured), not BYO-key,
+// so they aren't offered in this picker — but the Record must still be
+// total over AiProvider for the type to hold.
 const PROVIDER_LABEL: Record<AiProvider, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic (Claude)',
+  nvidia_nim: 'NVIDIA NIM',
+  ollama: 'Ollama (local)',
 };
 
 const KEY_PLACEHOLDER: Record<AiProvider, string> = {
   openai: 'sk-...',
   anthropic: 'sk-ant-...',
+  nvidia_nim: 'nvapi-...',
+  ollama: '',
 };
 
 export function AiConfig() {

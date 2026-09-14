@@ -9,6 +9,19 @@ import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+// Clinic AI gateway imports
+import {
+  resolveClinicFromPhoneNumberId,
+  loadClinicAiConfig,
+  loadClinicInfo,
+  loadClinicServices,
+} from './clinic-config'
+import { buildClinicSystemPrompt, languageLabel } from './clinic-prompt'
+import { tryBasicReply } from './basic-reply'
+import { extractAppointmentIntent, formatExtractionHint } from './local-extract'
+import { generateWithTools } from './generate-with-tools'
+import { filterAllowedTools, toToolDefinitions } from './tools/definitions'
+import { checkClinicUsageLimit } from './usage-guard'
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -18,6 +31,10 @@ interface DispatchArgs {
   /** The account's WhatsApp config owner, used for the outbound send's
    *  audit columns (mirrors how the flow runner passes it through). */
   configOwnerUserId: string
+  /** Meta phone_number_id — used to resolve the clinic for the AI
+   *  gateway. When set and a clinic is found, the tool-calling path
+   *  runs; otherwise the existing BYO-key path is used. */
+  phoneNumberId?: string
 }
 
 /**
@@ -42,10 +59,33 @@ interface DispatchArgs {
 export async function dispatchInboundToAiReply(
   args: DispatchArgs,
 ): Promise<void> {
-  const { accountId, conversationId, contactId, configOwnerUserId } = args
+  const { accountId, conversationId, contactId, configOwnerUserId, phoneNumberId } = args
 
   try {
     const db = supabaseAdmin()
+
+    // ── Clinic AI gateway path ──────────────────────────────
+    // When the inbound arrived on a phone number bound to a clinic
+    // with an active AI config, use the tool-calling receptionist.
+    if (phoneNumberId) {
+      const clinicRef = await resolveClinicFromPhoneNumberId(db, phoneNumberId)
+      if (clinicRef) {
+        const clinicConfig = await loadClinicAiConfig(db, clinicRef.clinicId)
+        if (clinicConfig) {
+          await dispatchClinicAiReply({
+            db,
+            clinicConfig,
+            accountId,
+            conversationId,
+            contactId,
+            configOwnerUserId,
+          })
+          return // Clinic AI handled it — don't fall through.
+        }
+      }
+    }
+
+    // ── Existing BYO-key path (unchanged) ────────────────────
 
     const config = await loadAiConfig(db, accountId)
     if (!config || !config.autoReplyEnabled) return
@@ -190,4 +230,200 @@ export async function dispatchInboundToAiReply(
   } catch (err) {
     console.error('[ai auto-reply] dispatch failed:', err)
   }
+}
+
+// ============================================================
+// Clinic AI gateway — tool-calling receptionist path.
+//
+// Separated into its own function for clarity. Runs when a clinic
+// has been resolved from the inbound phone number and has an active
+// clinic_ai_configs row. Uses NVIDIA NIM (or compatible) with tool
+// calling for appointment management.
+// ============================================================
+
+interface ClinicDispatchArgs {
+  db: ReturnType<typeof supabaseAdmin>
+  clinicConfig: NonNullable<Awaited<ReturnType<typeof loadClinicAiConfig>>>
+  accountId: string
+  conversationId: string
+  contactId: string
+  configOwnerUserId: string
+}
+
+async function dispatchClinicAiReply(args: ClinicDispatchArgs): Promise<void> {
+  const { db, clinicConfig, accountId, conversationId, contactId, configOwnerUserId } = args
+
+  // ── Conversation eligibility gates (same logic as BYO path) ──
+  const { data: conv, error: convErr } = await db
+    .from('conversations')
+    .select('assigned_agent_id, ai_autoreply_disabled, ai_reply_count')
+    .eq('id', conversationId)
+    .maybeSingle()
+  if (convErr || !conv) return
+  if (conv.assigned_agent_id) return
+  if (conv.ai_autoreply_disabled) return
+
+  const messages = await buildConversationContext(db, conversationId)
+  if (messages.length === 0) return
+
+  // ── Usage guard ──
+  const usageCheck = await checkClinicUsageLimit(
+    db,
+    clinicConfig.clinicId,
+    clinicConfig,
+  )
+  if (!usageCheck.allowed) {
+    console.warn(
+      `[clinic ai] clinic ${clinicConfig.clinicId} hit usage limit: ${usageCheck.reason}`,
+    )
+    // Hand off to a human rather than silently ignoring.
+    const update: Record<string, unknown> = {
+      ai_autoreply_disabled: true,
+      ai_handoff_summary: `🤖 AI monthly limit reached: ${usageCheck.reason}`,
+    }
+    if (clinicConfig.handoffAgentId && !conv.assigned_agent_id) {
+      update.assigned_agent_id = clinicConfig.handoffAgentId
+    }
+    await db.from('conversations').update(update).eq('id', conversationId)
+    return
+  }
+
+  // ── Load context for the system prompt ──
+  const clinic = await loadClinicInfo(db, clinicConfig.clinicId)
+  if (!clinic) return
+
+  const { data: contact } = await db
+    .from('contacts')
+    .select('name, phone')
+    .eq('id', contactId)
+    .maybeSingle()
+  const patient = { name: contact?.name ?? null, phone: contact?.phone ?? '' }
+
+  // ── Fast path: small talk → local model ──
+  // Greetings / thanks / acks don't need tools or the full clinic
+  // context; answer them from a local Ollama model in ~2s instead of
+  // waiting on NIM. Returns null when the flag is off, the message
+  // isn't small talk, or Ollama fails — then we continue as normal.
+  const basic = await tryBasicReply({
+    db,
+    accountId,
+    conversationId,
+    contactId,
+    clinicId: clinicConfig.clinicId,
+    clinicName: clinic.name,
+    patientName: patient.name,
+    language: languageLabel(clinicConfig.language),
+    messages,
+  })
+  if (basic) {
+    await engineSendText({
+      accountId,
+      userId: configOwnerUserId,
+      conversationId,
+      contactId,
+      text: basic.text,
+      aiGenerated: true,
+    })
+    return
+  }
+
+  // ── Local pre-extraction (optional) ──
+  // Not small talk, so this is going to the primary model. Kick off
+  // the local intent/entity parser in parallel with the DB lookups
+  // below; its result becomes a hint in the system prompt.
+  const extractionPromise = extractAppointmentIntent(messages)
+
+  const services = await loadClinicServices(db, accountId)
+
+  // Recent appointments for the patient at this clinic.
+  const { data: recentAppts } = await db
+    .from('appointments')
+    .select('starts_at, service, status, doctor:doctors(name)')
+    .eq('contact_id', contactId)
+    .eq('clinic_id', clinicConfig.clinicId)
+    .gte('starts_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .order('starts_at', { ascending: false })
+    .limit(3)
+
+  const recentAppointments = (recentAppts ?? []).map((a) => ({
+    starts_at: a.starts_at as string,
+    service: a.service as string,
+    doctor_name: (a.doctor as { name: string }[] | null)?.[0]?.name ?? null,
+    status: a.status as string,
+  }))
+
+  // ── Filter tools by clinic permissions ──
+  const allowedTools = filterAllowedTools({
+    allow_booking: clinicConfig.allowBooking,
+    allow_rescheduling: clinicConfig.allowRescheduling,
+    allow_cancellation: clinicConfig.allowCancellation,
+    allow_patient_creation: clinicConfig.allowPatientCreation,
+  })
+
+  const systemPrompt = buildClinicSystemPrompt({
+    config: clinicConfig,
+    clinic,
+    patient,
+    services,
+    recentAppointments,
+    availableToolNames: allowedTools.map((t) => t.function.name),
+    extractionHint: formatExtractionHint(await extractionPromise),
+  })
+
+  // ── Generate with tool calling ──
+  const { text, handoff, usage, toolCalls } = await generateWithTools({
+    provider: clinicConfig.provider,
+    model: clinicConfig.model,
+    systemPrompt,
+    messages,
+    tools: toToolDefinitions(allowedTools),
+    clinicContext: {
+      accountId,
+      clinicId: clinicConfig.clinicId,
+      patientId: contactId,
+      conversationId,
+    },
+    db,
+  })
+
+  // ── Log usage ──
+  const requestType = toolCalls.length > 0 ? 'tool_call' : 'chat'
+  void logAiUsage(db, {
+    accountId,
+    conversationId,
+    mode: 'auto_reply',
+    provider: clinicConfig.provider,
+    model: clinicConfig.model,
+    usage,
+    clinicId: clinicConfig.clinicId,
+    patientId: contactId,
+    requestType,
+  })
+
+  // ── Handoff ──
+  if (handoff || !text) {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: conv.ai_reply_count ?? 0,
+    })
+    const update: Record<string, unknown> = {
+      ai_autoreply_disabled: true,
+      ai_handoff_summary: summary,
+    }
+    if (clinicConfig.handoffAgentId && !conv.assigned_agent_id) {
+      update.assigned_agent_id = clinicConfig.handoffAgentId
+    }
+    await db.from('conversations').update(update).eq('id', conversationId)
+    return
+  }
+
+  // ── Send the reply ──
+  await engineSendText({
+    accountId,
+    userId: configOwnerUserId,
+    conversationId,
+    contactId,
+    text,
+    aiGenerated: true,
+  })
 }

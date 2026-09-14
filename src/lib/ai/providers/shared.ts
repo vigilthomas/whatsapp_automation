@@ -1,8 +1,18 @@
-import { AiError, type AiUsage, type ChatMessage } from '../types'
+import { AiError, type AiUsage, type ChatMessage, type ChatMessageWithRole } from '../types'
 
 // ============================================================
 // Bits shared by the OpenAI + Anthropic adapters.
 // ============================================================
+
+/** JSON Schema definition for a tool the model can call. */
+export interface ToolDefinition {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: Record<string, unknown>
+  }
+}
 
 export interface ProviderArgs {
   apiKey: string
@@ -10,6 +20,11 @@ export interface ProviderArgs {
   systemPrompt: string
   messages: ChatMessage[]
   timeoutMs: number
+  /** OpenAI-format tool definitions. When set, the provider includes
+   *  them in the request and the response may contain tool_calls. */
+  tools?: ToolDefinition[]
+  /** Controls whether the model must call a tool. Defaults to 'auto'. */
+  toolChoice?: 'auto' | 'none' | 'required'
 }
 
 /**
@@ -95,6 +110,38 @@ export async function providerHttpError(
  * lines). Anthropic requires strictly alternating roles; merging is
  * also harmless for OpenAI and keeps the transcript compact.
  */
+/**
+ * Tool-aware variant of `mergeConsecutive` for the tool-calling loop.
+ * Plain user/assistant text turns are merged exactly as above, but an
+ * assistant turn carrying `tool_calls` and every `tool` result message
+ * are passed through untouched — merging those would drop the
+ * `tool_call_id` linkage the provider needs to pair results with
+ * calls, and OpenAI-compatible endpoints reject that.
+ */
+export function mergeConsecutiveWithTools(
+  messages: ChatMessageWithRole[],
+): ChatMessageWithRole[] {
+  const out: ChatMessageWithRole[] = []
+  for (const m of messages) {
+    const isPlainText =
+      (m.role === 'user' || m.role === 'assistant') && !m.tool_calls && !m.tool_call_id
+    const last = out[out.length - 1]
+    const lastIsPlainText =
+      !!last &&
+      (last.role === 'user' || last.role === 'assistant') &&
+      !last.tool_calls &&
+      !last.tool_call_id
+    if (isPlainText && lastIsPlainText && last.role === m.role) {
+      last.content = `${last.content ?? ''}
+
+${m.content ?? ''}`
+    } else {
+      out.push({ ...m })
+    }
+  }
+  return out
+}
+
 export function mergeConsecutive(messages: ChatMessage[]): ChatMessage[] {
   const out: ChatMessage[] = []
   for (const m of messages) {

@@ -29,6 +29,9 @@ describe('logAiUsage', () => {
       prompt_tokens: 30,
       completion_tokens: 6,
       total_tokens: 36,
+      clinic_id: null,
+      patient_id: null,
+      request_type: 'chat',
     })
   })
 

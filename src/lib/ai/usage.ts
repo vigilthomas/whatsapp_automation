@@ -11,6 +11,12 @@ export interface LogAiUsageArgs {
   model: string
   /** Provider usage; a no-op when null (nothing worth recording). */
   usage: AiUsage | null
+  /** Clinic ID for clinic-scoped AI. Null for account-level BYO-key. */
+  clinicId?: string | null
+  /** Patient (contact) ID for clinic-scoped AI. */
+  patientId?: string | null
+  /** Request type for analytics: 'chat', 'tool_call', etc. */
+  requestType?: string
 }
 
 /**
@@ -41,6 +47,9 @@ export async function logAiUsage(
       prompt_tokens: args.usage.promptTokens,
       completion_tokens: args.usage.completionTokens,
       total_tokens: args.usage.totalTokens,
+      clinic_id: args.clinicId ?? null,
+      patient_id: args.patientId ?? null,
+      request_type: args.requestType ?? 'chat',
     })
     if (error) {
       console.error('[ai usage] log insert failed:', error)
