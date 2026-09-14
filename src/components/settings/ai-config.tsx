@@ -191,7 +191,8 @@ export function AiConfig() {
       toast.error(t('missingModel'));
       return;
     }
-    if (!configured && !keyEdited) {
+    // First save of a BYO provider needs a key; NIM/Ollama don't.
+    if (!configured && !keyEdited && !KEYLESS.has(provider)) {
       toast.error(t('missingApiKey'));
       return;
     }
