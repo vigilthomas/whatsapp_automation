@@ -21,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { avatarColor, initialsOf } from "@/components/dashboard/clinic-widgets";
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -36,15 +38,29 @@ interface ConversationListProps {
   resyncToken?: number;
 }
 
-const STATUS_COLORS: Record<ConversationStatus, string> = {
-  open: "bg-primary",
-  pending: "bg-amber-500",
-  closed: "bg-muted-foreground",
+type InboxFilter = ConversationStatus | "all" | "unread" | "ai" | "staff";
+
+/**
+ * Reference conversation states. Derived, not stored: the bot owns a
+ * thread while auto-reply is on and nobody is assigned; "needs staff"
+ * once the bot has paused/handed off or the thread is pending.
+ */
+export type ConversationState = "ai" | "staff" | "assigned" | "pending" | "closed" | "open";
+export function conversationState(c: Conversation): ConversationState {
+  if (c.status === "closed") return "closed";
+  if (c.assigned_agent_id) return "assigned";
+  if (c.status === "pending") return "pending";
+  if (c.ai_autoreply_disabled) return "staff";
+  return "ai";
+}
+const STATE_VARIANT: Record<ConversationState, "info" | "warn" | "neutral" | "success" | "danger"> = {
+  ai: "info",
+  staff: "warn",
+  assigned: "neutral",
+  pending: "warn",
+  closed: "neutral",
+  open: "success",
 };
-
-
-
-type InboxFilter = ConversationStatus | "all" | "unread";
 
 export function ConversationList({
   activeConversationId,
@@ -55,9 +71,15 @@ export function ConversationList({
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
   
-  const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
+  // Chips (reference): All · AI replying · Needs staff · Unread. The
+  // status filters stay reachable from the dropdown next to them.
+  const CHIP_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterAll"), value: "all" },
+    { label: t("filterAi"), value: "ai" },
+    { label: t("filterStaff"), value: "staff" },
     { label: t("filterUnread"), value: "unread" },
+  ], [t]);
+  const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterOpen"), value: "open" },
     { label: t("filterPending"), value: "pending" },
     { label: t("filterClosed"), value: "closed" },
@@ -163,6 +185,10 @@ export function ConversationList({
 
     if (filter === "unread") {
       result = result.filter((c) => c.unread_count > 0);
+    } else if (filter === "ai") {
+      result = result.filter((c) => conversationState(c) === "ai");
+    } else if (filter === "staff") {
+      result = result.filter((c) => ["staff", "pending", "assigned"].includes(conversationState(c)));
     } else if (filter !== "all") {
       result = result.filter((c) => c.status === filter);
     }
@@ -223,23 +249,46 @@ export function ConversationList({
     // w-full on mobile so the list occupies the whole viewport when it's
     // the single pane showing; fixed 320px on desktop where it shares the
     // row with the thread + contact sidebar.
-    <div className="flex h-full w-full flex-col border-r border-border bg-card lg:w-80">
-      {/* Search + Filter */}
-      <div className="space-y-2 border-b border-border p-3">
+    <div className="flex h-full w-full flex-col border-r border-border bg-card lg:w-[320px]">
+      {/* Title + search + state chips (reference left column) */}
+      <div className="border-b border-border px-4 pt-[18px] pb-3">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-heading text-lg font-semibold text-foreground">{t("title")}</h2>
+        </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground/70" strokeWidth={1.75} />
           <Input
             value={search}
             onChange={handleSearchChange}
             placeholder={t("searchPlaceholder")}
-            className="border-border bg-muted pl-9 text-sm text-foreground placeholder-muted-foreground focus:border-primary/50"
+            className="h-9 rounded-[10px] border-input bg-card pl-9 text-[13.5px] text-foreground placeholder:text-muted-foreground/70"
           />
         </div>
+        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none]">
+          {CHIP_OPTIONS.map((opt) => {
+            const on = filter === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFilter(opt.value)}
+                className={cn(
+                  "inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors",
+                  on
+                    ? "border-navy bg-navy text-white dark:border-teal dark:bg-teal dark:text-[#06201f]"
+                    : "border-input bg-card text-foreground hover:bg-sunken",
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
 
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="mt-2 flex flex-wrap items-center gap-1">
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
-                {activeFilter?.label ?? t("filterAll")}
+            <DropdownMenuTrigger className="inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-sunken hover:text-foreground">
+                {activeFilter?.label ?? t("status")}
                 <ChevronDown className="h-3 w-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -438,7 +487,8 @@ function ConversationItem({
 }: ConversationItemProps) {
   const contact = conversation.contact;
   const displayName = contact?.name || contact?.phone || t("unknown");
-  const initials = displayName.charAt(0).toUpperCase();
+  const initials = initialsOf(displayName);
+  const state = conversationState(conversation);
 
   const handleClick = useCallback(() => {
     onSelect(conversation);
@@ -454,17 +504,20 @@ function ConversationItem({
     <button
       onClick={handleClick}
       className={cn(
-        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-        isActive && "border-l-2 border-primary bg-muted/70"
+        "flex w-full items-start gap-3 border-t border-border px-4 py-3 text-left transition-colors hover:bg-card-2",
+        isActive && "bg-[#F2FBF9] hover:bg-[#F2FBF9] dark:bg-mint dark:hover:bg-mint"
       )}
     >
-      {/* Avatar */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
+      {/* Avatar — deterministic colour per contact (reference .a1–.a6) */}
+      <div
+        className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
+        style={{ background: avatarColor(conversation.contact_id) }}
+      >
         {contact?.avatar_url ? (
           <img
             src={contact.avatar_url}
             alt={displayName}
-            className="h-10 w-10 rounded-full object-cover"
+            className="size-9 rounded-full object-cover"
           />
         ) : (
           initials
@@ -474,29 +527,21 @@ function ConversationItem({
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
+          <span className="truncate text-[13.5px] font-semibold text-foreground">
             {displayName}
           </span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground/80">{timeAgo}</span>
         </div>
-        <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-muted-foreground">
-            {conversation.last_message_text || t("noMessagesYet")}
-          </p>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {conversation.unread_count > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                {conversation.unread_count}
-              </span>
-            )}
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                STATUS_COLORS[conversation.status]
-              )}
-              title={conversation.status}
-            />
-          </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {conversation.last_message_text || t("noMessagesYet")}
+        </p>
+        <div className="mt-1 flex items-center gap-1.5">
+          <Badge variant={STATE_VARIANT[state]}>{t(`state.${state}`)}</Badge>
+          {conversation.unread_count > 0 && (
+            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-teal px-1 text-[10px] font-bold text-white">
+              {conversation.unread_count}
+            </span>
+          )}
         </div>
       </div>
     </button>

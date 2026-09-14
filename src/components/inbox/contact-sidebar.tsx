@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import type { Contact, Deal, ContactNote, Tag } from "@/types";
+import type { Contact, Deal, ContactNote, Tag, Conversation } from "@/types";
 import {
   Phone,
   Mail,
@@ -20,17 +20,33 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { useTranslations } from "next-intl";
+import { avatarColor, initialsOf } from "@/components/dashboard/clinic-widgets";
+import { conversationState } from "@/components/inbox/conversation-list";
+import Link from "next/link";
 
 interface ContactSidebarProps {
   contact: Contact | null;
+  /** The open thread — drives the "Conversation" details block. */
+  conversation?: Conversation | null;
 }
 
-export function ContactSidebar({ contact }: ContactSidebarProps) {
+interface NextAppointment {
+  id: string;
+  starts_at: string;
+  service: string;
+  status: string;
+  source: string;
+  doctor: { name: string } | null;
+}
+
+export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
   const tSidebar = useTranslations("Inbox.sidebar");
   const tThread = useTranslations("Inbox.messageThread");
+  const tState = useTranslations("Inbox.state");
 
   const { accountId } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [nextAppt, setNextAppt] = useState<NextAppointment | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [tags, setTags] = useState<(Tag & { contact_tag_id: string })[]>([]);
@@ -41,6 +57,25 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     if (!contact) return;
 
     const supabase = createClient();
+
+    // Next upcoming appointment for the reference "Appointment" block.
+    void supabase
+      .from("appointments")
+      .select("id, starts_at, service, status, source, doctor:doctors(name)")
+      .eq("contact_id", contact.id)
+      .gte("starts_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+      .neq("status", "cancelled")
+      .order("starts_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return setNextAppt(null);
+        const doc = data.doctor as unknown as { name: string }[] | { name: string } | null;
+        setNextAppt({
+          ...(data as Omit<NextAppointment, "doctor">),
+          doctor: Array.isArray(doc) ? (doc[0] ?? null) : doc,
+        });
+      });
 
     // Fetch deals, notes, and tags in parallel
     const [dealsRes, notesRes, tagsRes] = await Promise.all([
@@ -121,42 +156,108 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
 
   if (!contact) {
     return (
-      <div className="flex h-full w-70 items-center justify-center border-l border-border bg-card">
+      <div className="flex h-full w-[300px] items-center justify-center border-l border-border bg-card">
         <p className="text-sm text-muted-foreground">{tThread("selectConversation")}</p>
       </div>
     );
   }
 
   const displayName = contact.name || contact.phone;
-  const initials = displayName.charAt(0).toUpperCase();
+  const initials = initialsOf(displayName);
+  const apptTime = nextAppt
+    ? new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(nextAppt.starts_at))
+    : null;
+  const state = conversation ? conversationState(conversation) : null;
 
   return (
-    <div className="flex h-full w-70 flex-col border-l border-border bg-card">
+    <div className="flex h-full w-[300px] flex-col border-l border-border bg-card">
       <ScrollArea className="flex-1">
-        <div className="p-4">
+        <div className="p-5">
           {/* Contact Info */}
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">
+            <div
+              className="flex size-12 items-center justify-center overflow-hidden rounded-full text-[15px] font-bold text-white"
+              style={{ background: avatarColor(contact.id) }}
+            >
               {contact.avatar_url ? (
                 <img
                   src={contact.avatar_url}
                   alt={displayName}
-                  className="h-16 w-16 rounded-full object-cover"
+                  className="size-12 rounded-full object-cover"
                 />
               ) : (
                 initials
               )}
             </div>
-            <h3 className="mt-3 text-sm font-semibold text-foreground">
+            <h3 className="mt-2 text-[15px] font-semibold text-foreground">
               {displayName}
             </h3>
             {contact.company && (
-              <p className="text-xs text-muted-foreground">{contact.company}</p>
+              <p className="text-[11px] text-muted-foreground">{contact.company}</p>
             )}
           </div>
 
+          {/* Appointment block (reference) */}
+          <div className="mt-4">
+            <span className="text-[11.5px] font-bold tracking-[0.06em] text-muted-foreground/80 uppercase">
+              {tSidebar("appointment")}
+            </span>
+            {nextAppt ? (
+              <div className="mt-2.5 rounded-[10px] bg-mint p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-foreground">{apptTime}</span>
+                  {nextAppt.source === "ai" ? (
+                    <span className="inline-flex h-[22px] items-center rounded-full bg-info-bg px-2.5 text-[11.5px] font-semibold text-info-fg">
+                      {tSidebar("bookedByAi")}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-xs text-teal-700">
+                  {nextAppt.service}
+                  {nextAppt.doctor ? ` · ${nextAppt.doctor.name}` : ""}
+                </p>
+                <div className="mt-2.5 flex gap-1.5">
+                  <Link
+                    href="/appointments"
+                    className="inline-flex h-8 items-center rounded-lg border border-input bg-card px-3 text-[12.5px] font-semibold text-foreground hover:bg-sunken"
+                  >
+                    {tSidebar("openCalendar")}
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">{tSidebar("noAppointment")}</p>
+            )}
+          </div>
+
+          {/* Conversation details (reference) */}
+          {conversation && state ? (
+            <div className="mt-4">
+              <span className="text-[11.5px] font-bold tracking-[0.06em] text-muted-foreground/80 uppercase">
+                {tSidebar("conversation")}
+              </span>
+              <div className="mt-2.5 flex flex-col gap-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{tSidebar("handledBy")}</span>
+                  <span className="font-semibold text-foreground">
+                    {state === "ai" ? tSidebar("clinicoroAi") : tSidebar("staff")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{tSidebar("stateLabel")}</span>
+                  <span className="font-semibold text-foreground">{tState(state)}</span>
+                </div>
+                {conversation.ai_handoff_summary ? (
+                  <p className="rounded-lg bg-warn-bg px-2.5 py-2 text-[11.5px] text-warn-fg">
+                    {conversation.ai_handoff_summary}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           {/* Phone */}
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-1">
             <button
               onClick={handleCopyPhone}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"

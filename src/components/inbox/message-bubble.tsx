@@ -10,7 +10,6 @@ import {
   MapPin,
   LayoutTemplate,
   CornerDownLeft,
-  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
@@ -239,12 +238,17 @@ export function MessageBubble({
     >
       <div
         className={cn(
-          "relative rounded-2xl px-3 py-2",
+          // Reference bubbles: inbound white on a hairline border, outbound
+          // navy. Both carry the soft card shadow.
+          "relative rounded-[14px] border px-3 py-2.5 text-[13.5px] shadow-card",
           isAgent
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md bg-muted text-foreground",
+            ? "border-navy bg-navy text-white dark:border-primary dark:bg-primary dark:text-primary-foreground"
+            : "border-border bg-card text-foreground",
         )}
       >
+        {message.ai_generated && (
+          <span className="mb-0.5 block text-[11px] font-bold text-[#7FE0DB]">{t("aiAuthor")}</span>
+        )}
         {reply && (
           <ReplyQuote
             authorLabel={reply.authorLabel}
@@ -268,23 +272,12 @@ export function MessageBubble({
               (always outbound, so it sits on the primary fill). Lets
               agents tell an AI reply from their own / a Flow's at a
               glance. */}
-          {message.ai_generated && (
-            <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
-              title={t("aiBadgeTitle")}
-            >
-              <Sparkles className="h-2.5 w-2.5" />
-              {t("aiBadge")}
-            </span>
-          )}
           <span
             className={cn(
               "text-[10px]",
-              // Outbound bubbles sit on the primary fill, so the
-              // timestamp must read against that (not the neutral
-              // foreground) — otherwise it goes low-contrast in light
-              // mode. Inbound bubbles use the muted surface.
-              isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
+              // Outbound bubbles sit on navy, so the timestamp reads
+              // against that; inbound bubbles use the muted ink.
+              isAgent ? "text-white/70" : "text-muted-foreground/80",
             )}
           >
             {time}

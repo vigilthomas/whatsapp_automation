@@ -212,6 +212,12 @@
     }
   },
   "Inbox": {
+    "title": "WhatsApp",
+    "filterAi": "AI 응답 중",
+    "filterStaff": "직원 필요",
+    "status": "상태",
+    "aiReplying": "AI 응답 중",
+    "state": {"ai": "AI 응답 중", "staff": "직원 필요", "assigned": "배정됨", "pending": "대기", "closed": "종료", "open": "열림"},
     "page": {
       "whatsappNotConnected": "WhatsApp®이 연결되어 있지 않습니다. 설정으로 이동해 계정을 연결하세요."
     },
@@ -291,6 +297,7 @@
       "quickReplySaveError": "빠른 답장을 저장하지 못했습니다."
     },
     "bubble": {
+      "aiAuthor": "Clinicoro AI",
       "photo": "사진",
       "video": "동영상",
       "audio": "오디오",
@@ -359,6 +366,15 @@
       "send": "템플릿 보내기"
     },
     "sidebar": {
+      "appointment": "예약",
+      "bookedByAi": "AI 예약",
+      "openCalendar": "캘린더 열기",
+      "noAppointment": "예정된 예약이 없습니다.",
+      "conversation": "대화",
+      "handledBy": "담당",
+      "clinicoroAi": "Clinicoro AI",
+      "staff": "직원",
+      "stateLabel": "상태",
       "contactInfo": "연락처 정보",
       "tags": "태그",
       "notes": "메모",

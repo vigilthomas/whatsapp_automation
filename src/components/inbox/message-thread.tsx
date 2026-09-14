@@ -7,6 +7,7 @@ import { usePresence } from "@/hooks/use-presence";
 import { PresenceDot } from "@/components/presence/presence-dot";
 import { presenceLabel } from "@/lib/presence";
 import { cn } from "@/lib/utils";
+import { avatarColor, initialsOf } from "@/components/dashboard/clinic-widgets";
 import type {
   Conversation,
   Message,
@@ -146,8 +147,8 @@ const STATUS_OPTIONS: { label: string; value: ConversationStatus; color: string 
  * Defined once at module scope so the two render paths can't drift —
  * if we ever switch the asset, both spots update together.
  */
-const DOODLE_BG_CLASSES =
-  "bg-background bg-[url('/inbox-doodle.svg')] bg-repeat";
+// Reference chat ground: the plain cool-grey page colour.
+const DOODLE_BG_CLASSES = "bg-background";
 
 export function MessageThread({
   conversation,
@@ -902,7 +903,7 @@ export function MessageThread({
     <div className={cn("flex min-w-0 flex-1 flex-col", DOODLE_BG_CLASSES)}>
       {/* Header — solid card surface sits on top of the doodle so the
           name/avatar/dropdowns stay legible. */}
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 sm:px-4">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {/* Back-to-list button — mobile only. Hidden on lg+ where the
               conversation list is always visible next to the thread. */}
@@ -916,12 +917,18 @@ export function MessageThread({
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
-            {displayName.charAt(0).toUpperCase()}
+          <div
+            className="flex size-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+            style={{ background: avatarColor(conversation.contact_id) }}
+          >
+            {initialsOf(displayName)}
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-foreground">{displayName}</h2>
-            <p className="truncate text-xs text-muted-foreground">{contact.phone}</p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {contact.phone}
+              {!conversation.ai_autoreply_disabled && !conversation.assigned_agent_id ? ` · ${t("aiReplying")}` : ""}
+            </p>
           </div>
           {/* Session timer badge — hidden on the narrowest phones so
               the name + back arrow keep their room. */}
@@ -929,7 +936,7 @@ export function MessageThread({
             variant="outline"
             className={cn(
               "ml-1 hidden gap-1 border-border text-[10px] sm:inline-flex sm:ml-2",
-              sessionInfo.expired ? "text-red-400" : "text-primary"
+              sessionInfo.expired ? "text-danger-fg" : "text-teal-700"
             )}
           >
             <Clock className="h-3 w-3" />
@@ -1098,7 +1105,7 @@ export function MessageThread({
               <div key={group.date}>
                 {/* Date separator */}
                 <div className="mb-4 flex items-center justify-center">
-                  <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
+                  <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] text-muted-foreground/80">
                     {formatDateSeparator(group.date, t)}
                   </span>
                 </div>

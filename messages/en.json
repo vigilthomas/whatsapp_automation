@@ -212,6 +212,12 @@
     }
   },
   "Inbox": {
+    "title": "WhatsApp",
+    "filterAi": "AI replying",
+    "filterStaff": "Needs staff",
+    "status": "Status",
+    "aiReplying": "AI replying",
+    "state": {"ai": "AI replying", "staff": "Needs staff", "assigned": "Assigned", "pending": "Waiting", "closed": "Closed", "open": "Open"},
     "page": {
       "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account."
     },
@@ -291,6 +297,7 @@
       "quickReplySaveError": "Couldn't save the quick reply."
     },
     "bubble": {
+      "aiAuthor": "Clinicoro AI",
       "photo": "Photo",
       "video": "Video",
       "audio": "Audio",
@@ -359,6 +366,15 @@
       "send": "Send template"
     },
     "sidebar": {
+      "appointment": "Appointment",
+      "bookedByAi": "Booked by AI",
+      "openCalendar": "Open calendar",
+      "noAppointment": "No upcoming appointment.",
+      "conversation": "Conversation",
+      "handledBy": "Handled by",
+      "clinicoroAi": "Clinicoro AI",
+      "staff": "Staff",
+      "stateLabel": "State",
       "contactInfo": "Contact info",
       "tags": "Tags",
       "notes": "Notes",

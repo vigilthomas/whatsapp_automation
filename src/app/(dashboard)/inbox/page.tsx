@@ -562,13 +562,16 @@ function InboxPageInner() {
   const hasActiveConv = !!activeConversation;
 
   return (
-    <div className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-m-6">
+    // Bleeds to the shell edges and fills the viewport below the header
+    // (56px mobile / 60px desktop). Mobile also leaves room for the tab
+    // bar; the thread hides it when a conversation is open.
+    <div className="-m-4 -mb-20 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:-m-6 sm:-mb-20 lg:-m-7 lg:-mt-[26px] lg:-mb-8 lg:h-[calc(100dvh-60px)]">
       {/* WhatsApp connection banner — in the flex column, not absolute,
           so it pushes the panels down instead of overlapping them. */}
       {whatsappConnected === false && (
-        <div className="flex shrink-0 items-center justify-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2">
-          <WifiOff className="h-4 w-4 text-amber-400" />
-          <p className="text-xs text-amber-400">
+        <div className="flex shrink-0 items-center justify-center gap-2 border-b border-border bg-warn-bg px-4 py-2">
+          <WifiOff className="h-4 w-4 text-warn-fg" />
+          <p className="text-xs font-medium text-warn-fg">
             {t("whatsappNotConnected")}
           </p>
         </div>
@@ -632,7 +635,7 @@ function InboxPageInner() {
             toggle — which is itself desktop-only — never affects it. */}
         {contactPanelOpen && (
           <div className="hidden lg:block">
-            <ContactSidebar contact={activeContact} />
+            <ContactSidebar contact={activeContact} conversation={activeConversation} />
           </div>
         )}
       </div>
