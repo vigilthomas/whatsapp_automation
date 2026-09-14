@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { moduleForPath } from "@/lib/auth/module-access";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { AccountAccessAlert } from "@/components/layout/account-access-alert";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
@@ -72,12 +73,15 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onOpenSidebar={() => setSidebarOpen(true)} />
         {/* Thinner horizontal padding on mobile so cards have room to breathe. */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        {/* Bottom padding on mobile clears the fixed tab bar. Desktop
+            padding follows the reference `.page` (26px 28px 32px). */}
+        <main className="flex-1 overflow-y-auto p-4 pb-20 sm:p-6 lg:px-7 lg:pt-[26px] lg:pb-8">
           {/* Above every page: writes are being rejected and here's why.
               Renders nothing unless the account/role failed to resolve. */}
           <AccountAccessAlert />
           <ModuleGuard>{children}</ModuleGuard>
         </main>
+        <MobileNav onOpenMenu={() => setSidebarOpen(true)} />
       </div>
     </div>
   );

@@ -16,6 +16,12 @@
   },
   "Sidebar": {
     "title": "Clinicoro",
+    "tagline": "클리닉의 AI 리셉셔니스트",
+    "aiReceptionist": "AI 리셉셔니스트",
+    "aiOnline": "온라인",
+    "aiOffline": "꺼짐",
+    "aiHandling": "24/7 메시지 처리 중",
+    "aiIdle": "초안만 — 자동 응답 꺼짐",
     "controls": "컨트롤",
     "accessControl": "접근 제어",
     "master": "마스터",
@@ -55,7 +61,17 @@
     "menuSettings": "설정",
     "menuSignOut": "로그아웃"
   },
+  "MobileNav": {
+    "label": "기본 메뉴",
+    "home": "홈",
+    "appointments": "예약",
+    "whatsapp": "WhatsApp",
+    "patients": "환자",
+    "more": "더보기"
+  },
   "Header": {
+    "searchPlaceholder": "환자, 예약, 메시지 검색…",
+    "notifications": "알림",
     "dashboard": "대시보드",
     "inbox": "인박스",
     "appointments": "예약",

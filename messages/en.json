@@ -16,6 +16,12 @@
   },
   "Sidebar": {
     "title": "Clinicoro",
+    "tagline": "Your clinic's AI receptionist",
+    "aiReceptionist": "AI Receptionist",
+    "aiOnline": "Online",
+    "aiOffline": "Off",
+    "aiHandling": "Handling messages 24/7",
+    "aiIdle": "Drafts only — auto-reply is off",
     "controls": "Controls",
     "accessControl": "Access control",
     "master": "Master",
@@ -55,7 +61,17 @@
     "menuSettings": "Settings",
     "menuSignOut": "Sign out"
   },
+  "MobileNav": {
+    "label": "Primary",
+    "home": "Home",
+    "appointments": "Appointments",
+    "whatsapp": "WhatsApp",
+    "patients": "Patients",
+    "more": "More"
+  },
   "Header": {
+    "searchPlaceholder": "Search patients, appointments or messages…",
+    "notifications": "Notifications",
     "dashboard": "Dashboard",
     "inbox": "Inbox",
     "appointments": "Appointments",
