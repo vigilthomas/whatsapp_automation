@@ -565,7 +565,14 @@ function InboxPageInner() {
     // Bleeds to the shell edges and fills the viewport below the header
     // (56px mobile / 60px desktop). Mobile also leaves room for the tab
     // bar; the thread hides it when a conversation is open.
-    <div className="-m-4 -mb-20 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:-m-6 sm:-mb-20 lg:-m-7 lg:-mt-[26px] lg:-mb-8 lg:h-[calc(100dvh-60px)]">
+    <div
+      className={cn(
+        "-m-4 flex flex-col overflow-hidden sm:-m-6 lg:-m-7 lg:-mt-[26px] lg:-mb-8 lg:h-[calc(100dvh-60px)]",
+        // Mobile: the shell keeps 64px of bottom padding for the tab bar
+        // unless a thread is open (then the bar is hidden and we take it all).
+        hasActiveConv ? "h-[calc(100dvh-3.5rem)]" : "h-[calc(100dvh-7.5rem)]",
+      )}
+    >
       {/* WhatsApp connection banner — in the flex column, not absolute,
           so it pushes the panels down instead of overlapping them. */}
       {whatsappConnected === false && (

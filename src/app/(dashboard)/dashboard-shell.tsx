@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { moduleForPath } from "@/lib/auth/module-access";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -39,6 +40,11 @@ function ModuleGuard({ children }: { children: React.ReactNode }) {
 function DashboardShellInner({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // A thread open on a phone (MobileWhatsApp reference) is full-screen
+  // with its own composer at the bottom — the tab bar gets out of the way.
+  const threadOpen = pathname.startsWith("/inbox") && !!searchParams.get("c");
 
   // Sidebar drawer state — only used on mobile. On lg+ the sidebar is
   // always visible and this stays at `false` (ignored by the component).
@@ -75,13 +81,18 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
         {/* Thinner horizontal padding on mobile so cards have room to breathe. */}
         {/* Bottom padding on mobile clears the fixed tab bar. Desktop
             padding follows the reference `.page` (26px 28px 32px). */}
-        <main className="flex-1 overflow-y-auto p-4 pb-20 sm:p-6 lg:px-7 lg:pt-[26px] lg:pb-8">
+        <main
+          className={cn(
+            "flex-1 overflow-y-auto p-4 sm:p-6 lg:px-7 lg:pt-[26px] lg:pb-8",
+            threadOpen ? "pb-4" : "pb-20",
+          )}
+        >
           {/* Above every page: writes are being rejected and here's why.
               Renders nothing unless the account/role failed to resolve. */}
           <AccountAccessAlert />
           <ModuleGuard>{children}</ModuleGuard>
         </main>
-        <MobileNav onOpenMenu={() => setSidebarOpen(true)} />
+        {!threadOpen && <MobileNav onOpenMenu={() => setSidebarOpen(true)} />}
       </div>
     </div>
   );
@@ -92,7 +103,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       {/* One confirmation modal for the whole app — see useConfirm(). */}
       <ConfirmProvider>
-        <DashboardShellInner>{children}</DashboardShellInner>
+        {/* useSearchParams() in the shell needs a Suspense boundary for
+            the static build. */}
+        <Suspense fallback={null}>
+          <DashboardShellInner>{children}</DashboardShellInner>
+        </Suspense>
       </ConfirmProvider>
     </AuthProvider>
   );

@@ -536,7 +536,7 @@ export function MessageComposer({
   // ---- Render --------------------------------------------------------
 
   return (
-    <div className="border-t border-border bg-card p-3">
+    <div className="border-t border-border bg-card p-3 sm:px-5 sm:py-3.5">
       {replyTo && (
         <div className="mb-2">
           <ReplyQuote
@@ -547,14 +547,14 @@ export function MessageComposer({
         </div>
       )}
       {sessionExpired && (
-        <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2">
-          <p className="text-xs text-amber-400">
+        <div className="mb-2 flex items-center justify-between rounded-lg bg-warn-bg px-3 py-2">
+          <p className="text-xs text-warn-fg">
             {t("sessionExpiredHint")}
           </p>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs text-amber-400 hover:text-amber-300"
+            className="h-7 text-xs text-warn-fg hover:text-warn-fg/80"
             onClick={onOpenTemplates}
           >
             <LayoutTemplate className="mr-1 h-3 w-3" />
@@ -745,7 +745,7 @@ export function MessageComposer({
             // The placeholder text also surfaces the read-only state.
             title={readOnly ? t("readOnlyTitle") : undefined}
             className={cn(
-              "flex-1 resize-none rounded-xl border border-border bg-muted px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-primary/50",
+              "flex-1 resize-none rounded-[10px] border border-input bg-card px-4 py-2.5 text-[13.5px] text-foreground placeholder:text-muted-foreground/70 outline-none transition-colors focus:border-ring focus:ring-[3px] focus:ring-ring/20",
               (sessionExpired || readOnly) && "cursor-not-allowed opacity-50"
             )}
           />
@@ -756,7 +756,7 @@ export function MessageComposer({
             gateReason="send messages"
             disabled={!text.trim() || sessionExpired || sending}
             onClick={handleSend}
-            className="h-9 w-9 shrink-0 bg-primary p-0 hover:bg-primary/90 disabled:opacity-40"
+            className="size-10 shrink-0 rounded-full bg-primary p-0 text-primary-foreground hover:bg-primary-hover disabled:opacity-40 sm:size-9 sm:rounded-[10px]"
           >
             <Send className="h-4 w-4" />
           </GatedButton>
