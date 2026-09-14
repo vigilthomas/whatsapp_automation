@@ -884,6 +884,7 @@ async function processMessage(
       contactId: contactRecord.id,
       configOwnerUserId,
       phoneNumberId,
+      inboundMessageId: message.id,
     })
   }
 

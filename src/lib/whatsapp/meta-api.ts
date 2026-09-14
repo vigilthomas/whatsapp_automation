@@ -704,6 +704,49 @@ export async function sendReactionMessage(
 }
 
 // ============================================================
+// Typing indicator
+// ============================================================
+
+export interface SendTypingIndicatorArgs {
+  phoneNumberId: string
+  accessToken: string
+  /** Meta id (wamid) of the inbound message we're "typing" in reply to. */
+  inboundMessageId: string
+}
+
+/**
+ * Show the "typing…" bubble to the customer and mark their message as
+ * read — Meta bundles both into one call: the indicator is a field on
+ * the mark-as-read status update, and can only be attached to an
+ * inbound message id. It clears on its own after ~25 seconds or as soon
+ * as we send a message, whichever comes first, so a slow model needs
+ * the caller to re-send it (see engineTypingKeepalive).
+ *   https://developers.facebook.com/docs/whatsapp/cloud-api/typing-indicators
+ */
+export async function sendTypingIndicator(
+  args: SendTypingIndicatorArgs
+): Promise<void> {
+  const { phoneNumberId, accessToken, inboundMessageId } = args
+  const url = `${META_API_BASE}/${phoneNumberId}/messages`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: inboundMessageId,
+      typing_indicator: { type: 'text' },
+    }),
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+}
+
+// ============================================================
 // Interactive (button replies + list messages)
 // ============================================================
 //
