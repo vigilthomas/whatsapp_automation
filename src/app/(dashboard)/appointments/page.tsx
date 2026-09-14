@@ -351,6 +351,13 @@ function AppointmentsPageInner() {
         </label>
       </div>
 
+      <AppointmentActions
+        selected={selected}
+        canEdit={canEdit}
+        onAdd={() => openDialog(emptyDraft())}
+        onAction={onAction}
+      />
+
       {view === "week" ? (
         <AppointmentCalendar
           weekStart={weekStart}
@@ -375,13 +382,6 @@ function AppointmentsPageInner() {
           emptyLabel={t("emptyDay")}
         />
       )}
-
-      <AppointmentActions
-        selected={selected}
-        canEdit={canEdit}
-        onAdd={() => openDialog(emptyDraft())}
-        onAction={onAction}
-      />
 
       <AppointmentDialog
         draft={draft}
