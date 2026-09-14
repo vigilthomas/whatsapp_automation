@@ -31,7 +31,10 @@ export function useUnreadNotifications(): number {
     })();
 
     const channel = supabase
-      .channel("notifications-unread-count")
+      // Unique per mount: the sidebar, header and mobile nav all use this
+      // hook, and supabase-js returns the *same* channel object for a
+      // repeated name — calling .on() on it after subscribe() throws.
+      .channel(`notifications-unread-count-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications" },

@@ -43,7 +43,8 @@ export function useTotalUnread(): number {
     })();
 
     const channel = supabase
-      .channel("total-unread-realtime")
+      // Unique per mount — see useUnreadNotifications for why.
+      .channel(`total-unread-realtime-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations" },
