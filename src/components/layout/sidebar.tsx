@@ -41,7 +41,10 @@ import {
 } from "lucide-react";
 import type { AccountRole } from "@/lib/auth/roles";
 import type { ModuleId } from "@/lib/auth/module-access";
-import { Logo } from "@/components/brand/logo";
+import { BrandMark } from "@/components/brand/brand-mark";
+import { useBranding } from "@/hooks/use-branding";
+import { resolveMenu, type ResolvedItem } from "@/lib/branding-menu";
+import { BRAND_ICONS } from "@/lib/branding-icons";
 
 // Per-role chip metadata used in the sidebar's account strip + the
 // Members tab roster. Keeping this near both consumers in a single
@@ -170,9 +173,15 @@ const afterGroupItems: NavItem[] = [
   { href: "/access-control", labelKey: "accessControl", icon: LockKeyhole, adminOnly: true },
 ];
 
-const bottomNavItems = [
+const bottomNavItems: NavItem[] = [
   { href: "/settings", labelKey: "settings", icon: Settings },
 ];
+
+/** An item's icon, or the one chosen in Settings → Sidebar menu. */
+function NavIcon({ item, className }: { item: { icon: typeof LayoutDashboard; iconKey?: string }; className: string }) {
+  const Icon = (item.iconKey && BRAND_ICONS[item.iconKey]) || item.icon;
+  return <Icon className={className} strokeWidth={1.75} />;
+}
 
 interface SidebarProps {
   /** Controlled on mobile by the Header's hamburger button. Ignored on lg+. */
@@ -194,6 +203,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     sidebarModules,
     canManageMembers,
   } = useAuth();
+  const { branding } = useBranding();
   const totalUnread = useTotalUnread();
   const unreadNotifications = useUnreadNotifications();
 
@@ -218,7 +228,23 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   // Groups with their access-filtered, re-ordered children; a group
   // with nothing left to show is dropped rather than rendered as an
   // empty toggle.
-  const visibleGroups = navGroups
+  // Settings → Sidebar menu: names, icons, groups and hiding. Applied before
+  // the permission filter, which still decides what each member may see.
+  const menu = resolveMenu<NavItem>(
+    [
+      { id: "top", items: navItems },
+      ...navGroups.map((g) => ({ id: g.id, items: g.children })),
+      { id: "after", items: afterGroupItems },
+      { id: "bottom", items: bottomNavItems },
+    ],
+    branding.menu,
+  );
+  const section = (id: string) => menu.find((s) => s.id === id)!;
+  const topItems = section("top").items;
+  const brandedGroups = navGroups.map((g) => ({ ...g, label: section(g.id).label, children: section(g.id).items }));
+  const label = (item: ResolvedItem<NavItem>) => item.label ?? t(item.labelKey as string);
+
+  const visibleGroups = brandedGroups
     .map((g) => ({ ...g, children: orderVisible(g.children) }))
     .filter((g) => g.children.length > 0);
 
@@ -228,7 +254,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   // hand; navigating into a child re-opens it so the active row is
   // never out of sight.
   const activeGroupId =
-    navGroups.find((g) => g.children.some((c) => isItemActive(c.href)))?.id ??
+    brandedGroups.find((g) => g.children.some((c) => isItemActive(c.href)))?.id ??
     null;
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
     activeGroupId ? { [activeGroupId]: true } : {},
@@ -323,12 +349,20 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             close button is hidden since the sidebar is always-visible. */}
         <div className="flex shrink-0 items-center justify-between gap-2 px-5 pt-[18px] pb-1">
           <Link href="/dashboard" className="flex items-center gap-2.5">
-            <Logo className="h-[34px] w-[34px]" title="" />
-            <span className="flex flex-col">
-              <span className="font-heading text-lg leading-[1.1] font-bold text-navy dark:text-foreground">
-                {t("title")}
+            <BrandMark className="h-[34px] w-[34px]" />
+            <span className="flex min-w-0 flex-col">
+              <span
+                className="truncate font-heading text-lg leading-[1.1] font-bold text-navy dark:text-foreground"
+                style={branding.title_color ? { color: "var(--brand-title)" } : undefined}
+              >
+                {branding.title || t("title")}
               </span>
-              <span className="text-[11px] text-muted-foreground">{t("tagline")}</span>
+              <span
+                className="truncate text-[11px] text-muted-foreground"
+                style={branding.subtitle_color ? { color: "var(--brand-subtitle)" } : undefined}
+              >
+                {branding.subtitle || t("tagline")}
+              </span>
             </span>
           </Link>
           <button
@@ -344,7 +378,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         {/* Main navigation */}
         <nav className="flex-1 overflow-y-auto px-3.5 py-4">
           <ul className="flex flex-col gap-0.5">
-            {orderVisible(navItems).map((item) => {
+            {orderVisible(topItems).map((item) => {
               const isActive = isItemActive(item.href);
 
               const showUnreadDot =
@@ -360,8 +394,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               return (
                 <li key={item.href}>
                   <Link href={item.href} className={rowClass(isActive)}>
-                    <item.icon className="size-[18px]" strokeWidth={1.75} />
-                    <span className="flex-1">{t(item.labelKey as string)}</span>
+                    <NavIcon item={item} className="size-[18px]" />
+                    <span className="flex-1">{label(item)}</span>
                     {item.beta && (
                       <span
                         aria-label={t("beta")}
@@ -413,7 +447,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                     )}
                   >
                     <group.icon className="size-[18px]" strokeWidth={1.75} />
-                    <span className="flex-1 text-left">{t(group.labelKey)}</span>
+                    <span className="flex-1 text-left">{group.label ?? t(group.labelKey)}</span>
                     <ChevronDown
                       className={cn(
                         "h-4 w-4 transition-transform",
@@ -431,8 +465,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                         return (
                           <li key={item.href}>
                             <Link href={item.href} className={cn(rowClass(isActive), "h-9 text-[13.5px]")}>
-                              <item.icon className="size-4" strokeWidth={1.75} />
-                              <span className="flex-1">{t(item.labelKey)}</span>
+                              <NavIcon item={item} className="size-4" />
+                              <span className="flex-1">{label(item)}</span>
                               {item.beta && (
                                 <span
                                   aria-label={t("beta")}
@@ -452,15 +486,15 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             );
           })}
 
-          {afterGroupItems.filter(isItemVisible).length > 0 && (
+          {section("after").items.filter(isItemVisible).length > 0 && (
             <ul className="mt-0.5 flex flex-col gap-0.5">
-              {afterGroupItems.filter(isItemVisible).map((item) => {
+              {section("after").items.filter(isItemVisible).map((item) => {
                 const isActive = isItemActive(item.href);
                 return (
                   <li key={item.href}>
                     <Link href={item.href} className={rowClass(isActive)}>
-                      <item.icon className="size-[18px]" strokeWidth={1.75} />
-                      <span className="flex-1">{t(item.labelKey)}</span>
+                      <NavIcon item={item} className="size-[18px]" />
+                      <span className="flex-1">{label(item)}</span>
                     </Link>
                   </li>
                 );
@@ -469,13 +503,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           )}
 
           <ul className="mt-0.5 flex flex-col gap-0.5">
-            {bottomNavItems.map((item) => {
+            {section("bottom").items.map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
                 <li key={item.href}>
                   <Link href={item.href} className={rowClass(isActive)}>
-                    <item.icon className="size-[18px]" strokeWidth={1.75} />
-                    {t(item.labelKey as string)}
+                    <NavIcon item={item} className="size-[18px]" />
+                    {label(item)}
                   </Link>
                 </li>
               );

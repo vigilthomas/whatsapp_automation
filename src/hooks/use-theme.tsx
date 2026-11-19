@@ -13,9 +13,7 @@ import {
   DEFAULT_MODE,
   DEFAULT_THEME,
   MODE_STORAGE_KEY,
-  STORAGE_KEY,
   isMode,
-  isThemeId,
   type Mode,
   type ThemeId,
 } from "@/lib/themes";
@@ -48,18 +46,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readInitialTheme(): ThemeId {
-  if (typeof window === "undefined") return DEFAULT_THEME;
-  // Whatever the boot script applied is the truth. Fall back to
-  // localStorage / default if for some reason the attribute is missing
-  // (e.g. someone bypassed the boot script in a custom layout).
-  const fromAttr = document.documentElement.dataset.theme;
-  if (isThemeId(fromAttr)) return fromAttr;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (isThemeId(stored)) return stored;
-  } catch {
-    // localStorage can throw in private-browsing / sandboxed contexts.
-  }
+  // The accent is no longer chosen per device; Settings → Branding sets the colours.
   return DEFAULT_THEME;
 }
 
@@ -77,20 +64,12 @@ function readInitialMode(): Mode {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeId>(readInitialTheme);
+  const [theme] = useState<ThemeId>(readInitialTheme);
   const [mode, setModeState] = useState<Mode>(readInitialMode);
 
+  // Kept for callers; the accent is fixed (Settings → Branding sets the colours).
   const setTheme = useCallback((next: ThemeId) => {
-    setThemeState(next);
-    if (typeof document !== "undefined") {
-      document.documentElement.dataset.theme = next;
-    }
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Same private-browsing edge case as above; the in-memory state
-      // still updates so the current tab works for the session.
-    }
+    void next;
   }, []);
 
   const setMode = useCallback((next: Mode) => {
@@ -113,13 +92,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // catches up without a refresh.
   useEffect(() => {
     function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY) {
-        if (isThemeId(e.newValue) && e.newValue !== theme) {
-          setThemeState(e.newValue);
-          document.documentElement.dataset.theme = e.newValue;
-        }
-        return;
-      }
       if (e.key === MODE_STORAGE_KEY) {
         if (isMode(e.newValue) && e.newValue !== mode) {
           setModeState(e.newValue);
@@ -129,7 +101,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [theme, mode]);
+  }, [mode]);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, mode, setMode, toggleMode }}>

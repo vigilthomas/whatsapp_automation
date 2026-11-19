@@ -15,7 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckCircle, UsersRound } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
+import { BrandMark } from "@/components/brand/brand-mark";
+import { useBranding } from "@/hooks/use-branding";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless wrapped in Suspense — same pattern as /login.
@@ -35,6 +36,7 @@ function SignupPageInner() {
   // points back at /join/<token> so the user lands on the redeem
   // step after verifying instead of being dropped on /dashboard.
   const inviteToken = searchParams.get("invite");
+  const brandName = useBranding().branding.title || "Clinicoro";
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -136,7 +138,7 @@ function SignupPageInner() {
             {inviteToken ? (
               <UsersRound className="h-6 w-6 text-primary" />
             ) : (
-              <Logo className="h-8 w-8" title="" />
+              <BrandMark className="h-8 w-8" />
             )}
           </div>
           <CardTitle className="text-xl text-foreground">
@@ -145,7 +147,7 @@ function SignupPageInner() {
           <CardDescription className="text-muted-foreground">
             {inviteToken
               ? "Verify your email, then accept the invitation to join your team."
-              : "Get started with Clinicoro"}
+              : `Get started with ${brandName}`}
           </CardDescription>
         </CardHeader>
         <CardContent>

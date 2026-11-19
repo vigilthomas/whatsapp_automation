@@ -5,14 +5,13 @@ import { Manrope, Sora } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { BRANDING_CACHE_KEY, BRAND_STYLE_ID, BrandingProvider } from "@/hooks/use-branding";
 import { ThemedToaster } from "@/components/themed-toaster";
 import {
   DEFAULT_MODE,
   DEFAULT_THEME,
   MODE_STORAGE_KEY,
   MODES,
-  STORAGE_KEY,
-  THEME_IDS,
 } from "@/lib/themes";
 
 // Clinicoro type pair from the design reference: Manrope for body
@@ -54,9 +53,11 @@ export const viewport: Viewport = {
   colorScheme: "dark light",
 };
 
-// Inline boot script — runs before React hydrates so the user's
-// chosen accent (data-theme) AND mode (data-mode) are on the <html>
-// element before first paint. Without this every page load flashes
+// Inline boot script — runs before React hydrates so the mode
+// (data-mode) and the clinic's branding colours (cached by
+// BrandingProvider) are on the page before first paint. The accent is
+// no longer a per-device choice: it comes from Settings → Branding, so
+// data-theme is always the Clinicoro base. Without this every page load flashes
 // the server-rendered defaults for a frame before the React tree
 // mounts and applies the picked values.
 //
@@ -68,17 +69,22 @@ const THEME_BOOT_SCRIPT = `
 (function(){
   var d = document.documentElement;
   try {
-    var THEME_KEY = ${JSON.stringify(STORAGE_KEY)};
-    var THEME_DEFAULT = ${JSON.stringify(DEFAULT_THEME)};
-    var THEMES = ${JSON.stringify(THEME_IDS)};
-    var savedTheme = localStorage.getItem(THEME_KEY);
-    d.dataset.theme = THEMES.indexOf(savedTheme) !== -1 ? savedTheme : THEME_DEFAULT;
+    d.dataset.theme = ${JSON.stringify(DEFAULT_THEME)};
 
     var MODE_KEY = ${JSON.stringify(MODE_STORAGE_KEY)};
     var MODE_DEFAULT = ${JSON.stringify(DEFAULT_MODE)};
     var MODES = ${JSON.stringify(MODES)};
     var savedMode = localStorage.getItem(MODE_KEY);
     d.dataset.mode = MODES.indexOf(savedMode) !== -1 ? savedMode : MODE_DEFAULT;
+
+    var brand = JSON.parse(localStorage.getItem(${JSON.stringify(BRANDING_CACHE_KEY)}) || "null");
+    if (brand && typeof brand.css === "string" && brand.css) {
+      var style = document.createElement("style");
+      style.id = ${JSON.stringify(BRAND_STYLE_ID)};
+      style.textContent = brand.css;
+      document.head.appendChild(style);
+      d.dataset.brand = "1";
+    }
   } catch (_e) {
     d.dataset.theme = ${JSON.stringify(DEFAULT_THEME)};
     d.dataset.mode = ${JSON.stringify(DEFAULT_MODE)};
@@ -119,8 +125,10 @@ export default async function RootLayout({
       <body className="min-h-full bg-background text-foreground font-sans">
         <NextIntlClientProvider messages={messages} locale={locale}>
           <ThemeProvider>
-            {children}
-            <ThemedToaster />
+            <BrandingProvider>
+              {children}
+              <ThemedToaster />
+            </BrandingProvider>
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>

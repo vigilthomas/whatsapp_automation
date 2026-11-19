@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UsersRound } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
+import { BrandMark } from "@/components/brand/brand-mark";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless it sits under a Suspense boundary. We split the form into
@@ -83,7 +83,7 @@ function LoginPageInner() {
             {inviteToken ? (
               <UsersRound className="h-6 w-6 text-primary" />
             ) : (
-              <Logo className="h-8 w-8" title="" />
+              <BrandMark className="h-8 w-8" />
             )}
           </div>
           <CardTitle className="text-xl text-foreground">
