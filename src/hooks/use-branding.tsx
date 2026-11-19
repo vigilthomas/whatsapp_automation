@@ -25,6 +25,8 @@ type BrandingContextValue = {
   branding: Branding;
   /** True once the row has been read (or found missing). */
   loaded: boolean;
+  /** False when the table can't be read (migration 046 not run yet). */
+  available: boolean;
   /** Show a branding without saving it (live preview); `null` returns to the saved one. */
   preview: (b: Branding | null) => void;
   reload: () => Promise<void>;
@@ -35,6 +37,7 @@ type BrandingContextValue = {
 const BrandingContext = createContext<BrandingContextValue>({
   branding: BLANK_BRANDING,
   loaded: false,
+  available: false,
   preview: () => {},
   reload: async () => {},
   save: async () => "Branding isn't available here.",
@@ -94,6 +97,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const [saved, setSaved] = useState<Branding>(readCache);
   const [previewing, setPreviewing] = useState<Branding | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [available, setAvailable] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const branding = previewing ?? saved;
 
@@ -112,6 +116,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       setSaved(b);
       writeCache(b);
     }
+    setAvailable(!!b);
     setLoaded(true);
   }, []);
 
@@ -166,8 +171,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ branding, loaded, preview: setPreviewing, reload, save }),
-    [branding, loaded, reload, save],
+    () => ({ branding, loaded, available, preview: setPreviewing, reload, save }),
+    [branding, loaded, available, reload, save],
   );
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }

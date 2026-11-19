@@ -4,6 +4,7 @@ import {
   KeyRound,
   LockKeyhole,
   LayoutGrid,
+  Paintbrush,
   Palette,
   PlugZap,
   Shield,
@@ -27,6 +28,7 @@ export const SETTINGS_SECTIONS = [
   'profile',
   'security',
   'appearance',
+  'branding',
   'whatsapp',
   'templates',
   'quick-replies',
@@ -87,6 +89,8 @@ export interface SectionMeta {
   icon: LucideIcon;
   /** `master` / `moved` sections render on their own routes, not in the settings rail. */
   group: 'top' | 'account' | 'workspace' | 'master' | 'moved';
+  /** Only account owners and admins see it in the rail. */
+  adminOnly?: boolean;
 }
 
 export const SECTION_META: Record<SettingsSection, SectionMeta> = {
@@ -94,6 +98,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   profile: { id: 'profile', label: 'Your profile', icon: User, group: 'account' },
   security: { id: 'security', label: 'Login & security', icon: Shield, group: 'account' },
   appearance: { id: 'appearance', label: 'Appearance', icon: Palette, group: 'account' },
+  branding: { id: 'branding', label: 'Branding', icon: Paintbrush, group: 'workspace', adminOnly: true },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
   templates: { id: 'templates', label: 'Templates', icon: FileText, group: 'master' },
   'quick-replies': { id: 'quick-replies', label: 'Quick replies', icon: Zap, group: 'master' },
