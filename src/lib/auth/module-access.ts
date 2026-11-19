@@ -19,8 +19,9 @@
 // gets exactly what their role already allowed. Treat it as
 // workspace tidiness, not a security boundary.
 //
-// `owner` is never restricted — someone has to be able to undo a
-// lock-out — so the matrix only carries admin / agent / viewer.
+// `owner` is never in this deny-list (owners follow their designation
+// instead, and the super admin from 049 can always undo a lock-out),
+// so the matrix only carries admin / agent / viewer.
 // ============================================================
 
 import type { AccountRole } from "./roles";
@@ -31,11 +32,10 @@ export const MODULES = [
   "appointments",
   "notifications",
   "contacts",
-  "clinics",
   "branches",
-  "doctors",
-  "clinic-admins",
   "services",
+  "doctor-services",
+  "leaves",
   "designations",
   "users",
   "templates",
@@ -46,9 +46,31 @@ export const MODULES = [
   "broadcasts",
   "automations",
   "flows",
+  "settings-overview",
+  "settings-profile",
+  "settings-security",
+  "settings-appearance",
 ] as const;
 
 export type ModuleId = (typeof MODULES)[number];
+
+/**
+ * The Settings page's own sections (Overview, Your profile, Login &
+ * security, Appearance). They aren't in the sidebar, so Access control
+ * lists them in a "Settings" group of their own.
+ */
+export const SETTINGS_MODULES = [
+  "settings-overview",
+  "settings-profile",
+  "settings-security",
+  "settings-appearance",
+] as const satisfies readonly ModuleId[];
+
+export type SettingsModuleId = (typeof SETTINGS_MODULES)[number];
+
+export function isSettingsModule(value: unknown): value is SettingsModuleId {
+  return typeof value === "string" && (SETTINGS_MODULES as readonly string[]).includes(value);
+}
 
 /** Roles whose access can be restricted. Owner is deliberately absent. */
 export const RESTRICTABLE_ROLES = ["admin", "agent", "viewer"] as const;
@@ -67,17 +89,15 @@ const ROUTE_MODULES: Record<string, ModuleId> = {
   "/appointments": "appointments",
   "/notifications": "notifications",
   "/contacts": "contacts",
-  "/master/clinics": "clinics",
   "/master/branches": "branches",
-  "/master/doctors": "doctors",
-  "/master/clinic-admins": "clinic-admins",
   "/master/services": "services",
+  "/master/doctor-services": "doctor-services",
+  "/master/leaves": "leaves",
   "/master/designations": "designations",
   "/master/users": "users",
   "/master/templates": "templates",
   "/master/quick-replies": "quick-replies",
   "/master/fields": "fields",
-  "/master/deals": "deals",
   "/pipelines": "pipelines",
   "/broadcasts": "broadcasts",
   "/automations": "automations",
@@ -128,7 +148,8 @@ export function canAccessModule(
 
 /**
  * The module a pathname belongs to, or null when the route is not
- * gated (dashboard, settings, the join flow, …).
+ * gated (dashboard, the join flow, …). Settings sections share one
+ * route, so the settings page gates them itself.
  */
 export function moduleForPath(pathname: string): ModuleId | null {
   let best: { prefix: string; module: ModuleId } | null = null;

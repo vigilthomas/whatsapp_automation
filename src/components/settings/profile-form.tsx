@@ -9,6 +9,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LogoCropDialog } from '@/components/settings/logo-crop-dialog';
+import { Crop } from 'lucide-react';
 import {
   Avatar,
   AvatarFallback,
@@ -16,6 +18,7 @@ import {
 } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTranslations } from 'next-intl';
+import { checkLogoUrl } from '@/lib/branding';
 import { SettingsPanelHead } from './settings-panel-head';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -40,8 +43,15 @@ export function ProfileForm() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
+  // The picked photo as a data: URL, kept so it can be (re)cropped — the same
+  // crop dialog as Workspace → Branding, locked to a circle like the avatar.
+  const [cropSource, setCropSource] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
+  // A photo from a link (https://…), staged until Save — same as Branding's logo link.
+  const [avatarLink, setAvatarLink] = useState('');
+  const [linkedAvatar, setLinkedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [emailChangePending, setEmailChangePending] = useState(false);
 
@@ -60,7 +70,21 @@ export function ProfileForm() {
   }, [previewUrl]);
 
   const currentAvatar =
-    previewUrl ?? (!removeAvatar ? profile?.avatar_url ?? null : null);
+    previewUrl ?? linkedAvatar ?? (!removeAvatar ? profile?.avatar_url ?? null : null);
+
+  const onUseLink = () => {
+    const problem = checkLogoUrl(avatarLink);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPendingAvatar(null);
+    setPreviewUrl(null);
+    setLinkedAvatar(avatarLink.trim());
+    setAvatarLink('');
+    setRemoveAvatar(false);
+  };
 
   const initial = (fullName || profile?.full_name || profile?.email || 'U')
     .charAt(0)
@@ -84,9 +108,30 @@ export function ProfileForm() {
       return;
     }
 
+    // Crop first; the cropped image becomes the pending upload.
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      setCropSource(reader.result);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /** Use a cropped (or whole) data: URL as the photo to upload on save. */
+  const onCropped = async (dataUrl: string) => {
+    setCropOpen(false);
+    const blob = await (await fetch(dataUrl)).blob();
+    const ext = blob.type.split('/')[1] || 'png';
+    const file = new File([blob], `avatar.${ext}`, { type: blob.type || 'image/png' });
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error(t('imageTooLarge'), { description: t('imageTooLargeDesc') });
+      return;
+    }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPendingAvatar(file);
     setPreviewUrl(URL.createObjectURL(file));
+    setLinkedAvatar(null);
     setRemoveAvatar(false);
   };
 
@@ -94,6 +139,8 @@ export function ProfileForm() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPendingAvatar(null);
     setPreviewUrl(null);
+    setCropSource(null);
+    setLinkedAvatar(null);
     setRemoveAvatar(true);
   };
 
@@ -135,6 +182,8 @@ export function ProfileForm() {
           data: { publicUrl },
         } = supabase.storage.from('avatars').getPublicUrl(path);
         nextAvatarUrl = publicUrl;
+      } else if (linkedAvatar) {
+        nextAvatarUrl = linkedAvatar;
       } else if (removeAvatar) {
         nextAvatarUrl = null;
       }
@@ -175,6 +224,7 @@ export function ProfileForm() {
       setEmailChangePending(emailSent);
       setPendingAvatar(null);
       setPreviewUrl(null);
+      setLinkedAvatar(null);
       setRemoveAvatar(false);
       await refreshProfile();
 
@@ -196,6 +246,7 @@ export function ProfileForm() {
     (fullName.trim() !== (profile.full_name ?? '') ||
       email.trim().toLowerCase() !== (profile.email ?? '').toLowerCase() ||
       pendingAvatar !== null ||
+      linkedAvatar !== null ||
       removeAvatar);
 
   const joined = user?.created_at
@@ -243,6 +294,18 @@ export function ProfileForm() {
                 <Upload className="size-4" />
                 {currentAvatar ? t('changePhoto') : t('uploadPhoto')}
               </Button>
+              {cropSource && pendingAvatar && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setCropOpen(true)}
+                  disabled={saving}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Crop className="size-4" />
+                  Crop
+                </Button>
+              )}
               {currentAvatar && (
                 <Button
                   type="button"
@@ -255,6 +318,30 @@ export function ProfileForm() {
                   {t('remove')}
                 </Button>
               )}
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <Input
+                  className="h-8 max-w-xs text-sm"
+                  placeholder={t('photoLink')}
+                  value={avatarLink}
+                  onChange={(e) => setAvatarLink(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (avatarLink.trim()) onUseLink();
+                    }
+                  }}
+                  disabled={saving}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onUseLink}
+                  disabled={saving || !avatarLink.trim()}
+                >
+                  {t('useLink')}
+                </Button>
+              </div>
               <p className="w-full text-xs text-muted-foreground">
                 {t('photoHint')}
               </p>
@@ -352,6 +439,14 @@ export function ProfileForm() {
           </Button>
         </div>
       </form>
+      <LogoCropDialog
+        src={cropOpen ? cropSource : null}
+        shape="circle"
+        fixedShape
+        title="Crop your photo"
+        onCancel={() => setCropOpen(false)}
+        onDone={(url) => void onCropped(url)}
+      />
     </section>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, UserPlus } from "lucide-react";
+import { Link2, Loader2, MailX, Plus, Trash2, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/hooks/use-auth";
 import type { AccountMember } from "@/types";
@@ -20,96 +20,119 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, useTableLayout, type DataColumn } from "@/components/ui/data-table";
+import { NativeSelect } from "@/components/ui/native-select";
 import { SettingsPanelHead } from "@/components/settings/settings-panel-head";
+import { InviteMemberDialog } from "@/components/settings/invite-member-dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface NewUser {
   full_name: string;
   email: string;
   password: string;
-  clinic_id: string;
+  branch_id: string;
   designation_id: string;
   speciality: string;
   phone: string;
+}
+
+interface Invitation {
+  id: string;
+  role: "admin" | "agent" | "viewer";
+  label: string | null;
+  created_at: string;
+  expires_at: string;
 }
 
 const EMPTY: NewUser = {
   full_name: "",
   email: "",
   password: "",
-  clinic_id: "",
+  branch_id: "",
   designation_id: "",
   speciality: "",
   phone: "",
 };
 
-const selectCls =
-  "h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60";
+
+const selectCls = "h-9 w-full";
+
+const isDoctorRole = (name: string) => /\bdoctor\b|\bdr\b|physician|surgeon|dentist|consultant/i.test(name);
 
 /**
- * Master → Users. A clinic admin adds a staff member with a login in
- * one step (name, email, password, clinic, designation) and edits each
- * user's clinic and designation inline. Staff type and the RLS role
- * are derived from the designation server-side — the form deliberately
- * doesn't ask for them. Removing a user goes through the existing
- * members API (remove_account_member).
+ * Master → Users: everyone who can sign in, in one place (the old Team
+ * members page is merged in).
  *
- * Every control is gated on the caller's `users` permissions; the
- * routes behind them check the same matrix.
+ * - Add a user with a password (they can sign in straight away) or make
+ *   an invite link they open themselves.
+ * - Per user: branch (or all branches) and role, or remove them. What
+ *   they can do comes from the role (Access control); the database
+ *   access level follows the role automatically.
+ * - A user whose role is a doctor role is bookable in Appointments and by
+ *   the booking assistant; there is no separate Doctors list.
+ * - Pending invite links can be revoked.
+ *
+ * Buttons follow the caller's `users` permissions; the routes behind them
+ * check again.
  */
 export function UsersPanel() {
   const t = useTranslations("Master.users");
+  const tRoles = useTranslations("Settings.roles");
   const confirm = useConfirm();
-  const { user, can } = useAuth();
+  const { user, can, canManageMembers } = useAuth();
   const canWrite = can("users", "write");
+  const canEdit = can("users", "edit");
   const canDelete = can("users", "delete");
 
   const [members, setMembers] = useState<AccountMember[]>([]);
-  const [clinics, setClinics] = useState<MasterRecord[]>([]);
+  const [branches, setBranches] = useState<MasterRecord[]>([]);
   const [designations, setDesignations] = useState<MasterRecord[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [draft, setDraft] = useState<NewUser | null>(null);
   const [saving, setSaving] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [m, c, d] = await Promise.all([
+      const [m, b, d, i] = await Promise.all([
         fetch("/api/account/members", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/master/clinics", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+        fetch("/api/master/branches", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/master/designations", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+        canManageMembers
+          ? fetch("/api/account/invitations", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}))
+          : Promise.resolve({}),
       ]);
       setMembers(Array.isArray(m.members) ? m.members : []);
-      setClinics(Array.isArray(c.records) ? c.records : []);
+      setBranches(Array.isArray(b.records) ? b.records : []);
       setDesignations(Array.isArray(d.records) ? d.records : []);
+      setInvitations(Array.isArray(i.invitations) ? i.invitations : []);
     } catch {
       toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, canManageMembers]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const clinicName = useMemo(() => {
-    const map = new Map(clinics.map((c) => [c.id, String(c.name)]));
-    return (id: string | null) => (id ? (map.get(id) ?? "—") : "—");
-  }, [clinics]);
+  const branchName = useMemo(() => {
+    const map = new Map(branches.map((c) => [c.id, String(c.name)]));
+    return (id: string | null) => (id ? (map.get(id) ?? "—") : t("allBranches"));
+  }, [branches, t]);
+
+  const roleName = (id: string | null) => {
+    const d = designations.find((x) => x.id === id);
+    return d ? String(d.name) : t("noDesignation");
+  };
 
   async function patchMember(
     m: AccountMember,
-    body: Partial<{ clinic_id: string | null; designation_id: string | null }>,
+    body: Partial<{ branch_id: string | null; designation_id: string | null }>,
     confirmTitle: string,
   ) {
     if (!(await confirm({ title: confirmTitle, description: t("confirmChangeDesc") }))) return;
@@ -155,6 +178,24 @@ export function UsersPanel() {
     }
   }
 
+  async function revoke(inv: Invitation) {
+    const ok = await confirm({
+      title: t("confirmRevokeTitle"),
+      description: t("confirmRevokeDesc"),
+      tone: "danger",
+      confirmLabel: t("revoke"),
+    });
+    if (!ok) return;
+    const res = await fetch(`/api/account/invitations/${inv.id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(data.error ?? t("revokeFailed"));
+      return;
+    }
+    toast.success(t("revoked"));
+    setInvitations((list) => list.filter((x) => x.id !== inv.id));
+  }
+
   async function createUser() {
     if (!draft) return;
     if (!draft.full_name.trim() || !draft.email.trim() || draft.password.length < 8) {
@@ -174,7 +215,7 @@ export function UsersPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...draft,
-          clinic_id: draft.clinic_id || null,
+          branch_id: draft.branch_id || null,
           designation_id: draft.designation_id || null,
         }),
       });
@@ -194,131 +235,191 @@ export function UsersPanel() {
   }
 
   const set = <K extends keyof NewUser>(k: K, v: NewUser[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
+  const draftIsDoctor = !!draft && isDoctorRole(roleName(draft.designation_id || null));
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+  const rowInfo = (m: AccountMember) => {
+    const isSelf = m.user_id === user?.id;
+    const isSuper = !!m.is_super_admin;
+    return { isSelf, isSuper, editable: canEdit && m.role !== "owner" && !isSelf && !isSuper };
+  };
+
+  const columns: DataColumn<AccountMember>[] = [
+    {
+      id: "user",
+      header: t("cols.user"),
+      hideable: false,
+      width: 300,
+      exportValue: (m) => m.full_name || "",
+      cell: (m) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="size-8">
+            {m.avatar_url ? <AvatarImage src={m.avatar_url} alt="" /> : null}
+            <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+              {(m.full_name || m.email || "U").charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 truncate text-sm font-medium text-foreground">
+              {m.full_name || t("unnamed")}
+              {rowInfo(m).isSelf ? <span className="text-xs text-muted-foreground">({t("you")})</span> : null}
+              {m.staff_type === "doctor" ? (
+                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  {t("doctorBadge")}
+                </span>
+              ) : null}
+            </div>
+            {m.email ? <div className="truncate text-xs text-muted-foreground">{m.email}</div> : null}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "email",
+      header: t("fields.email"),
+      defaultHidden: true,
+      width: 220,
+      exportValue: (m) => m.email || "",
+      cell: (m) => m.email || "—",
+    },
+    {
+      id: "branch",
+      header: t("cols.branch"),
+      width: 220,
+      exportValue: (m) => branchName(m.branch_id),
+      cell: (m) =>
+        rowInfo(m).editable ? (
+          <NativeSelect
+            value={m.branch_id ?? ""}
+            disabled={busyId === m.user_id}
+            onChange={(e) =>
+              patchMember(m, { branch_id: e.target.value || null }, t("confirmBranch", { name: m.full_name || "" }))
+            }
+            className={selectCls}
+            aria-label={t("cols.branch")}
+          >
+            <option value="">{t("allBranches")}</option>
+            {branches.map((c) => (
+              <option key={c.id} value={c.id}>
+                {String(c.name)}
+              </option>
+            ))}
+          </NativeSelect>
+        ) : (
+          <span className="text-sm text-muted-foreground">{branchName(m.branch_id)}</span>
+        ),
+    },
+    {
+      id: "designation",
+      header: t("cols.designation"),
+      width: 220,
+      exportValue: (m) => (m.is_super_admin ? t("superAdmin") : roleName(m.designation_id)),
+      cell: (m) =>
+        rowInfo(m).editable ? (
+          <NativeSelect
+            value={m.designation_id ?? ""}
+            disabled={busyId === m.user_id}
+            onChange={(e) =>
+              patchMember(
+                m,
+                { designation_id: e.target.value || null },
+                t("confirmDesignation", { name: m.full_name || "" }),
+              )
+            }
+            className={selectCls}
+            aria-label={t("cols.designation")}
+          >
+            <option value="">{t("noDesignation")}</option>
+            {designations.map((d) => (
+              <option key={d.id} value={d.id}>
+                {String(d.name)}
+              </option>
+            ))}
+          </NativeSelect>
+        ) : rowInfo(m).isSuper ? (
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            {t("superAdmin")}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground">{roleName(m.designation_id)}</span>
+        ),
+    },
+  ];
+  const table = useTableLayout("master.users", columns);
 
   return (
-    <div>
+    <div className="space-y-6">
       <SettingsPanelHead
         title={t("title")}
         description={t("description")}
         action={
-          canWrite ? (
-            <Button onClick={() => setDraft(EMPTY)}>
-              <UserPlus className="mr-1 size-4" />
-              {t("addUser")}
-            </Button>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            {canManageMembers ? (
+              <Button variant="outline" onClick={() => setInviteOpen(true)}>
+                <Link2 className="mr-1 size-4" />
+                {t("inviteLink")}
+              </Button>
+            ) : null}
+            {canWrite ? (
+              <Button onClick={() => setDraft(EMPTY)}>
+                <UserPlus className="mr-1 size-4" />
+                {t("addUser")}
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
-      {loading ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-muted-foreground">{t("cols.user")}</TableHead>
-                <TableHead className="text-muted-foreground">{t("cols.clinic")}</TableHead>
-                <TableHead className="text-muted-foreground">{t("cols.designation")}</TableHead>
-                {canDelete && <TableHead className="w-12" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((m) => {
-                const isSelf = m.user_id === user?.id;
-                const isOwner = m.role === "owner";
-                const editable = canWrite && !isOwner && !isSelf;
-                const busy = busyId === m.user_id;
-                return (
-                  <TableRow key={m.user_id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="size-8">
-                          {m.avatar_url ? <AvatarImage src={m.avatar_url} alt="" /> : null}
-                          <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                            {(m.full_name || m.email || "U").charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-foreground">
-                            {m.full_name || t("unnamed")}
-                            {isSelf ? <span className="ml-2 text-xs text-muted-foreground">({t("you")})</span> : null}
-                          </div>
-                          {m.email ? <div className="truncate text-xs text-muted-foreground">{m.email}</div> : null}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {editable ? (
-                        <select
-                          value={m.clinic_id ?? ""}
-                          disabled={busy}
-                          onChange={(e) =>
-                            patchMember(m, { clinic_id: e.target.value || null }, t("confirmClinic", { name: m.full_name || "" }))
-                          }
-                          className={selectCls}
-                        >
-                          <option value="">—</option>
-                          {clinics.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {String(c.name)}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{clinicName(m.clinic_id)}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editable ? (
-                        <select
-                          value={m.designation_id ?? ""}
-                          disabled={busy}
-                          onChange={(e) =>
-                            patchMember(m, { designation_id: e.target.value || null }, t("confirmDesignation", { name: m.full_name || "" }))
-                          }
-                          className={selectCls}
-                        >
-                          <option value="">{t("noDesignation")}</option>
-                          {designations.map((d) => (
-                            <option key={d.id} value={d.id}>
-                              {String(d.name)}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {designations.find((d) => d.id === m.designation_id)?.name
-                            ? String(designations.find((d) => d.id === m.designation_id)?.name)
-                            : t("noDesignation")}
-                        </span>
-                      )}
-                    </TableCell>
-                    {canDelete && (
-                      <TableCell>
-                        {editable ? (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            disabled={busy}
-                            aria-label={t("remove")}
-                            onClick={() => removeMember(m)}
-                            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        ) : null}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <DataTable
+        table={table}
+        rows={members}
+        rowKey={(m) => m.user_id}
+        loading={loading}
+        trailing={
+          canDelete
+            ? {
+                width: 56,
+                cell: (m) =>
+                  rowInfo(m).editable ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={busyId === m.user_id}
+                      aria-label={t("remove")}
+                      onClick={() => removeMember(m)}
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  ) : null,
+              }
+            : undefined
+        }
+      />
+
+      {canManageMembers && invitations.length > 0 ? (
+        <section>
+          <h3 className="mb-2 text-sm font-semibold text-foreground">{t("pendingInvites")}</h3>
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            {invitations.map((inv) => (
+              <li key={inv.id} className="flex items-center gap-3 px-4 py-2.5">
+                <Link2 className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-foreground">{inv.label || t("untitledInvite")}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {tRoles(inv.role)} · {t("inviteDates", { created: fmtDate(inv.created_at), expires: fmtDate(inv.expires_at) })}
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => revoke(inv)} className="text-red-600 dark:text-red-400">
+                  <MailX className="size-4" /> {t("revoke")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <InviteMemberDialog open={inviteOpen} onOpenChange={setInviteOpen} onCreated={() => void load()} />
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent className="sm:max-w-lg">
@@ -357,29 +458,30 @@ export function UsersPanel() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <Label className="text-muted-foreground">{t("fields.clinic")}</Label>
-                  <select value={draft.clinic_id} onChange={(e) => set("clinic_id", e.target.value)} className={selectCls}>
-                    <option value="">—</option>
-                    {clinics.map((c) => (
+                  <Label className="text-muted-foreground">{t("fields.branch")}</Label>
+                  <NativeSelect value={draft.branch_id} onChange={(e) => set("branch_id", e.target.value)} className={selectCls}>
+                    <option value="">{t("allBranches")}</option>
+                    {branches.map((c) => (
                       <option key={c.id} value={c.id}>
                         {String(c.name)}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="text-muted-foreground">{t("fields.designation")}</Label>
-                  <select value={draft.designation_id} onChange={(e) => set("designation_id", e.target.value)} className={selectCls}>
+                  <NativeSelect value={draft.designation_id} onChange={(e) => set("designation_id", e.target.value)} className={selectCls}>
                     <option value="">{t("noDesignation")}</option>
                     {designations.map((d) => (
                       <option key={d.id} value={d.id}>
                         {String(d.name)}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              {draftIsDoctor ? (
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-1.5">
                     <Label className="text-muted-foreground">{t("fields.speciality")}</Label>
                     <Input value={draft.speciality} onChange={(e) => set("speciality", e.target.value)} />
@@ -389,6 +491,7 @@ export function UsersPanel() {
                     <Input value={draft.phone} onChange={(e) => set("phone", e.target.value)} />
                   </div>
                 </div>
+              ) : null}
               <p className="text-xs text-muted-foreground">{t("fields.designationHint")}</p>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDraft(null)} disabled={saving}>

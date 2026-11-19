@@ -14,7 +14,7 @@ const ID = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
 function appt(over: Partial<Appointment>): Appointment {
   return {
     id: "a",
-    clinic_id: null,
+    branch_id: null,
     doctor_id: null,
     contact_id: ID,
     service: "Consultation",
@@ -27,7 +27,7 @@ function appt(over: Partial<Appointment>): Appointment {
     updated_at: "",
     contact: null,
     doctor: null,
-    clinic: null,
+    branch: null,
     ...over,
   };
 }
@@ -74,8 +74,8 @@ describe("validateAppointmentInput", () => {
   });
 
   it("allows clearing doctor / clinic with null or empty string", () => {
-    const r = validateAppointmentInput({ doctor_id: "", clinic_id: null }, { partial: true });
-    expect(r).toEqual({ ok: true, values: { doctor_id: null, clinic_id: null } });
+    const r = validateAppointmentInput({ doctor_id: "", branch_id: null }, { partial: true });
+    expect(r).toEqual({ ok: true, values: { doctor_id: null, branch_id: null } });
   });
 
   it("partial update touches only supplied keys and refuses empty", () => {

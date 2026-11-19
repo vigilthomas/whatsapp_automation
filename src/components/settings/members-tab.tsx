@@ -1,5 +1,6 @@
 'use client';
 
+import { NativeSelect } from '@/components/ui/native-select';
 // ============================================================
 // MembersTab — Settings → Members
 //
@@ -135,7 +136,7 @@ function fmtExpiresIn(iso: string, t: (key: string, values?: Record<string, stri
 export function MembersTab() {
   const t = useTranslations('Settings.members');
   const tRoles = useTranslations('Settings.roles');
-  const { user, canManageMembers } = useAuth();
+  const { user, canManageMembers, isSuperAdmin } = useAuth();
   const { getPresence, getRow, now } = usePresence();
   const confirm = useConfirm();
 
@@ -459,11 +460,11 @@ export function MembersTab() {
                       role dropdown lines up under the avatar. */}
                   <div className="flex items-center gap-2 sm:gap-3">
                     {/* Designation — drives the member's permissions
-                        (Access control). Admin+ may change anyone's
-                        except the owner's, who is never restricted. */}
-                    {designations.length > 0 && !isOwnerRow ? (
-                      canManageMembers ? (
-                        <select
+                        (Access control). Admin+ may change anyone's;
+                        an owner's only the super admin may change. */}
+                    {designations.length > 0 ? (
+                      canManageMembers && (!isOwnerRow || isSuperAdmin) ? (
+                        <NativeSelect
                           value={member.designation_id ?? ''}
                           disabled={isBusy}
                           aria-label={t('designation')}
@@ -476,7 +477,7 @@ export function MembersTab() {
                               {d.name}
                             </option>
                           ))}
-                        </select>
+                        </NativeSelect>
                       ) : (
                         <span className="text-xs text-muted-foreground">
                           {designations.find((d) => d.id === member.designation_id)?.name ?? t('noDesignation')}

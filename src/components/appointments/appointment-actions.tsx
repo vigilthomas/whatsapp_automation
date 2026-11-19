@@ -8,6 +8,7 @@ import type { CalendarAction } from "@/components/appointments/appointment-calen
 
 interface Props {
   selected: Appointment | null;
+  canCreate: boolean;
   canEdit: boolean;
   onAdd: () => void;
   onAction: (action: CalendarAction, appointment: Appointment) => void;
@@ -18,10 +19,10 @@ interface Props {
  * Appointments page. Shared by the day table and the week calendar so
  * the one selection drives the same button set everywhere.
  */
-export function AppointmentActions({ selected, canEdit, onAdd, onAction }: Props) {
+export function AppointmentActions({ selected, canCreate, canEdit, onAdd, onAction }: Props) {
   const t = useTranslations("Appointments");
   const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-  if (!canEdit) return null;
+  if (!canCreate && !canEdit) return null;
   const disabled = !selected;
   const act = (a: CalendarAction) => selected && onAction(a, selected);
 
@@ -41,9 +42,12 @@ export function AppointmentActions({ selected, canEdit, onAdd, onAction }: Props
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={onAdd}>
-          {t("actions.add")}
-        </Button>
+        {canCreate && (
+          <Button size="sm" onClick={onAdd}>
+            {t("actions.add")}
+          </Button>
+        )}
+        {canEdit && (<>
         <Button size="sm" variant="outline" disabled={disabled} onClick={() => act("edit")}>
           {t("actions.edit")}
         </Button>
@@ -85,6 +89,7 @@ export function AppointmentActions({ selected, canEdit, onAdd, onAction }: Props
         <Button size="sm" variant="outline" disabled={disabled} onClick={() => act("changeDoctor")}>
           {t("actions.changeDoctor")}
         </Button>
+        </>)}
       </div>
     </section>
   );

@@ -1,8 +1,8 @@
 // ============================================================
 // Clinic master-data registry — pure, no I/O.
 //
-// One declarative description per entity (clinics, doctors, clinic
-// admins) drives everything else: the API route validates request
+// One declarative description per entity (branches, doctors, clinic
+// admins, services, roles) drives everything else: the API route validates request
 // bodies against it, and the Master pages render list columns and
 // the add/edit form from it. Adding a field is one entry here plus
 // the column in the migration — no per-entity route or form code.
@@ -12,23 +12,41 @@
 // ============================================================
 
 import { parsePermissions } from "@/lib/auth/permissions";
+import type { ModuleId } from "@/lib/auth/module-access";
 
 export const MASTER_ENTITY_SLUGS = [
-  "clinics",
   "branches",
   "doctors",
-  "clinic-admins",
   "services",
+  "doctor-services",
+  "leaves",
   "designations",
 ] as const;
 export type MasterEntitySlug = (typeof MASTER_ENTITY_SLUGS)[number];
 
 /**
- * `number` — numeric input (see `min` / `step`); `clinic` — pick from
- * the clinics list; `permissions` — the designation matrix, edited on
+ * `number` — numeric input (see `min` / `step`); `branch` — pick from
+ * the branches list (one clinic per install, many branches); `permissions` — the designation matrix, edited on
  * the Access control page rather than in the CRUD form (`form: false`).
  */
-export type MasterFieldType = "text" | "textarea" | "boolean" | "number" | "clinic" | "permissions";
+/** Fields that pick a record from another list (stored as its id). */
+export const REF_TYPES = ["branch", "doctor", "service", "user"] as const;
+export type RefType = (typeof REF_TYPES)[number];
+
+export type MasterFieldType =
+  | "text"
+  | "textarea"
+  | "boolean"
+  | "number"
+  | "date"
+  | "select"
+  | "duration"
+  | RefType
+  | "permissions";
+
+export function isRefType(t: MasterFieldType): t is RefType {
+  return (REF_TYPES as readonly string[]).includes(t);
+}
 
 export interface MasterField {
   key: string;
@@ -49,17 +67,52 @@ export interface MasterField {
   money?: boolean;
   /** `number` fields: suffix shown in the list, e.g. "min". */
   unit?: string;
+  /** Optional `number` fields: stored when left empty (else null). */
+  empty?: number;
+  /** `select` fields: allowed values; labels are `Master.options.<key>.<value>`. */
+  options?: readonly string[];
+  /** Only shown (and kept) when another field has this value. */
+  showIf?: { key: string; equals: string | boolean };
+  /**
+   * A form-only switch (a checkbox in the dialog) that isn't saved: the
+   * API ignores it, and its value on an existing record is worked out
+   * from the record with `derive`.
+   */
+  virtual?: { derive: (record: Record<string, unknown>) => unknown; initial: unknown };
+  /** Use another label while another field has this value (e.g. "Date" vs "From"). */
+  labelIf?: { key: string; equals: string | boolean; labelKey: string };
+  /**
+   * Ref fields: when adding, pick several at once — one record is saved
+   * per pick (the API takes `<key>s: [{ <key>, ...perPick }]`).
+   */
+  multiOnCreate?: true;
+  /**
+   * `duration` fields: empty means "use the default time of the service
+   * picked in this field", and the form shows that default.
+   */
+  defaultFrom?: string;
 }
 
 export interface MasterEntity {
   slug: MasterEntitySlug;
   /** Postgres table name. */
-  table: "clinics" | "branches" | "doctors" | "clinic_admins" | "services" | "designations";
+  table: "branches" | "doctors" | "services" | "doctor_services" | "user_leaves" | "designations";
   /** Access-control module id checked by the API and the UI. */
-  module: MasterEntitySlug;
+  module: ModuleId;
+  /**
+   * Listed by the API but not edited through it, and with no Master
+   * page of its own. Doctors: managed from Users (a user with a doctor
+   * role gets a doctor record), read by Appointments and the booking
+   * assistant.
+   */
+  readOnly?: true;
   /** i18n key under `Master.entities`. */
   labelKey: string;
   fields: MasterField[];
+  /** List order; default name A→Z. */
+  orderBy?: { column: string; ascending: boolean };
+  /** Checks across fields after each one is valid; returns an error or null. */
+  validate?: (values: Record<string, unknown>) => string | null;
 }
 
 const name: MasterField = { key: "name", labelKey: "name", type: "text", required: true, list: true };
@@ -67,24 +120,9 @@ const phone: MasterField = { key: "phone", labelKey: "phone", type: "text", list
 const email: MasterField = { key: "email", labelKey: "email", type: "text", list: true };
 const notes: MasterField = { key: "notes", labelKey: "notes", type: "textarea" };
 const isActive: MasterField = { key: "is_active", labelKey: "isActive", type: "boolean", list: true };
-const clinic: MasterField = { key: "clinic_id", labelKey: "clinic", type: "clinic", list: true };
+const branch: MasterField = { key: "branch_id", labelKey: "branch", type: "branch", list: true };
 
 export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
-  clinics: {
-    slug: "clinics",
-    table: "clinics",
-    module: "clinics",
-    labelKey: "clinics",
-    fields: [
-      name,
-      phone,
-      email,
-      { key: "address", labelKey: "address", type: "text", maxLength: 500 },
-      { key: "city", labelKey: "city", type: "text", list: true },
-      notes,
-      isActive,
-    ],
-  },
   branches: {
     slug: "branches",
     table: "branches",
@@ -92,7 +130,6 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
     labelKey: "branches",
     fields: [
       name,
-      clinic,
       { key: "address", labelKey: "address", type: "text", maxLength: 500 },
       { key: "city", labelKey: "city", type: "text", list: true },
       phone,
@@ -103,25 +140,19 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
   doctors: {
     slug: "doctors",
     table: "doctors",
-    module: "doctors",
+    module: "appointments",
+    readOnly: true,
     labelKey: "doctors",
     fields: [
       name,
       { key: "speciality", labelKey: "speciality", type: "text", list: true },
-      clinic,
+      branch,
       phone,
       { key: "whatsapp_number", labelKey: "whatsappNumber", type: "text" },
       email,
       notes,
       isActive,
     ],
-  },
-  "clinic-admins": {
-    slug: "clinic-admins",
-    table: "clinic_admins",
-    module: "clinic-admins",
-    labelKey: "clinicAdmins",
-    fields: [name, clinic, phone, email, notes, isActive],
   },
   services: {
     slug: "services",
@@ -130,11 +161,83 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
     labelKey: "services",
     fields: [
       name,
-      { key: "duration_min", labelKey: "duration", type: "number", required: true, list: true, min: 5, step: 5, unit: "min" },
-      { key: "price", labelKey: "price", type: "number", required: true, list: true, min: 0, step: 0.01, money: true },
+      { key: "duration_min", labelKey: "duration", type: "duration", required: true, list: true, min: 5 },
+      { key: "buffer_min", labelKey: "buffer", type: "duration", list: true, empty: 0 },
+      { key: "price", labelKey: "price", type: "number", list: true, min: 0, step: 0.01, money: true },
       { key: "description", labelKey: "description", type: "textarea" },
       isActive,
     ],
+  },
+  "doctor-services": {
+    slug: "doctor-services",
+    table: "doctor_services",
+    module: "doctor-services",
+    labelKey: "doctorServices",
+    orderBy: { column: "created_at", ascending: true },
+    fields: [
+      { key: "doctor_id", labelKey: "doctor", type: "doctor", required: true, list: true },
+      { key: "service_id", labelKey: "service", type: "service", required: true, list: true, multiOnCreate: true },
+      { key: "duration_min", labelKey: "doctorTime", type: "duration", list: true, defaultFrom: "service_id" },
+      { key: "notes", labelKey: "notes", type: "text", list: true, maxLength: 300 },
+      isActive,
+    ],
+  },
+  leaves: {
+    slug: "leaves",
+    table: "user_leaves",
+    module: "leaves",
+    labelKey: "leaves",
+    orderBy: { column: "starts_on", ascending: false },
+    fields: [
+      { key: "user_id", labelKey: "user", type: "user", required: true, list: true },
+      {
+        key: "leave_type",
+        labelKey: "leaveType",
+        type: "select",
+        required: true,
+        list: true,
+        options: ["full", "half_am", "half_pm", "late"],
+      },
+      {
+        key: "late_minutes",
+        labelKey: "lateBy",
+        type: "duration",
+        list: true,
+        showIf: { key: "leave_type", equals: "late" },
+      },
+      {
+        key: "multi_day",
+        labelKey: "multiDay",
+        type: "boolean",
+        virtual: { derive: (r) => !!r.ends_on && r.ends_on !== r.starts_on, initial: false },
+      },
+      {
+        key: "starts_on",
+        labelKey: "startsOn",
+        type: "date",
+        required: true,
+        list: true,
+        labelIf: { key: "multi_day", equals: false, labelKey: "date" },
+      },
+      // Empty (one day) → the same day as starts_on.
+      { key: "ends_on", labelKey: "endsOn", type: "date", list: true, showIf: { key: "multi_day", equals: true } },
+      { key: "reason", labelKey: "reason", type: "text", list: true, maxLength: 300 },
+      isActive,
+    ],
+    validate: (v) => {
+      // One day: an empty end date means the start day.
+      if (typeof v.starts_on === "string" && v.ends_on === null) {
+        v.ends_on = v.starts_on;
+      }
+      if (typeof v.starts_on === "string" && typeof v.ends_on === "string" && v.ends_on < v.starts_on) {
+        return "ends_on must be on or after starts_on";
+      }
+      if (v.leave_type === "late" && !(typeof v.late_minutes === "number" && v.late_minutes > 0)) {
+        return "Enter how late (hours and minutes)";
+      }
+      if (typeof v.leave_type === "string" && v.leave_type !== "late") v.late_minutes = null;
+      return null;
+    },
   },
   designations: {
     slug: "designations",
@@ -164,6 +267,7 @@ export type MasterRecord = { id: string; created_at: string; updated_at: string 
 >;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type SanitizeResult =
   | { ok: true; values: Record<string, unknown> }
@@ -179,8 +283,8 @@ export type SanitizeResult =
  *
  * Unknown keys are ignored rather than rejected, so a client running
  * a newer field list against an older server degrades gracefully.
- * `clinic` fields must be a UUID or null — existence/tenancy of the
- * referenced clinic is the caller's job (the route checks it against
+ * `branch` fields must be a UUID or null — existence/tenancy of the
+ * referenced branch is the caller's job (the route checks it against
  * the account before writing).
  */
 export function sanitizeMasterInput(
@@ -195,6 +299,7 @@ export function sanitizeMasterInput(
   const values: Record<string, unknown> = {};
 
   for (const field of entity.fields) {
+    if (field.virtual) continue;
     const present = Object.prototype.hasOwnProperty.call(input, field.key);
     if (!present) {
       if (!partial && field.required) {
@@ -230,18 +335,66 @@ export function sanitizeMasterInput(
         values[field.key] = raw;
         break;
       }
-      case "clinic": {
+      case "branch":
+      case "doctor":
+      case "service":
+      case "user": {
         if (raw === null || raw === "") {
+          if (field.required) return { ok: false, error: `${field.key} is required` };
           values[field.key] = null;
           break;
         }
         if (typeof raw !== "string" || !UUID_RE.test(raw)) {
-          return { ok: false, error: `${field.key} must be a clinic id` };
+          return { ok: false, error: `${field.key} must be a ${field.type} id` };
+        }
+        values[field.key] = raw;
+        break;
+      }
+      case "select": {
+        if (raw === null || raw === "") {
+          if (field.required) return { ok: false, error: `${field.key} is required` };
+          values[field.key] = null;
+          break;
+        }
+        if (typeof raw !== "string" || !(field.options ?? []).includes(raw)) {
+          return { ok: false, error: `${field.key} must be one of ${(field.options ?? []).join(", ")}` };
+        }
+        values[field.key] = raw;
+        break;
+      }
+      case "duration": {
+        if (raw === null || raw === "" || raw === 0) {
+          if (field.required) return { ok: false, error: `${field.key} is required` };
+          values[field.key] = field.empty ?? null;
+          break;
+        }
+        const n = typeof raw === "number" ? raw : Number(raw);
+        if (!Number.isInteger(n) || n < 0 || n > 24 * 60) {
+          return { ok: false, error: `${field.key} must be minutes between 0 and 1440` };
+        }
+        if (field.min !== undefined && n < field.min) {
+          return { ok: false, error: `${field.key} must be at least ${field.min} minutes` };
+        }
+        values[field.key] = n;
+        break;
+      }
+      case "date": {
+        if (raw === null || raw === "") {
+          if (field.required) return { ok: false, error: `${field.key} is required` };
+          values[field.key] = null;
+          break;
+        }
+        if (typeof raw !== "string" || !DATE_RE.test(raw) || Number.isNaN(Date.parse(`${raw}T00:00:00Z`))) {
+          return { ok: false, error: `${field.key} must be a date (YYYY-MM-DD)` };
         }
         values[field.key] = raw;
         break;
       }
       case "number": {
+        if (!field.required && (raw === null || raw === "")) {
+          values[field.key] = field.empty ?? null;
+          break;
+        }
         const n = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() ? Number(raw) : NaN;
         if (!Number.isFinite(n)) return { ok: false, error: `${field.key} must be a number` };
         if (field.min !== undefined && n < field.min) {
@@ -264,5 +417,7 @@ export function sanitizeMasterInput(
   if (partial && Object.keys(values).length === 0) {
     return { ok: false, error: "No editable fields supplied" };
   }
+  const crossError = entity.validate?.(values);
+  if (crossError) return { ok: false, error: crossError };
   return { ok: true, values };
 }

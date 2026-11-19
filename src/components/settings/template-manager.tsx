@@ -1,5 +1,6 @@
 'use client';
 
+import { DataTable, useTableLayout, type DataColumn } from '@/components/ui/data-table';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -25,7 +26,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useTranslations } from 'next-intl';
-import { Card, CardContent } from '@/components/ui/card';
 import { SettingsPanelHead } from './settings-panel-head';
 import {
   Dialog,
@@ -447,6 +447,80 @@ export function TemplateManager() {
     }));
   }
 
+  const templateColumns: DataColumn<(typeof templates)[number]>[] = [
+    {
+      id: 'name',
+      header: 'Name',
+      hideable: false,
+      width: 220,
+      className: 'font-medium text-foreground',
+      cell: (tpl) => tpl.name,
+    },
+    {
+      id: 'category',
+      header: 'Category',
+      width: 130,
+      cell: (tpl) => <Badge className={`border text-xs ${categoryColors[tpl.category] || ''}`}>{tpl.category}</Badge>,
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      width: 130,
+      cell: (tpl) => {
+        const status = templateStatusConfig[tpl.status || 'DRAFT'];
+        return <Badge className={`border text-xs ${status.classes}`}>{status.label}</Badge>;
+      },
+    },
+    { id: 'language', header: 'Language', width: 100, className: 'uppercase text-xs', cell: (tpl) => tpl.language || '—' },
+    {
+      id: 'body',
+      header: 'Message',
+      width: 340,
+      cell: (tpl) => (
+        <div className="min-w-0">
+          <p className="truncate text-sm">{tpl.body_text}</p>
+          {(tpl.rejection_reason || tpl.submission_error) && (
+            <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-red-600 dark:text-red-400">
+              <AlertCircle className="size-3 shrink-0" />
+              {tpl.rejection_reason || tpl.submission_error}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'quality',
+      header: 'Quality',
+      width: 110,
+      defaultHidden: true,
+      cell: (tpl) =>
+        tpl.quality_score ? (
+          <span
+            className={`text-[11px] font-medium uppercase ${
+              tpl.quality_score === 'GREEN'
+                ? 'text-emerald-500'
+                : tpl.quality_score === 'YELLOW'
+                  ? 'text-yellow-500'
+                  : 'text-red-500'
+            }`}
+          >
+            {tpl.quality_score}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      id: 'footer',
+      header: 'Footer',
+      width: 200,
+      defaultHidden: true,
+      className: 'italic text-xs',
+      cell: (tpl) => tpl.footer_text || '—',
+    },
+  ];
+  const templateTable = useTableLayout('master.templates', templateColumns);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -505,128 +579,64 @@ export function TemplateManager() {
         }
       />
 
-      {templates.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-muted-foreground text-sm">{t('noTemplates')}</p>
-            <p className="text-muted-foreground text-xs mt-1">
-              {t('createFirst')}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3 xl:grid-cols-2">
-          {templates.map((template) => {
+      <DataTable
+        table={templateTable}
+        rows={templates}
+        rowKey={(tpl) => tpl.id}
+        empty={
+          <div>
+            <p className="text-sm text-muted-foreground">{t('noTemplates')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('createFirst')}</p>
+          </div>
+        }
+        trailing={{
+          width: 150,
+          cell: (template) => {
             const statusKey = template.status || 'DRAFT';
-            const status = templateStatusConfig[statusKey];
             return (
-              <Card key={template.id}>
-                <CardContent className="flex items-start justify-between pt-4">
-                  <div className="space-y-2 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-foreground">{template.name}</h3>
-                      <Badge
-                        className={`text-xs border ${categoryColors[template.category] || ''}`}
-                      >
-                        {template.category}
-                      </Badge>
-                      <Badge className={`text-xs border ${status.classes}`}>
-                        {status.label}
-                      </Badge>
-                      {template.language && (
-                        <span className="text-xs text-muted-foreground uppercase">
-                          {template.language}
-                        </span>
-                      )}
-                      {template.quality_score && (
-                        <span
-                          className={`text-[10px] uppercase font-medium ${
-                            template.quality_score === 'GREEN'
-                              ? 'text-emerald-400'
-                              : template.quality_score === 'YELLOW'
-                                ? 'text-yellow-400'
-                                : 'text-red-400'
-                          }`}
-                          title="Meta quality score"
-                        >
-                          {template.quality_score}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {template.body_text}
-                    </p>
-                    {template.footer_text && (
-                      <p className="text-xs text-muted-foreground italic">
-                        {template.footer_text}
-                      </p>
-                    )}
-                    {(template.rejection_reason || template.submission_error) && (
-                      <div className="flex items-start gap-1.5 rounded border border-red-300 bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
-                        <AlertCircle className="size-3.5 mt-0.5 shrink-0" />
-                        <span>
-                          {template.rejection_reason || template.submission_error}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    {statusKey === 'APPROVED' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEdit(template)}
-                        title={t('editTitle')}
-                        aria-label={t('editLabel')}
-                        className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 px-2"
-                      >
-                        <Pencil className="size-3.5" />
-                        {t('edit')}
-                      </Button>
-                    )}
-                    {(statusKey === 'REJECTED' || statusKey === 'PAUSED') && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEdit(template)}
-                        title={t('resubmitTitle')}
-                        aria-label={t('resubmitLabel')}
-                        className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 px-2"
-                      >
-                        <RotateCcw className="size-3.5" />
-                        {t('resubmit')}
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setTemplateToDelete(template)}
-                      disabled={deletingId === template.id}
-                      aria-label={
-                        template.meta_template_id
-                          ? t('deleteMetaLocallyAria')
-                          : t('deleteLocallyAria')
-                      }
-                      title={
-                        template.meta_template_id
-                          ? t('deleteMetaLocallyTitle')
-                          : t('deleteLocallyTitle')
-                      }
-                      className="text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 h-8 w-8"
-                    >
-                      {deletingId === template.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="size-4" />
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center justify-end gap-1">
+                {statusKey === 'APPROVED' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEdit(template)}
+                    title={t('editTitle')}
+                    aria-label={t('editLabel')}
+                    className="h-8 px-2 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  >
+                    <Pencil className="size-3.5" />
+                    {t('edit')}
+                  </Button>
+                )}
+                {(statusKey === 'REJECTED' || statusKey === 'PAUSED') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEdit(template)}
+                    title={t('resubmitTitle')}
+                    aria-label={t('resubmitLabel')}
+                    className="h-8 px-2 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  >
+                    <RotateCcw className="size-3.5" />
+                    {t('resubmit')}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setTemplateToDelete(template)}
+                  disabled={deletingId === template.id}
+                  aria-label={template.meta_template_id ? t('deleteMetaLocallyAria') : t('deleteLocallyAria')}
+                  title={template.meta_template_id ? t('deleteMetaLocallyTitle') : t('deleteLocallyTitle')}
+                  className="h-8 w-8 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                >
+                  {deletingId === template.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                </Button>
+              </div>
             );
-          })}
-        </div>
-      )}
+          },
+        }}
+      />
 
       <Dialog
         open={dialogOpen}

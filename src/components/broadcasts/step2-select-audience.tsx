@@ -1,5 +1,8 @@
 'use client';
 
+import { downloadCsvTemplate } from '@/lib/csv-templates';
+import { Download } from 'lucide-react';
+import { NativeSelect } from '@/components/ui/native-select';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { parseBroadcastCsv } from '@/lib/broadcast-csv';
@@ -389,7 +392,7 @@ export function Step2SelectAudience({
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)]">
-              <select
+              <NativeSelect
                 value={audience.customField?.fieldId ?? ''}
                 onChange={(e) => updateCustomField({ fieldId: e.target.value })}
                 className="h-9 rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -400,8 +403,8 @@ export function Step2SelectAudience({
                     {f.field_name}
                   </option>
                 ))}
-              </select>
-              <select
+              </NativeSelect>
+              <NativeSelect
                 value={audience.customField?.operator ?? 'is'}
                 onChange={(e) =>
                   updateCustomField({
@@ -415,7 +418,7 @@ export function Step2SelectAudience({
                     {op.label}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               <input
                 type="text"
                 value={audience.customField?.value ?? ''}
@@ -468,6 +471,14 @@ export function Step2SelectAudience({
             onChange={handleCsvChange}
             className="hidden"
           />
+          <button
+            type="button"
+            onClick={() => downloadCsvTemplate('broadcast')}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+          >
+            <Download className="size-3.5" />
+            Download template (CSV)
+          </button>
         </div>
       )}
 

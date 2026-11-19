@@ -24,6 +24,21 @@ export const COLOR_KEYS = [
 ] as const;
 export type ColorKey = (typeof COLOR_KEYS)[number];
 
+/** Clinicoro's own light-mode colours — what a colour left empty looks like (globals.css). */
+export const DEFAULT_COLORS: Record<ColorKey, string> = {
+  sidebar_bg: "#FFFFFF",
+  sidebar_text: "#627485",
+  sidebar_accent: "#0E9F9A",
+  title_color: "#0B2740",
+  subtitle_color: "#627485",
+  theme_primary: "#0B2740",
+  theme_text: "#172B3A",
+  theme_muted: "#627485",
+  theme_bg: "#F4F8FA",
+  theme_surface: "#FFFFFF",
+  theme_danger: "#B4232B",
+};
+
 export type Branding = {
   title: string | null;
   subtitle: string | null;
@@ -103,7 +118,7 @@ export function inkOn(bg: string): string {
   return contrast(bg, LIGHT_INK) >= contrast(bg, DARK_BG) ? LIGHT_INK : DARK_BG;
 }
 /** The accent for dark mode: lightened towards white until it stands out on the navy page (3:1). */
-function darkAccent(hex: string): string {
+export function darkAccent(hex: string): string {
   let out = hex;
   for (let t = 0.1; contrast(out, DARK_BG) < 3 && t <= 1; t += 0.1) {
     out = "#" + channels(hex).map((c) => Math.round(c + (255 - c) * t).toString(16).padStart(2, "0")).join("");

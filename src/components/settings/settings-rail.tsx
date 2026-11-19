@@ -35,7 +35,7 @@ export function SettingsRail({
   hints?: Partial<Record<SettingsSection, ReactNode>>;
 }) {
   const t = useTranslations('Settings');
-  const { canManageMembers } = useAuth();
+  const { canManageMembers, can } = useAuth();
   const { canEdit: canEditBranding } = useBranding();
   const activeRef = useRef<HTMLButtonElement>(null);
 
@@ -62,8 +62,9 @@ export function SettingsRail({
     >
       {RAIL_GROUPS.map(({ label, group }) => {
         const items = SETTINGS_SECTIONS.filter(
-          (s) => SECTION_META[s].group === group && railShows(SECTION_META[s], { canManageMembers, canEditBranding }),
+          (s) => SECTION_META[s].group === group && railShows(SECTION_META[s], { canManageMembers, canEditBranding, canView: (m) => can(m, 'view') }),
         );
+        if (items.length === 0) return null;
         return (
           <div
             key={group}

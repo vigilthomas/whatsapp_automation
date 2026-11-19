@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentAccount, toErrorResponse } from "@/lib/auth/account";
 import { canManageMembers, isAccountRole } from "@/lib/auth/roles";
+import { supabaseAdmin } from "@/lib/automations/admin-client";
 import type { AccountMember } from "@/types";
 
 interface ProfileRow {
@@ -54,16 +55,25 @@ export async function GET() {
 
     // Best-effort lookup of the 043/044 columns — tolerated when those
     // migrations aren't applied (the fields just read as null).
-    type Extra = { designation_id: string | null; clinic_id: string | null; staff_type: string | null };
+    type Extra = { designation_id: string | null; branch_id: string | null; staff_type: string | null };
     const extras = new Map<string, Extra>();
     const eRes = await ctx.supabase
       .from("profiles")
-      .select("user_id, designation_id, clinic_id, staff_type")
+      .select("user_id, designation_id, branch_id, staff_type")
       .eq("account_id", ctx.accountId);
     if (!eRes.error) {
       for (const r of eRes.data as ({ user_id: string } & Extra)[]) {
-        extras.set(r.user_id, { designation_id: r.designation_id, clinic_id: r.clinic_id, staff_type: r.staff_type });
+        extras.set(r.user_id, { designation_id: r.designation_id, branch_id: r.branch_id, staff_type: r.staff_type });
       }
+    }
+
+    // Super admins (049). super_admins isn't readable by members, so the
+    // service role looks up just the ids on this account's roster.
+    const superIds = new Set<string>();
+    const ids = (data as ProfileRow[]).map((r) => r.user_id);
+    if (ids.length) {
+      const sRes = await supabaseAdmin().from("super_admins").select("user_id").in("user_id", ids);
+      if (!sRes.error) for (const r of sRes.data as { user_id: string }[]) superIds.add(r.user_id);
     }
 
     const members: AccountMember[] = (data as ProfileRow[]).flatMap((row) => {
@@ -80,8 +90,9 @@ export async function GET() {
           role: row.account_role,
           joined_at: row.created_at,
           designation_id: extras.get(row.user_id)?.designation_id ?? null,
-          clinic_id: extras.get(row.user_id)?.clinic_id ?? null,
+          branch_id: extras.get(row.user_id)?.branch_id ?? null,
           staff_type: extras.get(row.user_id)?.staff_type ?? null,
+          is_super_admin: superIds.has(row.user_id),
         },
       ];
     });

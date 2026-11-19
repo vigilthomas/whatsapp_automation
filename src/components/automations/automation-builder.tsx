@@ -1,5 +1,6 @@
 "use client"
 
+import { NativeSelect } from '@/components/ui/native-select';
 import {
   createContext,
   useContext,
@@ -347,7 +348,7 @@ function TagSelect({
         style={{ backgroundColor: selected?.color ?? "transparent" }}
         aria-hidden
       />
-      <select
+      <NativeSelect
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={SELECT_CLASS}
@@ -363,7 +364,7 @@ function TagSelect({
         {value && !selected && (
           <option value={value}>{t("tags.unknown", { id: value })}</option>
         )}
-      </select>
+      </NativeSelect>
     </div>
   )
 }
@@ -386,7 +387,7 @@ function ContactFieldSelect({
   const knownCustom =
     customValue && customFields.some((f) => `custom:${f.id}` === customValue)
   return (
-    <select
+    <NativeSelect
       value={value || "name"}
       onChange={(e) => onChange(e.target.value)}
       className={SELECT_CLASS}
@@ -406,7 +407,7 @@ function ContactFieldSelect({
       {customValue && !knownCustom && (
         <option value={customValue}>{t("fields.unknown", { id: customValue })}</option>
       )}
-    </select>
+    </NativeSelect>
   )
 }
 
@@ -434,7 +435,7 @@ function AgentSelect({
   }
   const selected = members.find((m) => m.user_id === value)
   return (
-    <select
+    <NativeSelect
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={SELECT_CLASS}
@@ -448,7 +449,7 @@ function AgentSelect({
       {value && !selected && (
         <option value={value}>{t("agents.unknown", { id: value })}</option>
       )}
-    </select>
+    </NativeSelect>
   )
 }
 
@@ -499,7 +500,7 @@ function DealPipelineFields({
   return (
     <>
       <FieldBlock label={t("pipelines.pipelineLabel")}>
-        <select
+        <NativeSelect
           value={pipelineId}
           onChange={(e) => {
             const nextPipelineId = e.target.value
@@ -522,10 +523,10 @@ function DealPipelineFields({
           {pipelineId && !selectedPipeline && (
             <option value={pipelineId}>{t("pipelines.unknownPipeline", { id: pipelineId })}</option>
           )}
-        </select>
+        </NativeSelect>
       </FieldBlock>
       <FieldBlock label={t("pipelines.stageLabel")}>
-        <select
+        <NativeSelect
           value={stageId}
           onChange={(e) =>
             onChange({ pipeline_id: pipelineId, stage_id: e.target.value })
@@ -544,7 +545,7 @@ function DealPipelineFields({
           {stageId && pipelineId && !selectedStage && (
             <option value={stageId}>{t("pipelines.unknownStage", { id: stageId })}</option>
           )}
-        </select>
+        </NativeSelect>
       </FieldBlock>
     </>
   )
@@ -601,7 +602,7 @@ function SendTemplateFields({
 
   return (
     <FieldBlock label={t("templates.templateLabel")}>
-      <select
+      <NativeSelect
         value={current}
         onChange={(e) => {
           const [name, lang] = e.target.value.split("::")
@@ -623,7 +624,7 @@ function SendTemplateFields({
             {t("templates.unknown", { name: templateName, lang: language || t("templates.unknownLang") })}
           </option>
         )}
-      </select>
+      </NativeSelect>
     </FieldBlock>
   )
 }
@@ -833,7 +834,7 @@ function TriggerCard({
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 {t("triggerType")}
               </label>
-              <select
+              <NativeSelect
                 value={type}
                 onChange={(e) => onTypeChange(e.target.value as AutomationTriggerType)}
                 className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"
@@ -843,7 +844,7 @@ function TriggerCard({
                     {t(`triggers.${o.value}.label`)}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {t(`triggers.${type}.hint`)}
               </p>
@@ -913,7 +914,7 @@ function KeywordMatchConfig({
   // when the trigger type changes, so the seed stays in sync.
   const [draft, setDraft] = useState(keywords.join(", "))
 
-  // Persist the default the <select> displays. The dropdown falls back to
+  // Persist the default the <NativeSelect> displays. The dropdown falls back to
   // "contains" for display, but leaving it untouched would otherwise omit
   // match_type from the saved config — and activation validation then
   // rejected it (trigger.match_type). Seed once on mount; the component
@@ -958,7 +959,7 @@ function KeywordMatchConfig({
         <label className="mb-1 block text-xs font-medium text-muted-foreground">
           {t("config.matchType")}
         </label>
-        <select
+        <NativeSelect
           value={config?.match_type ?? "contains"}
           onChange={(e) =>
             onChange({
@@ -971,7 +972,7 @@ function KeywordMatchConfig({
           <option value="contains">{t("config.matchContains")}</option>
           <option value="word">{t("config.matchWord")}</option>
           <option value="exact">{t("config.matchExact")}</option>
-        </select>
+        </NativeSelect>
         {/* Only worth explaining for `word` — "contains" and "exact" read
             for themselves, and this is the one that changes which messages
             fire an automation in a way that isn't obvious. */}
@@ -1350,14 +1351,14 @@ function StepEditor({
       return (
         <>
           <FieldBlock label={t("config.modeLabel")}>
-            <select
+            <NativeSelect
               value={(cfg.mode as string) ?? "round_robin"}
               onChange={(e) => set({ mode: e.target.value })}
               className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground"
             >
               <option value="round_robin">{t("config.modes.round_robin")}</option>
               <option value="specific">{t("config.modes.specific")}</option>
-            </select>
+            </NativeSelect>
           </FieldBlock>
           {cfg.mode === "specific" && (
             <FieldBlock label={t("config.agentLabel")}>
@@ -1429,7 +1430,7 @@ function StepEditor({
             />
           </FieldBlock>
           <FieldBlock label={t("config.unitLabel")}>
-            <select
+            <NativeSelect
               value={(cfg.unit as string) ?? "hours"}
               onChange={(e) => set({ unit: e.target.value })}
               className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground"
@@ -1437,7 +1438,7 @@ function StepEditor({
               <option value="minutes">{t("config.units.minutes")}</option>
               <option value="hours">{t("config.units.hours")}</option>
               <option value="days">{t("config.units.days")}</option>
-            </select>
+            </NativeSelect>
           </FieldBlock>
         </div>
       )
@@ -1445,7 +1446,7 @@ function StepEditor({
       return (
         <>
           <FieldBlock label={t("config.subjectLabel")}>
-            <select
+            <NativeSelect
               value={(cfg.subject as string) ?? "tag_presence"}
               onChange={(e) => set({ subject: e.target.value })}
               className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground"
@@ -1454,7 +1455,7 @@ function StepEditor({
               <option value="contact_field">{t("config.subjects.contact_field")}</option>
               <option value="message_content">{t("config.subjects.message_content")}</option>
               <option value="time_of_day">{t("config.subjects.time_of_day")}</option>
-            </select>
+            </NativeSelect>
           </FieldBlock>
           <FieldBlock label={t("config.operandLabel")}>
             <Input

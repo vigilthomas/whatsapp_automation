@@ -1,5 +1,7 @@
 "use client";
 
+import { NativeSelect } from '@/components/ui/native-select';
+import { DateInput } from '@/components/ui/date-time-input';
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -271,7 +273,7 @@ export function DealForm({
 
             <div className="grid gap-2">
               <Label className="text-muted-foreground">{t("contact")}</Label>
-              <select
+              <NativeSelect
                 value={contactId}
                 onChange={(e) => setContactId(e.target.value)}
                 className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -282,7 +284,7 @@ export function DealForm({
                     {c.name || c.phone}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
 
               {linkedConversation && (
                 <Link
@@ -311,7 +313,7 @@ export function DealForm({
               </div>
               <div className="grid gap-2">
                 <Label className="text-muted-foreground">{t("currency")}</Label>
-                <select
+                <NativeSelect
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
                   className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary"
@@ -321,14 +323,13 @@ export function DealForm({
                       {c.code}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
             </div>
 
             <div className="grid gap-2">
               <Label className="text-muted-foreground">{t("expectedCloseDate")}</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={expectedCloseDate}
                 onChange={(e) => setExpectedCloseDate(e.target.value)}
                 className="border-border bg-muted text-foreground"
@@ -337,7 +338,7 @@ export function DealForm({
 
             <div className="grid gap-2">
               <Label className="text-muted-foreground">{t("stage")}</Label>
-              <select
+              <NativeSelect
                 value={stageId}
                 onChange={(e) => setStageId(e.target.value)}
                 className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary"
@@ -347,12 +348,12 @@ export function DealForm({
                     {s.name}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
 
             <div className="grid gap-2">
               <Label className="text-muted-foreground">{t("assignedTo")}</Label>
-              <select
+              <NativeSelect
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
                 className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary"
@@ -363,7 +364,7 @@ export function DealForm({
                     {p.full_name || p.email}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
 
             <div className="grid gap-2">

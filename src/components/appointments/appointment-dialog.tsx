@@ -1,5 +1,7 @@
 "use client";
 
+import { NativeSelect } from '@/components/ui/native-select';
+import { DateInput, TimeInput } from '@/components/ui/date-time-input';
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -15,6 +17,7 @@ import {
 import type { MasterRecord } from "@/lib/master/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DurationInput, useDurationLabel } from "@/components/ui/duration-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,6 +30,7 @@ import {
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { avatarColor, initialsOf } from "@/components/dashboard/clinic-widgets";
 import { WORK_END_HOUR, WORK_START_HOUR } from "@/components/appointments/appointment-calendar";
+import { dynamicStarts, hhmm } from "@/lib/booking/schedule";
 
 type PatientPick = { id: string; name: string | null; phone: string };
 
@@ -34,7 +38,7 @@ export interface AppointmentDraft {
   id?: string;
   contact: PatientPick | null;
   doctor_id: string | null;
-  clinic_id: string | null;
+  branch_id: string | null;
   service: string;
   /** yyyy-mm-dd, local. */
   date: string;
@@ -52,7 +56,7 @@ export function draftFromAppointment(a: Appointment): AppointmentDraft {
     id: a.id,
     contact: a.contact,
     doctor_id: a.doctor_id,
-    clinic_id: a.clinic_id,
+    branch_id: a.branch_id,
     service: a.service,
     date: toDateInput(s),
     time: toTimeInput(s),
@@ -67,7 +71,7 @@ export function emptyDraft(start?: Date): AppointmentDraft {
   return {
     contact: null,
     doctor_id: null,
-    clinic_id: null,
+    branch_id: null,
     service: "",
     date: toDateInput(s),
     time: toTimeInput(s),
@@ -94,7 +98,6 @@ function parseLocal(date: string, time: string) {
   return new Date(`${date}T${time}:00`);
 }
 
-const DURATIONS = [15, 20, 30, 45, 60, 90, 120];
 /** Days shown in the date strip (reference shows six). */
 const STRIP_DAYS = 6;
 
@@ -102,14 +105,18 @@ interface ServiceRecord {
   id: string;
   name: string;
   duration_min: number;
+  buffer_min: number;
 }
+
+/** Step between offered times when nothing is in the way. */
+const SLOT_GAP_MIN = 30;
 
 interface Props {
   draft: AppointmentDraft | null;
   onClose: () => void;
   onSaved: () => void;
   doctors: MasterRecord[];
-  clinics: MasterRecord[];
+  branches: MasterRecord[];
   /** Focus the schedule fields — used by the "Reschedule" action. */
   mode?: "edit" | "reschedule" | "changeDoctor";
 }
@@ -126,10 +133,11 @@ interface Props {
  * the calendar rather than guessing. Patients are searched live from
  * the account's contacts (RLS-scoped, via the browser client).
  */
-export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, mode = "edit" }: Props) {
+export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, mode = "edit" }: Props) {
   const t = useTranslations("Appointments.dialog");
   const tStatus = useTranslations("Appointments.status");
   const confirm = useConfirm();
+  const durationLabel = useDurationLabel();
   const [form, setForm] = useState<AppointmentDraft | null>(draft);
   const [saving, setSaving] = useState(false);
 
@@ -138,8 +146,10 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
   const [searching, setSearching] = useState(false);
 
   const [services, setServices] = useState<ServiceRecord[]>([]);
+  // Doctor services (057): a doctor's own time for a service.
+  const [ownTimes, setOwnTimes] = useState<{ doctor_id: string; service_id: string; duration_min: number }[]>([]);
   const [customService, setCustomService] = useState(false);
-  const [busy, setBusy] = useState<{ start: number; end: number; id?: string }[]>([]);
+  const [busy, setBusy] = useState<{ start: number; end: number; id?: string; service?: string }[]>([]);
   const [showAllDates, setShowAllDates] = useState(false);
 
   useEffect(() => {
@@ -162,6 +172,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                 id: String(r.id),
                 name: String(r.name ?? ""),
                 duration_min: Number(r.duration_min) || 30,
+                buffer_min: Number(r.buffer_min) || 0,
               }))
           : [];
         setServices(recs);
@@ -170,6 +181,20 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
         setCustomService(recs.length === 0 || (!!draft.service && !recs.some((s) => s.name === draft.service)));
       })
       .catch(() => setServices([]));
+    fetch("/api/master/doctor-services", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { records: [] }))
+      .then((d) =>
+        setOwnTimes(
+          (Array.isArray(d.records) ? d.records : [])
+            .filter((r: MasterRecord) => r.is_active !== false && Number(r.duration_min) > 0)
+            .map((r: MasterRecord) => ({
+              doctor_id: String(r.doctor_id),
+              service_id: String(r.service_id),
+              duration_min: Number(r.duration_min),
+            })),
+        ),
+      )
+      .catch(() => setOwnTimes([]));
   }, [draft]);
 
   // Debounced patient search. Skipped once a patient is picked.
@@ -211,7 +236,12 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
         setBusy(
           rows
             .filter((a) => a.status !== "cancelled")
-            .map((a) => ({ id: a.id, start: new Date(a.starts_at).getTime(), end: new Date(a.ends_at).getTime() })),
+            .map((a) => ({
+              id: a.id,
+              start: new Date(a.starts_at).getTime(),
+              end: new Date(a.ends_at).getTime(),
+              service: a.service,
+            })),
         );
       })
       .catch(() => setBusy([]));
@@ -223,10 +253,26 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
   const set = <K extends keyof AppointmentDraft>(k: K, v: AppointmentDraft[K]) =>
     setForm((f) => (f ? { ...f, [k]: v } : f));
 
-  const doctorClinicHint = useMemo(() => {
+  /** Time for a listed service with a doctor: the doctor's own, else the service's default. */
+  const minutesFor = (serviceName: string, doctorId: string | null) => {
+    const s = services.find((x) => x.name === serviceName);
+    if (!s) return null;
+    const own = doctorId ? ownTimes.find((o) => o.doctor_id === doctorId && o.service_id === s.id) : undefined;
+    return own?.duration_min ?? s.duration_min;
+  };
+
+  /** Pick a doctor; a listed service switches to that doctor's time. */
+  const pickDoctor = (doctorId: string | null) =>
+    setForm((f) => {
+      if (!f) return f;
+      const minutes = customService ? null : minutesFor(f.service, doctorId);
+      return { ...f, doctor_id: doctorId, ...(minutes ? { durationMin: minutes } : {}) };
+    });
+
+  const doctorBranchHint = useMemo(() => {
     if (!form?.doctor_id) return null;
     const d = doctors.find((x) => x.id === form.doctor_id);
-    return typeof d?.clinic_id === "string" ? d.clinic_id : null;
+    return typeof d?.branch_id === "string" ? d.branch_id : null;
   }, [form?.doctor_id, doctors]);
 
   const selectedDoctor = doctors.find((d) => d.id === form?.doctor_id) ?? null;
@@ -245,22 +291,34 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
   }, []);
   const dateInStrip = strip.some((s) => s.key === form?.date);
 
-  // Slot grid: working hours stepped by the service duration (min 15).
+  // Dynamic times (same rules as the booking assistant, schedule.ts): every
+  // 30 min, but straight after the chosen doctor's previous booking plus
+  // half of each service's buffer. Without a doctor there's nothing to
+  // work around, so it's the plain 30-minute grid.
   const slots = useMemo(() => {
     if (!form) return [];
-    const step = Math.max(15, Math.min(60, form.durationMin || 30));
-    const out: { time: string; label: string; taken: boolean; past: boolean }[] = [];
     const fmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+    const dayStart = parseLocal(form.date, "00:00").getTime();
+    const bufferOf = (name?: string) => services.find((x) => x.name === name)?.buffer_min ?? 0;
+    const blocks = form.doctor_id
+      ? busy
+          .filter((b) => b.id !== form.id)
+          .map((b) => ({ start: (b.start - dayStart) / 60000, end: (b.end - dayStart) / 60000, bufferMin: bufferOf(b.service) }))
+      : [];
+    const starts = dynamicStarts({
+      open: WORK_START_HOUR * 60,
+      close: WORK_END_HOUR * 60,
+      durationMin: form.durationMin,
+      bufferMin: bufferOf(form.service),
+      gapMin: SLOT_GAP_MIN,
+      blocks,
+    });
     const now = Date.now();
-    for (let m = WORK_START_HOUR * 60; m + form.durationMin <= WORK_END_HOUR * 60; m += step) {
-      const time = `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
-      const s = parseLocal(form.date, time).getTime();
-      const e = s + form.durationMin * 60000;
-      const taken = busy.some((b) => b.id !== form.id && b.start < e && b.end > s);
-      out.push({ time, label: fmt.format(new Date(s)), taken, past: e < now });
-    }
-    return out;
-  }, [form, busy]);
+    return starts.map((m) => {
+      const s = dayStart + m * 60000;
+      return { time: hhmm(m), label: fmt.format(new Date(s)), taken: false, past: s + form.durationMin * 60000 < now };
+    });
+  }, [form, busy, services]);
 
   async function save() {
     if (!form) return;
@@ -294,8 +352,8 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
       const body = {
         contact_id: form.contact.id,
         doctor_id: form.doctor_id,
-        // Default the clinic to the doctor's when the user left it blank.
-        clinic_id: form.clinic_id ?? doctorClinicHint,
+        // Default the branch to the doctor's when the user left it blank.
+        branch_id: form.branch_id ?? doctorBranchHint,
         service: form.service.trim(),
         starts_at: start.toISOString(),
         ends_at: end.toISOString(),
@@ -454,10 +512,10 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                           className={chip(on)}
                           onClick={() => {
                             set("service", s.name);
-                            set("durationMin", s.duration_min);
+                            set("durationMin", minutesFor(s.name, form.doctor_id) ?? s.duration_min);
                           }}
                         >
-                          {s.name} · {s.duration_min}m
+                          {s.name} · {durationLabel(minutesFor(s.name, form.doctor_id) ?? s.duration_min)}
                         </button>
                       );
                     })}
@@ -473,18 +531,11 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                       placeholder={t("servicePlaceholder")}
                       className="h-10 rounded-[10px] border-input text-[13.5px]"
                     />
-                    <select
+                    <DurationInput
                       value={form.durationMin}
-                      onChange={(e) => set("durationMin", Number(e.target.value))}
-                      className={cn(selectCls, "w-28")}
-                      aria-label={t("duration")}
-                    >
-                      {DURATIONS.map((m) => (
-                        <option key={m} value={m}>
-                          {t("minutes", { count: m })}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => set("durationMin", Math.max(5, v))}
+                      className="shrink-0"
+                    />
                     {services.length > 0 && (
                       <Button type="button" variant="outline" size="sm" className="h-10" onClick={() => setCustomService(false)}>
                         {t("pickService")}
@@ -506,7 +557,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                           key={d.id}
                           type="button"
                           autoFocus={mode === "changeDoctor" && on}
-                          onClick={() => set("doctor_id", on ? null : d.id)}
+                          onClick={() => pickDoctor(on ? null : d.id)}
                           className={cn(
                             "flex flex-col items-center gap-1.5 rounded-xl border px-1.5 py-2.5 transition-colors",
                             on ? "border-teal bg-mint" : "border-input bg-card hover:bg-sunken",
@@ -524,10 +575,10 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                     })}
                   </div>
                 ) : (
-                  <select
+                  <NativeSelect
                     autoFocus={mode === "changeDoctor"}
                     value={form.doctor_id ?? ""}
-                    onChange={(e) => set("doctor_id", e.target.value || null)}
+                    onChange={(e) => pickDoctor(e.target.value || null)}
                     className={selectCls}
                   >
                     <option value="">{t("noDoctor")}</option>
@@ -536,22 +587,22 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                         {String(d.name)}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 )}
-                {clinics.length > 1 && (
-                  <select
-                    value={form.clinic_id ?? ""}
-                    onChange={(e) => set("clinic_id", e.target.value || null)}
+                {branches.length > 1 && (
+                  <NativeSelect
+                    value={form.branch_id ?? ""}
+                    onChange={(e) => set("branch_id", e.target.value || null)}
                     className={cn(selectCls, "mt-1")}
-                    aria-label={t("clinic")}
+                    aria-label={t("branch")}
                   >
-                    <option value="">{t("noClinic")}</option>
-                    {clinics.map((c) => (
+                    <option value="">{t("noBranch")}</option>
+                    {branches.map((c) => (
                       <option key={c.id} value={c.id}>
                         {String(c.name)}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 )}
               </div>
 
@@ -568,8 +619,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                   </button>
                 </div>
                 {showAllDates || !dateInStrip ? (
-                  <Input
-                    type="date"
+                  <DateInput
                     autoFocus={mode === "reschedule"}
                     value={form.date}
                     onChange={(e) => set("date", e.target.value)}
@@ -635,9 +685,8 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                 </div>
                 <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
                   <span>{t("customTime")}</span>
-                  <Input
-                    type="time"
-                    step={300}
+                  <TimeInput
+                    minuteStep={5}
                     value={form.time}
                     onChange={(e) => set("time", e.target.value)}
                     className="h-8 w-28 rounded-lg border-input"
@@ -650,7 +699,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
               {form.id && (
                 <div className="flex flex-col gap-1.5">
                   <Label className={labelCls}>{t("status")}</Label>
-                  <select
+                  <NativeSelect
                     value={form.status}
                     onChange={(e) => set("status", e.target.value as AppointmentStatus)}
                     className={selectCls}
@@ -660,7 +709,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, clinics, m
                         {tStatus(s)}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
               )}
 

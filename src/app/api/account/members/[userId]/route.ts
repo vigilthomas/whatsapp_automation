@@ -17,9 +17,11 @@
 import { NextResponse } from "next/server";
 import type { PostgrestError } from "@supabase/supabase-js";
 
-import { requireRole, toErrorResponse } from "@/lib/auth/account";
+import { toErrorResponse } from "@/lib/auth/account";
 import { supabaseAdmin } from "@/lib/automations/admin-client";
 import { isAccountRole } from "@/lib/auth/roles";
+import { accessLevelFromRole, retireDoctorForUser, staffTypeFromRole, syncDoctorForUser } from "@/lib/master/staff";
+import { requirePermission } from "@/lib/auth/permission-guard";
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -48,7 +50,7 @@ export async function PATCH(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const ctx = await requireRole("admin");
+    const ctx = await requirePermission("users", "edit");
 
     const limit = checkRateLimit(
       `admin:memberRole:${ctx.userId}`,
@@ -59,7 +61,7 @@ export async function PATCH(
     const { userId } = await params;
 
     const body = (await request.json().catch(() => null)) as
-      | { role?: unknown; designation_id?: unknown; clinic_id?: unknown; staff_type?: unknown }
+      | { role?: unknown; designation_id?: unknown; branch_id?: unknown; staff_type?: unknown }
       | null;
 
     // Designation assignment. Goes through the service-role client
@@ -69,17 +71,17 @@ export async function PATCH(
     // scope on the UPDATE keeps it inside the caller's tenant, and the
     // designation itself must belong to that tenant too.
     const wantsProfileFields =
-      body && ("designation_id" in body || "clinic_id" in body || "staff_type" in body);
+      body && ("designation_id" in body || "branch_id" in body || "staff_type" in body);
     if (body && wantsProfileFields) {
       const update: Record<string, unknown> = {};
       const designationId = "designation_id" in body ? body.designation_id : undefined;
-      const clinicId = "clinic_id" in body ? body.clinic_id : undefined;
+      const branchId = "branch_id" in body ? body.branch_id : undefined;
       const staffType = "staff_type" in body ? body.staff_type : undefined;
       if (designationId !== undefined && designationId !== null && typeof designationId !== "string") {
         return NextResponse.json({ error: "'designation_id' must be an id or null" }, { status: 400 });
       }
-      if (clinicId !== undefined && clinicId !== null && typeof clinicId !== "string") {
-        return NextResponse.json({ error: "'clinic_id' must be an id or null" }, { status: 400 });
+      if (branchId !== undefined && branchId !== null && typeof branchId !== "string") {
+        return NextResponse.json({ error: "'branch_id' must be an id or null" }, { status: 400 });
       }
       if (
         staffType !== undefined &&
@@ -89,29 +91,57 @@ export async function PATCH(
         return NextResponse.json({ error: "'staff_type' must be doctor, assistant, other or null" }, { status: 400 });
       }
       const admin = supabaseAdmin();
-      if (clinicId) {
+      if (branchId) {
         const { data: c } = await admin
-          .from("clinics")
+          .from("branches")
           .select("id")
-          .eq("id", clinicId)
+          .eq("id", branchId)
           .eq("account_id", ctx.accountId)
+          .is("deleted_at", null)
           .maybeSingle();
-        if (!c) return NextResponse.json({ error: "clinic not found" }, { status: 400 });
+        if (!c) return NextResponse.json({ error: "branch not found" }, { status: 400 });
       }
+      const { data: target } = await admin
+        .from("profiles")
+        .select("account_role")
+        .eq("user_id", userId)
+        .eq("account_id", ctx.accountId)
+        .maybeSingle();
+      if (!target) return NextResponse.json({ error: "user not found" }, { status: 404 });
+      // Owners follow their designation (049), so only a super admin may change an owner's.
+      if (designationId !== undefined && !ctx.superAdmin) {
+        if (target.account_role === "owner") {
+          return NextResponse.json(
+            { error: "Only a super admin can change an owner's role" },
+            { status: 403 },
+          );
+        }
+      }
+      let roleName: string | null = null;
+      let rolePermissions: unknown = null;
       if (designationId) {
         const { data: d } = await admin
           .from("designations")
-          .select("id")
+          .select("id, name, permissions")
           .eq("id", designationId)
           .eq("account_id", ctx.accountId)
+          .is("deleted_at", null)
           .maybeSingle();
         if (!d) {
-          return NextResponse.json({ error: "designation not found" }, { status: 400 });
+          return NextResponse.json({ error: "role not found" }, { status: 400 });
         }
+        roleName = String(d.name ?? "");
+        rolePermissions = d.permissions;
       }
       if (designationId !== undefined) update.designation_id = designationId;
-      if (clinicId !== undefined) update.clinic_id = clinicId;
+      // The access level follows the role (owners keep theirs).
+      if (designationId !== undefined && target.account_role !== "owner") {
+        update.account_role = accessLevelFromRole(roleName, rolePermissions);
+      }
+      if (branchId !== undefined) update.branch_id = branchId;
       if (staffType !== undefined) update.staff_type = staffType;
+      // A new role decides whether they're a doctor, unless told outright.
+      else if (designationId !== undefined) update.staff_type = roleName ? staffTypeFromRole(roleName) : null;
       const { error } = await admin
         .from("profiles")
         .update(update)
@@ -119,6 +149,21 @@ export async function PATCH(
         .eq("account_id", ctx.accountId);
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      // Keep their doctor record (bookable in Appointments) in step.
+      if ("staff_type" in update || "branch_id" in update) {
+        const { data: now } = await admin
+          .from("profiles")
+          .select("staff_type, branch_id")
+          .eq("user_id", userId)
+          .eq("account_id", ctx.accountId)
+          .maybeSingle();
+        await syncDoctorForUser(admin, {
+          accountId: ctx.accountId,
+          userId,
+          isDoctor: now?.staff_type === "doctor",
+          branchId: (now?.branch_id as string | null | undefined) ?? null,
+        }).catch((err) => console.error("[members] doctor sync failed:", err));
       }
       if (!("role" in body)) return NextResponse.json({ ok: true });
     }
@@ -162,7 +207,7 @@ export async function DELETE(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const ctx = await requireRole("admin");
+    const ctx = await requirePermission("users", "delete");
 
     const limit = checkRateLimit(
       `admin:memberRemove:${ctx.userId}`,
@@ -177,6 +222,11 @@ export async function DELETE(
     });
 
     if (error) return rpcErrorToResponse(error);
+
+    // They're gone from the clinic, so they can't be booked any more.
+    await retireDoctorForUser(supabaseAdmin(), ctx.accountId, userId).catch((err) =>
+      console.error("[members] retiring doctor record failed:", err),
+    );
 
     return NextResponse.json({ ok: true, newPersonalAccountId: data });
   } catch (err) {

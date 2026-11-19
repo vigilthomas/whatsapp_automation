@@ -2,13 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, LogOut, Menu, Search, Settings, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { usePageLabel } from "@/hooks/use-page-label";
+import { SETTINGS_MODULES } from "@/lib/auth/module-access";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "dashboard",
@@ -17,6 +26,7 @@ const pageTitles: Record<string, string> = {
   "/notifications": "notifications",
   "/contacts": "contacts",
   "/master": "master",
+  "/workspace": "workspace",
   "/pipelines": "pipelines",
   "/broadcasts": "broadcasts",
   "/automations": "automations",
@@ -43,14 +53,18 @@ interface HeaderProps {
  * Top bar from the Clinicoro reference: a 60px white strip with a wide
  * global search (Ctrl+K focuses it; Enter jumps to Contacts with the
  * query), the notifications bell with an unread dot, and the account
- * chip. On mobile it collapses to hamburger + page title + bell.
+ * menu (profile, settings, sign out). On mobile it
+ * collapses to hamburger + page title + bell + avatar.
  */
 export function Header({ onOpenSidebar }: HeaderProps) {
   const t = useTranslations("Header");
   const pathname = usePathname();
   const router = useRouter();
   const titleKey = getPageTitleKey(pathname);
-  const { account, profile } = useAuth();
+  // The sidebar's (possibly renamed) name for this page, like the page heading.
+  const pageLabel = usePageLabel();
+  const { profile, signOut, can } = useAuth();
+  const settingsReadable = SETTINGS_MODULES.some((m) => can(m, "read"));
   const unread = useUnreadNotifications();
 
   const [query, setQuery] = useState("");
@@ -75,13 +89,15 @@ export function Header({ onOpenSidebar }: HeaderProps) {
     router.push(`/contacts?q=${encodeURIComponent(q)}`);
   };
 
+  const name = profile?.full_name || profile?.email || t("defaultUser");
   const initials =
-    (account?.name ?? profile?.full_name ?? "")
+    (profile?.full_name ?? profile?.email ?? "")
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
       .map((w) => w[0]?.toUpperCase())
-      .join("") || "C";
+      .join("") || "U";
+  const itemClass = "text-popover-foreground focus:bg-accent focus:text-accent-foreground";
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4 lg:h-[60px] lg:gap-4 lg:px-7">
@@ -95,7 +111,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </button>
       <h1 className="truncate font-heading text-base font-semibold text-foreground lg:hidden">
-        {t(titleKey as string)}
+        {pageLabel ?? t(titleKey as string)}
       </h1>
 
       {/* Global search — desktop only. */}
@@ -130,21 +146,48 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         )}
       </Link>
 
-      <div
-        className={cn(
-          "hidden items-center gap-2.5 border-l border-border pl-3 lg:flex",
-        )}
-      >
-        <span className="flex size-8 items-center justify-center rounded-full bg-[#3E6FB5] text-xs font-bold text-white">
-          {initials}
-        </span>
-        <span className="flex flex-col leading-tight">
-          <span className="text-[13.5px] font-semibold text-foreground">
-            {account?.name ?? profile?.full_name ?? t("defaultUser")}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={t("openAccountMenu")}
+          className="flex items-center gap-2.5 rounded-[10px] p-1 text-left transition-colors hover:bg-sunken focus:bg-sunken focus:outline-none data-popup-open:bg-sunken lg:border-l lg:border-border lg:pl-3"
+        >
+          <Avatar className="size-8 shrink-0">
+            {profile?.avatar_url ? <AvatarImage src={profile.avatar_url} alt={profile.full_name ?? t("defaultAvatar")} /> : null}
+            <AvatarFallback className="bg-[#3E6FB5] text-xs font-bold text-white">{initials}</AvatarFallback>
+          </Avatar>
+          <span className="hidden max-w-[200px] truncate text-[13.5px] font-semibold text-foreground lg:inline">
+            {name}
           </span>
-          <span className="text-[11px] text-muted-foreground">{profile?.email ?? ""}</span>
-        </span>
-      </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          sideOffset={6}
+          className="min-w-60 bg-popover text-popover-foreground ring-border"
+        >
+          {/* On mobile the chip is only an avatar, so say who is signed in here. */}
+          <div className="flex flex-col gap-0.5 px-2 py-1.5 lg:hidden">
+            <span className="truncate text-sm font-semibold text-foreground">{name}</span>
+          </div>
+          <DropdownMenuSeparator className="bg-border lg:hidden" />
+          {can("settings-profile", "read") ? (
+            <DropdownMenuItem render={<Link href="/settings?tab=profile" className={itemClass} />}>
+              <User className="size-4" />
+              {t("menuProfile")}
+            </DropdownMenuItem>
+          ) : null}
+          {settingsReadable ? (
+            <DropdownMenuItem render={<Link href="/settings" className={itemClass} />}>
+              <Settings className="size-4" />
+              {t("menuSettings")}
+            </DropdownMenuItem>
+          ) : null}
+          {settingsReadable ? <DropdownMenuSeparator className="bg-border" /> : null}
+          <DropdownMenuItem onClick={signOut} className={itemClass}>
+            <LogOut className="size-4" />
+            {t("menuSignOut")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </header>
   );
 }

@@ -131,7 +131,9 @@ interface AuthContextValue {
    *  while loading or when no account is resolved, so callers can use
    *  it unconditionally. */
   defaultCurrency: string;
-  /** True if `accountRole === 'owner'`. */
+  /** A super admin (049): every permission, acts as owner, above the clinic's owners. */
+  isSuperAdmin: boolean;
+  /** True if `accountRole === 'owner'` (also true for a super admin). */
   isOwner: boolean;
   /** True if `accountRole === 'admin'` (does NOT include owner — use canManageMembers for "admin or above"). */
   isAdmin: boolean;
@@ -217,6 +219,16 @@ interface ProfileRow {
   account_role: string | null;
 }
 
+/** Whether the user is a super admin (049). False when 049 isn't applied or the check fails. */
+async function fetchSuperAdmin(supabase: ReturnType<typeof createClient>): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc("is_super_admin");
+    return !error && data === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Best-effort designation lookup; null when the member has none or 043 isn't applied. */
 async function fetchDesignation(
   supabase: ReturnType<typeof createClient>,
@@ -243,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [designation, setDesignation] = useState<Permissions | null>(null);
+  const [superAdmin, setSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   // Why the account/role couldn't be established, when it couldn't.
   // Null on the happy path.
@@ -343,7 +356,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ? data.account_role
           : null;
 
-        setDesignation(await fetchDesignation(supabase, userId));
+        const [nextDesignation, nextSuperAdmin] = await Promise.all([
+          fetchDesignation(supabase, userId),
+          fetchSuperAdmin(supabase),
+        ]);
+        setDesignation(nextDesignation);
+        setSuperAdmin(nextSuperAdmin);
 
         setProfile({
           id: data.id,
@@ -464,6 +482,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setAccount(null);
+    setSuperAdmin(false);
     window.location.href = "/login";
   }, []);
 
@@ -477,8 +496,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // each derived value a stable identity for React.memo / useEffect
   // dependencies downstream.
   const derived = useMemo(() => {
-    const role = profile?.account_role ?? null;
+    // A super admin acts with the highest role, whatever their profile says.
+    const role = profile?.account_role ? (superAdmin ? "owner" : profile.account_role) : null;
     return {
+      isSuperAdmin: superAdmin,
       accountRole: role,
       accountId: profile?.account_id ?? null,
       isOwner: role === "owner",
@@ -489,12 +510,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canEditSettings: role ? canEditSettingsFor(role) : false,
       canSendMessages: role ? canSendMessagesFor(role) : false,
     };
-  }, [profile?.account_role, profile?.account_id]);
+  }, [profile?.account_role, profile?.account_id, superAdmin]);
 
   const moduleAccess = account?.module_access ?? EMPTY_MODULE_ACCESS;
   const permissions = useMemo(
-    () => effectivePermissions({ role: derived.accountRole, designation, moduleAccess }),
-    [derived.accountRole, designation, moduleAccess],
+    () => effectivePermissions({ role: derived.accountRole, designation, moduleAccess, superAdmin }),
+    [derived.accountRole, designation, moduleAccess, superAdmin],
   );
   const can = useCallback(
     (module: ModuleId, action: Action) => {
@@ -575,6 +596,7 @@ export function useAuth(): AuthContextValue {
       accountStatusDetail: null,
       accountId: null,
       accountRole: null,
+      isSuperAdmin: false,
       isOwner: false,
       isAdmin: false,
       isAgent: false,

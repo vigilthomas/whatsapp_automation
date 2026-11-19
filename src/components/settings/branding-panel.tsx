@@ -6,6 +6,7 @@
  * (presets, colour rows, preview, "use default colours", confirm on save).
  * A colour left at "Default" keeps Clinicoro's own value.
  */
+import { SectionCard } from "@/components/ui/section-card";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Crop, ImageUp, RotateCcw, X } from "lucide-react";
@@ -15,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useBranding } from "@/hooks/use-branding";
-import { checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, isHexColor, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
+import { checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, DEFAULT_COLORS, isHexColor, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 import { BrandingPreview } from "./branding-preview";
 import { LogoCropDialog } from "./logo-crop-dialog";
@@ -131,6 +132,8 @@ export function BrandingPanel() {
     <div className="divide-y divide-border rounded-xl border border-border bg-card">
       {keys.map((k) => {
         const value = draft[k];
+        // Empty = Clinicoro's own colour; show it rather than a blank swatch.
+        const shown = isHexColor(value) ? value : DEFAULT_COLORS[k];
         return (
           <div key={k} className="flex items-center gap-3 px-3.5 py-2.5">
             <Label htmlFor={`brand-${k}`} className="flex flex-1 flex-col items-start gap-0.5">
@@ -139,13 +142,14 @@ export function BrandingPanel() {
             </Label>
             <span
               className="relative size-8 shrink-0 overflow-hidden rounded-md border border-border"
-              style={{ background: isHexColor(value) ? value : "repeating-linear-gradient(45deg,#e3eaef 0 4px,#fff 4px 8px)" }}
+              style={{ background: shown }}
+              title={isHexColor(value) ? value : t("defaultColour", { hex: DEFAULT_COLORS[k] })}
             >
               <input
                 type="color"
                 aria-label={t(`fields.${k}`)}
                 disabled={readOnly}
-                value={isHexColor(value) ? value : "#0E9F9A"}
+                value={shown.toLowerCase()}
                 onChange={(e) => set(k, e.target.value.toUpperCase())}
                 className="absolute inset-0 cursor-pointer opacity-0"
               />
@@ -153,7 +157,7 @@ export function BrandingPanel() {
             <Input
               id={`brand-${k}`}
               className="w-[104px] font-mono text-xs uppercase"
-              placeholder={t("notSet")}
+              placeholder={DEFAULT_COLORS[k]}
               maxLength={7}
               disabled={readOnly}
               value={value ?? ""}
@@ -201,10 +205,8 @@ export function BrandingPanel() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-7">
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">{t("identity")}</h3>
-            <p className="text-xs text-muted-foreground">{t("identityDesc")}</p>
+        <div className="space-y-5">
+          <SectionCard title={t("identity")}>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="brand-title">{t("name")}</Label>
@@ -249,25 +251,21 @@ export function BrandingPanel() {
                 <LogoShapePicker value={draft.logo_shape} disabled={readOnly} onChange={(v) => set("logo_shape", v)} />
               </div>
             </div>
-          </div>
+          </SectionCard>
 
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">{t("sidebar")}</h3>
-            <p className="text-xs text-muted-foreground">{t("sidebarDesc")}</p>
+          <SectionCard title={t("sidebar")}>
             {presetRow(SIDEBAR_PRESETS)}
             {colourRows(SIDEBAR_KEYS)}
-          </div>
+          </SectionCard>
 
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">{t("page")}</h3>
-            <p className="text-xs text-muted-foreground">{t("pageDesc")}</p>
+          <SectionCard title={t("page")}>
             {presetRow(PAGE_PRESETS)}
             {colourRows(PAGE_KEYS)}
-          </div>
+          </SectionCard>
         </div>
 
-        <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
-          <h3 className="text-sm font-semibold text-foreground">{t("preview")}</h3>
+        <aside className="lg:sticky lg:top-4 lg:self-start">
+          <SectionCard title={t("preview")}>
           <BrandingPreview draft={draft} />
           <div className="flex flex-wrap gap-2">
             <Button type="button" disabled={readOnly || !dirty || invalid || saving} onClick={onSave}>
@@ -281,6 +279,7 @@ export function BrandingPanel() {
             </Button>
           </div>
           {dirty && <p className="text-xs text-warn-fg">{t("unsaved")}</p>}
+          </SectionCard>
         </aside>
       </div>
       <LogoCropDialog

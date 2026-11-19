@@ -1,5 +1,7 @@
 'use client';
 
+import { downloadCsvTemplate } from '@/lib/csv-templates';
+import { Download } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -463,6 +465,14 @@ export function ImportModal({
             onChange={handleFileChange}
             className="hidden"
           />
+          <button
+            type="button"
+            onClick={() => downloadCsvTemplate('contacts')}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+          >
+            <Download className="size-3.5" />
+            Download template (CSV)
+          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">

@@ -24,7 +24,10 @@ import {
   CALENDAR_DAYS,
   type CalendarAction,
 } from "@/components/appointments/appointment-calendar";
-import { AppointmentList } from "@/components/appointments/appointment-list";
+import { AppointmentList, useAppointmentTable } from "@/components/appointments/appointment-list";
+import { exportColumns } from "@/components/ui/data-table";
+import { NativeSelect } from "@/components/ui/native-select";
+import { PageHeading } from "@/components/layout/page-heading";
 import { AppointmentActions } from "@/components/appointments/appointment-actions";
 import {
   AppointmentDialog,
@@ -37,7 +40,7 @@ type View = "day" | "week";
 
 /**
  * Appointments — Day (table) / Week (calendar) views of one fetched
- * week, filterable by clinic, doctor and a patient/phone search. Both
+ * week, filterable by branch, doctor and a patient/phone search. Both
  * views share one selection and one action bar, mirroring the
  * reference Appointments page.
  */
@@ -56,7 +59,8 @@ function AppointmentsPageInner() {
   const confirm = useConfirm();
   // Mirrors the API's requirePermission('appointments', …) checks.
   const { can } = useAuth();
-  const canEdit = can("appointments", "write");
+  const canCreate = can("appointments", "write");
+  const canEdit = can("appointments", "edit");
   const canExport = can("appointments", "export");
 
   const [view, setView] = useState<View>("day");
@@ -68,13 +72,13 @@ function AppointmentsPageInner() {
     return d;
   });
   const [search, setSearch] = useState("");
-  const [clinicId, setClinicId] = useState("");
+  const [branchId, setBranchId] = useState("");
   const [doctorId, setDoctorId] = useState("");
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [doctors, setDoctors] = useState<MasterRecord[]>([]);
-  const [clinics, setClinics] = useState<MasterRecord[]>([]);
+  const [branches, setBranches] = useState<MasterRecord[]>([]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AppointmentDraft | null>(null);
@@ -91,10 +95,10 @@ function AppointmentsPageInner() {
     (async () => {
       const [d, c] = await Promise.all([
         fetch("/api/master/doctors", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
-        fetch("/api/master/clinics", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+        fetch("/api/master/branches", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
       ]);
       setDoctors(Array.isArray(d.records) ? d.records : []);
-      setClinics(Array.isArray(c.records) ? c.records : []);
+      setBranches(Array.isArray(c.records) ? c.records : []);
     })();
   }, []);
 
@@ -105,7 +109,7 @@ function AppointmentsPageInner() {
         from: weekStart.toISOString(),
         to: addDays(weekStart, CALENDAR_DAYS).toISOString(),
       });
-      if (clinicId) params.set("clinic_id", clinicId);
+      if (branchId) params.set("branch_id", branchId);
       if (doctorId) params.set("doctor_id", doctorId);
       const res = await fetch(`/api/appointments?${params}`, { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
@@ -120,23 +124,23 @@ function AppointmentsPageInner() {
     } finally {
       setLoading(false);
     }
-  }, [weekStart, clinicId, doctorId, t]);
+  }, [weekStart, branchId, doctorId, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // Doctors narrowed to the chosen clinic so the two filters agree.
+  // Doctors narrowed to the chosen branch so the two filters agree.
   const doctorOptions = useMemo(
-    () => (clinicId ? doctors.filter((d) => d.clinic_id === clinicId) : doctors),
-    [doctors, clinicId],
+    () => (branchId ? doctors.filter((d) => d.branch_id === branchId) : doctors),
+    [doctors, branchId],
   );
 
   const subject = useMemo(() => {
     if (doctorId) return String(doctors.find((d) => d.id === doctorId)?.name ?? "");
-    if (clinicId) return String(clinics.find((c) => c.id === clinicId)?.name ?? "");
+    if (branchId) return String(branches.find((c) => c.id === branchId)?.name ?? "");
     return t("allDoctors");
-  }, [doctorId, clinicId, doctors, clinics, t]);
+  }, [doctorId, branchId, doctors, branches, t]);
 
   const patch = useCallback(
     async (a: Appointment, body: { status: AppointmentStatus }) => {
@@ -187,32 +191,15 @@ function AppointmentsPageInner() {
     }
   };
 
+  // One layout for the list and the export: "Export" writes the columns
+  // shown in the list, in the same order.
+  const table = useAppointmentTable(true);
   const exportCsv = () => {
-    const fmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
     downloadCsv(
       `appointments-${weekStart.toISOString().slice(0, 10)}.csv`,
-      recordsToCsv(appointments, [
-        { key: "starts_at", label: t("list.when"), value: (a) => fmt.format(new Date(a.starts_at)) },
-        { key: "ends", label: "Ends", value: (a) => fmt.format(new Date(a.ends_at)) },
-        { key: "patient", label: t("list.patient"), value: (a) => patientLabel(a.contact) },
-        { key: "phone", label: "Phone", value: (a) => a.contact?.phone ?? "" },
-        { key: "service", label: t("list.service"), value: (a) => a.service },
-        { key: "doctor", label: t("list.doctor"), value: (a) => a.doctor?.name ?? "" },
-        { key: "clinic", label: t("list.clinic"), value: (a) => a.clinic?.name ?? "" },
-        { key: "status", label: t("list.status"), value: (a) => a.status },
-        { key: "source", label: t("list.source"), value: (a) => a.source },
-        { key: "notes", label: "Notes", value: (a) => a.notes ?? "" },
-      ]),
+      recordsToCsv(appointments, exportColumns(table)),
     );
   };
-
-  const weekLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(weekStart);
-  const dayLabel = new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(day);
 
   const q = search.trim().toLowerCase();
   const matches = (a: Appointment) =>
@@ -231,8 +218,6 @@ function AppointmentsPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointments, day, q]);
   const selected = appointments.find((a) => a.id === selectedId) ?? null;
-  const live = (view === "day" ? dayRows : appointments).filter((a) => a.status !== "cancelled");
-  const waCount = live.filter((a) => a.source === "whatsapp").length;
 
   const step = (dir: -1 | 1) => {
     if (view === "day") {
@@ -255,31 +240,24 @@ function AppointmentsPageInner() {
 
   return (
     <div className="flex flex-col gap-[22px]">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="font-heading text-[26px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
-            {t("pageTitle")}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {view === "day" ? dayLabel : weekLabel} · {t("countSummary", { count: live.length })}
-            {waCount > 0 ? ` · ${t("whatsappSummary", { count: waCount })}` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5">
+      <PageHeading
+        actions={
+          <>
           {canExport && appointments.length > 0 && (
             <Button variant="outline" onClick={exportCsv}>
               <Download className="size-4" strokeWidth={1.75} />
               {t("actions.export")}
             </Button>
           )}
-          {canEdit && (
+          {canCreate && (
             <Button variant="outline" onClick={() => openDialog(emptyDraft())}>
               <Plus className="size-4" strokeWidth={2.2} />
               {t("actions.add")}
             </Button>
           )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Toolbar — reference `.toolbar`: segmented view, date nav, filters, search. */}
       <div className="flex flex-wrap items-center gap-2.5">
@@ -311,23 +289,23 @@ function AppointmentsPageInner() {
             <ChevronRight className="size-4" />
           </Button>
         </div>
-        <select
-          value={clinicId}
+        <NativeSelect
+          value={branchId}
           onChange={(e) => {
-            setClinicId(e.target.value);
+            setBranchId(e.target.value);
             setDoctorId("");
           }}
           className={selectCls}
-          aria-label={t("filterClinic")}
+          aria-label={t("filterBranch")}
         >
-          <option value="">{t("allClinics")}</option>
-          {clinics.map((c) => (
+          <option value="">{t("allBranches")}</option>
+          {branches.map((c) => (
             <option key={c.id} value={c.id}>
               {String(c.name)}
             </option>
           ))}
-        </select>
-        <select
+        </NativeSelect>
+        <NativeSelect
           value={doctorId}
           onChange={(e) => setDoctorId(e.target.value)}
           className={selectCls}
@@ -339,7 +317,7 @@ function AppointmentsPageInner() {
               {String(d.name)}
             </option>
           ))}
-        </select>
+        </NativeSelect>
         <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-[10px] border border-input bg-card px-3 text-[13.5px] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20 sm:w-[260px]">
           <Search className="size-4 shrink-0 text-muted-foreground/70" strokeWidth={1.75} />
           <input
@@ -353,6 +331,7 @@ function AppointmentsPageInner() {
 
       <AppointmentActions
         selected={selected}
+        canCreate={canCreate}
         canEdit={canEdit}
         onAdd={() => openDialog(emptyDraft())}
         onAction={onAction}
@@ -369,10 +348,11 @@ function AppointmentsPageInner() {
           onAdd={() => openDialog(emptyDraft())}
           onAction={onAction}
           canEdit={canEdit}
-          onSlotClick={(start) => openDialog(emptyDraft(start))}
+          onSlotClick={canCreate ? (start) => openDialog(emptyDraft(start)) : undefined}
         />
       ) : (
         <AppointmentList
+          table={table}
           appointments={dayRows}
           loading={loading}
           selectedId={selectedId}
@@ -387,7 +367,7 @@ function AppointmentsPageInner() {
         draft={draft}
         mode={dialogMode}
         doctors={doctors}
-        clinics={clinics}
+        branches={branches}
         onClose={() => setDraft(null)}
         onSaved={() => {
           setDraft(null);

@@ -28,11 +28,17 @@ export function LogoCropDialog({
   onShape,
   onCancel,
   onDone,
+  fixedShape = false,
+  title,
 }: {
   /** The image to crop (a data: URL), or null when the dialog is closed. */
   src: string | null;
   shape: LogoShape | null;
-  onShape: (s: LogoShape) => void;
+  onShape?: (s: LogoShape) => void;
+  /** Lock the shape (no shape picker), e.g. round profile photos. */
+  fixedShape?: boolean;
+  /** Dialog title; defaults to the logo wording. */
+  title?: string;
   onCancel: () => void;
   onDone: (dataUrl: string) => void;
 }) {
@@ -128,11 +134,11 @@ export function LogoCropDialog({
     <Dialog open={!!src} onOpenChange={(o) => !o && onCancel()}>
       <DialogContent className="sm:max-w-[488px]">
         <DialogHeader>
-          <DialogTitle>{t("cropTitle")}</DialogTitle>
+          <DialogTitle>{title ?? t("cropTitle")}</DialogTitle>
           <DialogDescription>{t("cropDesc")}</DialogDescription>
         </DialogHeader>
 
-        <LogoShapePicker value={shape} onChange={onShape} />
+        {fixedShape || !onShape ? null : <LogoShapePicker value={shape} onChange={onShape} />}
 
         <div className="flex justify-center rounded-lg bg-[repeating-conic-gradient(#e5e7eb_0_25%,#fff_0_50%)] bg-[length:16px_16px] p-2">
           {loaded ? (

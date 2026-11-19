@@ -9,6 +9,7 @@ import { reopenClosedConversation } from '@/lib/conversations/reopen'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
+import { dispatchInboundToBooking } from '@/lib/booking/runner'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import {
   handleTemplateWebhookChange,
@@ -787,7 +788,21 @@ async function processMessage(
   // no active flows take the runner's early-exit "no_match" path
   // basically for free (one indexed SELECT for the active run).
   // ============================================================
-  const flowResult = await dispatchInboundToFlows({
+  // The booking assistant goes first: a customer in the middle of booking
+  // (or sending a booking trigger word) is talking to it, not to a Flow.
+  // Never throws; falls through when it's off or the message isn't for it.
+  const bookingResult = await dispatchInboundToBooking({
+    accountId,
+    userId: configOwnerUserId,
+    contactId: contactRecord.id,
+    conversationId: conversation.id,
+    text: contentText ?? message.text?.body ?? '',
+    replyId: interactiveReplyId ?? undefined,
+  })
+
+  const flowResult = bookingResult.consumed
+    ? { consumed: true }
+    : await dispatchInboundToFlows({
     accountId,
     userId: configOwnerUserId,
     contactId: contactRecord.id,

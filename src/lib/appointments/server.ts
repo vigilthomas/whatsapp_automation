@@ -8,8 +8,8 @@ import type { AppointmentInput } from './model'
  * keep the wire shape matching `Appointment` in model.ts.
  */
 export const APPOINTMENT_SELECT =
-  'id, clinic_id, doctor_id, contact_id, service, starts_at, ends_at, status, source, notes, created_at, updated_at, ' +
-  'contact:contacts(id, name, phone), doctor:doctors(id, name), clinic:clinics(id, name)'
+  'id, branch_id, doctor_id, contact_id, service, starts_at, ends_at, status, source, notes, created_at, updated_at, ' +
+  'contact:contacts(id, name, phone), doctor:doctors(id, name), branch:branches(id, name)'
 
 /**
  * Every FK in a payload must point inside the caller's account. The
@@ -25,7 +25,7 @@ export async function assertRefsInAccount(
   const checks: Array<[table: string, id: string | null | undefined, label: string]> = [
     ['contacts', values.contact_id, 'contact_id'],
     ['doctors', values.doctor_id, 'doctor_id'],
-    ['clinics', values.clinic_id, 'clinic_id'],
+    ['branches', values.branch_id, 'branch_id'],
   ]
   for (const [table, id, label] of checks) {
     if (typeof id !== 'string') continue

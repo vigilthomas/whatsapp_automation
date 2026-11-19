@@ -1,5 +1,7 @@
 "use client";
 
+import { DataTable, useTableLayout, type DataColumn } from "@/components/ui/data-table";
+import { PageHeading } from "@/components/layout/page-heading";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -193,6 +195,51 @@ export default function FlowsPage() {
     }
   }
 
+  const flowColumns: DataColumn<FlowRow>[] = [
+    {
+      id: "name",
+      header: "Name",
+      hideable: false,
+      width: 240,
+      cell: (flow) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <Workflow className="h-4 w-4 shrink-0 text-primary" />
+          <span className="truncate font-semibold text-foreground">{flow.name}</span>
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      width: 130,
+      cell: (flow) => {
+        const StatusIcon = flow.status === "active" ? PlayCircle : flow.status === "archived" ? Archive : PauseCircle;
+        return (
+          <Badge variant="outline" className={cn("gap-1 text-[10px]", STATUS_COLORS[flow.status])}>
+            <StatusIcon className="h-3 w-3" />
+            {STATUS_LABELS(t)[flow.status]}
+          </Badge>
+        );
+      },
+    },
+    { id: "trigger", header: "Trigger", width: 240, cell: (flow) => describeTrigger(flow, t) },
+    {
+      id: "description",
+      header: "Description",
+      width: 260,
+      defaultHidden: true,
+      cell: (flow) => flow.description || "—",
+    },
+    {
+      id: "runs",
+      header: "Runs",
+      width: 120,
+      className: "tabular-nums",
+      cell: (flow) => t("runCount", { count: flow.execution_count }),
+    },
+  ];
+  const flowTable = useTableLayout("flows", flowColumns);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -203,27 +250,22 @@ export default function FlowsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
-            <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-              {t("beta")}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("description")}
-          </p>
-        </div>
-        <GatedButton
-          canAct={canCreate}
-          gateReason="create flows"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus className="h-4 w-4" />
-          {t("newFlow")}
-        </GatedButton>
-      </header>
+      <PageHeading
+        actions={
+          <GatedButton
+            canAct={canCreate}
+            gateReason="create flows"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            {t("newFlow")}
+          </GatedButton>
+        }
+      >
+        <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-300">
+          {t("beta")}
+        </span>
+      </PageHeading>
 
       {flows.length === 0 ? (
         <EmptyState
@@ -232,17 +274,32 @@ export default function FlowsPage() {
           t={t}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {flows.map((flow) => (
-            <FlowCard
-              key={flow.id}
-              flow={flow}
-              onEdit={() => router.push(`/flows/${flow.id}`)}
-              onDelete={() => handleDelete(flow)}
-              t={t}
-            />
-          ))}
-        </div>
+        <DataTable
+          table={flowTable}
+          rows={flows}
+          rowKey={(flow) => flow.id}
+          onRowClick={(flow) => router.push(`/flows/${flow.id}`)}
+          trailing={{
+            width: 190,
+            cell: (flow) => (
+              <div className="flex items-center justify-end gap-1">
+                <Button variant="ghost" size="sm" onClick={() => router.push(`/flows/${flow.id}`)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  {t("edit")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(flow)}
+                  className="text-red-500 hover:bg-red-500/10 hover:text-red-600"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {t("delete")}
+                </Button>
+              </div>
+            ),
+          }}
+        />
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -354,75 +411,6 @@ function EmptyState({
         <Plus className="h-4 w-4" />
         {t("createFirst")}
       </GatedButton>
-    </div>
-  );
-}
-
-function FlowCard({
-  flow,
-  onEdit,
-  onDelete,
-  t,
-}: {
-  flow: FlowRow;
-  onEdit: () => void;
-  onDelete: () => void;
-  t: ReturnType<typeof useTranslations>;
-}) {
-  const triggerSummary = describeTrigger(flow, t);
-  const StatusIcon =
-    flow.status === "active"
-      ? PlayCircle
-      : flow.status === "archived"
-        ? Archive
-        : PauseCircle;
-  return (
-    <div className="flex flex-col rounded-lg border border-border bg-card p-4 transition-colors hover:border-border">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Workflow className="h-4 w-4 shrink-0 text-primary" />
-          <h3 className="truncate text-sm font-semibold text-foreground">
-            {flow.name}
-          </h3>
-        </div>
-        <Badge
-          variant="outline"
-          className={cn(
-            "shrink-0 gap-1 text-[10px]",
-            STATUS_COLORS[flow.status],
-          )}
-        >
-          <StatusIcon className="h-3 w-3" />
-          {STATUS_LABELS(t)[flow.status]}
-        </Badge>
-      </div>
-
-      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
-        {flow.description || triggerSummary}
-      </p>
-
-      <div className="mt-4 flex items-center gap-3 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <MessageSquare className="h-3 w-3" />
-          {t("runCount", { count: flow.execution_count })}
-        </span>
-      </div>
-
-      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border pt-3">
-        <Button variant="ghost" size="sm" onClick={onEdit}>
-          <Pencil className="h-3.5 w-3.5" />
-          {t("edit")}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {t("delete")}
-        </Button>
-      </div>
     </div>
   );
 }

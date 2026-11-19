@@ -1,5 +1,6 @@
 'use client';
 
+import { PageHeading } from '@/components/layout/page-heading';
 import { useTranslations } from 'next-intl';
 
 import { AccessControlPanel } from '@/components/settings/access-control-panel';
@@ -13,12 +14,7 @@ export default function AccessControlPage() {
   const t = useTranslations('AccessControl');
   return (
     <div>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          {t('pageTitle')}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('pageDesc')}</p>
-      </div>
+      <PageHeading fallback={t('pageTitle')} />
       <div className="mt-6 min-w-0">
         <AccessControlPanel />
       </div>

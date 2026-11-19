@@ -87,7 +87,6 @@ export function AppointmentCalendar({
   subject,
   selectedId,
   onSelect,
-  canEdit,
   onSlotClick,
 }: Props) {
   const t = useTranslations("Appointments");
@@ -171,11 +170,11 @@ export function AppointmentCalendar({
                       <td
                         key={di}
                         onClick={() =>
-                          canEdit && items.length === 0 && onSlotClick?.(slotStart)
+                          items.length === 0 && onSlotClick?.(slotStart)
                         }
                         className={cn(
                           "h-14 border-b border-l border-border p-1",
-                          canEdit && items.length === 0 && onSlotClick
+                          items.length === 0 && onSlotClick
                             ? "cursor-pointer hover:bg-muted/40"
                             : "",
                         )}

@@ -5,14 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Broadcast, BroadcastRecipient, RecipientStatus } from '@/types';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTable, exportColumns, useTableLayout, type DataColumn } from '@/components/ui/data-table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -204,27 +197,12 @@ export default function BroadcastDetailPage() {
     [recipients, statusFilter],
   );
 
+  // Exports every recipient, but only the columns shown in the table, in
+  // their on-screen order.
   function handleExport() {
     if (!broadcast) return;
-    const header = [
-      t('table.contact'),
-      t('table.phone'),
-      t('table.status'),
-      t('table.sent'),
-      t('table.delivered'),
-      t('table.read'),
-      t('table.error'),
-    ];
-    const rows = recipients.map((r) => [
-      r.contact?.name ?? '',
-      r.contact?.phone ?? '',
-      r.status,
-      r.sent_at ?? '',
-      r.delivered_at ?? '',
-      r.read_at ?? '',
-      r.error_message ?? '',
-    ]);
-    const csv = toCsv([header, ...rows]);
+    const cols = exportColumns(recipientTable);
+    const csv = toCsv([cols.map((c) => c.label), ...recipients.map((r) => cols.map((c) => c.value(r)))]);
     const safeName = broadcast.name.replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
     downloadBlob(`broadcast-${safeName}-${broadcastId.slice(0, 8)}.csv`, csv);
   }
@@ -297,6 +275,58 @@ export default function BroadcastDetailPage() {
     toast.success(t('toastDeleted'));
     router.push('/broadcasts');
   }
+
+  const fmtAt = (v?: string | null) => (v ? new Date(v).toLocaleString() : '');
+  const recipientColumns: DataColumn<BroadcastRecipient>[] = [
+    {
+      id: 'contact',
+      header: t('table.contact'),
+      hideable: false,
+      width: 200,
+      className: 'font-medium text-foreground',
+      exportValue: (r) => r.contact?.name ?? '',
+      cell: (r) => r.contact?.name ?? 'Unknown',
+    },
+    {
+      id: 'phone',
+      header: t('table.phone'),
+      width: 160,
+      exportValue: (r) => r.contact?.phone ?? '',
+      cell: (r) => r.contact?.phone ?? '-',
+    },
+    {
+      id: 'status',
+      header: t('table.status'),
+      width: 130,
+      exportValue: (r) => r.status,
+      cell: (r) => {
+        const rStatus = getRecipientStatus(r.status);
+        return (
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${rStatus.classes}`}>
+            {tStatus(rStatus.label)}
+          </span>
+        );
+      },
+    },
+    { id: 'sent', header: t('table.sent'), width: 180, exportValue: (r) => r.sent_at ?? '', cell: (r) => fmtAt(r.sent_at) || '-' },
+    {
+      id: 'delivered',
+      header: t('table.delivered'),
+      width: 180,
+      exportValue: (r) => r.delivered_at ?? '',
+      cell: (r) => fmtAt(r.delivered_at) || '-',
+    },
+    { id: 'read', header: t('table.read'), width: 180, exportValue: (r) => r.read_at ?? '', cell: (r) => fmtAt(r.read_at) || '-' },
+    {
+      id: 'error',
+      header: t('table.error'),
+      width: 240,
+      className: 'text-xs text-red-500 dark:text-red-400',
+      exportValue: (r) => r.error_message ?? '',
+      cell: (r) => r.error_message ?? '-',
+    },
+  ];
+  const recipientTable = useTableLayout('broadcast.recipients', recipientColumns);
 
   if (loading) {
     return (
@@ -569,71 +599,13 @@ export default function BroadcastDetailPage() {
           </div>
         </div>
 
-        {filteredRecipients.length === 0 ? (
-          <div className="flex h-32 items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              {recipients.length === 0
-                ? t('noRecipients')
-                : t('noRecipientsFilter')}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">{t('table.contact')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.phone')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.status')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.sent')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.delivered')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.read')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.error')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRecipients.map((recipient) => {
-                  const rStatus = getRecipientStatus(recipient.status);
-                  return (
-                    <TableRow key={recipient.id} className="border-border">
-                      <TableCell className="font-medium text-foreground">
-                        {recipient.contact?.name ?? 'Unknown'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {recipient.contact?.phone ?? '-'}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${rStatus.classes}`}
-                        >
-                          {tStatus(rStatus.label)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {recipient.sent_at
-                          ? new Date(recipient.sent_at).toLocaleString()
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {recipient.delivered_at
-                          ? new Date(recipient.delivered_at).toLocaleString()
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {recipient.read_at
-                          ? new Date(recipient.read_at).toLocaleString()
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-xs text-red-400">
-                        {recipient.error_message ?? '-'}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <DataTable
+          table={recipientTable}
+          rows={filteredRecipients}
+          rowKey={(r) => r.id}
+          className="rounded-none border-0 shadow-none"
+          empty={recipients.length === 0 ? t('noRecipients') : t('noRecipientsFilter')}
+        />
       </div>
     </div>
   );

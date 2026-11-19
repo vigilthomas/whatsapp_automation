@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeading } from '@/components/layout/page-heading';
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -163,13 +164,9 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Conversations other teammates assign to you show up here.
-          </p>
-        </div>
+      <PageHeading
+        fallback="Notifications"
+        actions={
         <Button
           variant="outline"
           size="sm"
@@ -183,7 +180,8 @@ export default function NotificationsPage() {
           )}
           Mark all as read
         </Button>
-      </div>
+        }
+      />
 
       {notifications.length === 0 ? (
         <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/40">

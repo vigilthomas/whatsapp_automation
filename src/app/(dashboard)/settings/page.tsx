@@ -1,5 +1,6 @@
 'use client';
 
+import { PageHeading } from '@/components/layout/page-heading';
 import { Suspense, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -22,10 +23,13 @@ import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { AccessControlPanel } from '@/components/settings/access-control-panel';
 import {
+  SECTION_META,
+  allowedSection,
   movedSectionHref,
   resolveSection,
   type SettingsSection,
 } from '@/components/settings/settings-sections';
+import { actionsFor } from '@/lib/auth/permissions';
 
 // `useSearchParams` opts this page out of static prerendering unless it
 // sits under a Suspense boundary. Without one, the production build hits
@@ -46,7 +50,7 @@ export default function SettingsPage() {
 function SettingsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { defaultCurrency } = useAuth();
+  const { defaultCurrency, can } = useAuth();
   const { mode } = useTheme();
   const t = useTranslations('Settings');
 
@@ -54,16 +58,22 @@ function SettingsPageInner() {
   // section — deep-linkable, and it keeps the existing links in the
   // app sidebar/header working. Legacy tab values (tags, custom-fields)
   // resolve onto their new home; unknown/empty → the Overview landing.
-  const section = resolveSection(searchParams.get('tab'));
+  const asked = resolveSection(searchParams.get('tab'));
+  // Access control: a section this designation can't open falls back to
+  // the first one it can; with none at all, back to the dashboard.
+  const section = allowedSection(asked, (m) => can(m, 'read'));
+  const gate = section ? SECTION_META[section].module : undefined;
+  const readOnly = !!gate && actionsFor(gate).includes('edit') && !can(gate, 'edit');
 
   // Some sections moved to their own routes (/master/<section>,
   // /access-control). A legacy `?tab=` deep link (or an Overview tile)
   // forwards there instead of rendering inline, so one URL owns each
   // panel.
-  const movedHref = movedSectionHref(section);
+  const movedHref = movedSectionHref(asked);
+  const away = movedHref ?? (section ? null : '/dashboard');
   useEffect(() => {
-    if (movedHref) router.replace(movedHref);
-  }, [movedHref, router]);
+    if (away) router.replace(away);
+  }, [away, router]);
 
   const go = (next: SettingsSection) => {
     const href = movedSectionHref(next);
@@ -104,20 +114,23 @@ function SettingsPageInner() {
     api: <ApiKeysSettings />,
   };
 
+  if (!section) return null;
+
   return (
     <div>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          {t('pageTitle')}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('pageDesc')}
-        </p>
-      </div>
+      <PageHeading fallback={t('pageTitle')} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[236px_minmax(0,1fr)] lg:items-start">
         <SettingsRail active={section} onSelect={go} hints={hints} />
-        <div className="min-w-0">{panel[section]}</div>
+        {/* Without the write tick the section opens, but nothing in it can be changed. */}
+        <fieldset disabled={readOnly} className="min-w-0">
+          {readOnly ? (
+            <p className="mb-3 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              {t('readOnly')}
+            </p>
+          ) : null}
+          {panel[section]}
+        </fieldset>
       </div>
     </div>
   );

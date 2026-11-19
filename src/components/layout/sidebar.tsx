@@ -7,68 +7,11 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
-import {
-  ChevronDown,
-  Crown,
-  LayoutDashboard,
-  LogOut,
-  Settings,
-  Shield,
-  User,
-  UserCog,
-  X,
-} from "lucide-react";
-import type { AccountRole } from "@/lib/auth/roles";
+import { ChevronDown, Folder, LayoutDashboard, X } from "lucide-react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { useBranding } from "@/hooks/use-branding";
-import { resolveMenu, type ResolvedItem } from "@/lib/branding-menu";
+import { orderGroupIds, resolveMenu, type ResolvedItem } from "@/lib/branding-menu";
 import { BRAND_ICONS } from "@/lib/branding-icons";
-
-// Per-role chip metadata used in the sidebar's account strip + the
-// Members tab roster. Keeping this near both consumers in a single
-// place avoids drift between the two surfaces — when a designer
-// wants to recolour "agent" rows, this is the one diff.
-const ROLE_CHIP: Record<
-  AccountRole,
-  { icon: typeof Crown; labelKey: string; className: string }
-> = {
-  owner: {
-    icon: Crown,
-    labelKey: "roleOwner",
-    // Amber: scarce, immutable, "the boss" — gets visual emphasis.
-    className: "border-transparent bg-warn-bg text-warn-fg",
-  },
-  admin: {
-    icon: Shield,
-    labelKey: "roleAdmin",
-    // Primary-tinted: significant but not as scarce as owner.
-    className: "border-transparent bg-info-bg text-info-fg",
-  },
-  agent: {
-    icon: UserCog,
-    labelKey: "roleAgent",
-    // Neutral slate: the operational default.
-    className: "border-transparent bg-neutral-bg text-neutral-fg",
-  },
-  viewer: {
-    icon: User,
-    labelKey: "roleViewer",
-    // Muted slate: read-only role; visually quieter than agent.
-    className: "border-transparent bg-neutral-bg text-neutral-fg/80",
-  },
-};
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 import {
   menuSections,
@@ -94,16 +37,8 @@ import { useTranslations } from "next-intl";
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
-  const {
-    profile,
-    profileLoading,
-    account,
-    accountRole,
-    signOut,
-    sidebarModules,
-    canManageMembers,
-  } = useAuth();
-  const { branding } = useBranding();
+  const { sidebarModules, canManageMembers } = useAuth();
+  const { branding, canEdit: canEditBranding } = useBranding();
   const totalUnread = useTotalUnread();
   const unreadNotifications = useUnreadNotifications();
 
@@ -117,13 +52,17 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   // module (dashboard, settings) are fixed.
   const isItemVisible = (item: NavItem) =>
     (!item.module || sidebarModules.includes(item.module)) &&
-    (!item.adminOnly || canManageMembers);
+    (!item.adminOnly || canManageMembers) &&
+    (!item.clinicAdminOnly || canEditBranding);
   const byPermissionOrder = (a: NavItem, b: NavItem) => {
     const ia = a.module ? sidebarModules.indexOf(a.module) : -1;
     const ib = b.module ? sidebarModules.indexOf(b.module) : -1;
     return ia - ib;
   };
-  const orderVisible = (items: NavItem[]) => items.filter(isItemVisible).sort(byPermissionOrder);
+  // A section ordered in Settings → Sidebar menu keeps that order; otherwise
+  // the designation's order (Access control) applies.
+  const orderVisible = (items: NavItem[], ordered?: boolean) =>
+    ordered ? items.filter(isItemVisible) : items.filter(isItemVisible).sort(byPermissionOrder);
 
   // Groups with their access-filtered, re-ordered children; a group
   // with nothing left to show is dropped rather than rendered as an
@@ -133,11 +72,24 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const menu = resolveMenu<NavItem>(menuSections(), branding.menu);
   const section = (id: string) => menu.find((s) => s.id === id)!;
   const topItems = section("top").items;
-  const brandedGroups = navGroups.map((g) => ({ ...g, label: section(g.id).label, children: section(g.id).items }));
+  const groupIds = orderGroupIds(navGroups.map((g) => g.id), branding.menu);
+  // Built-in groups keep their icon; a section added in Sidebar menu has its chosen one (or a folder).
+  const brandedGroups = groupIds.map((id) => {
+    const base = navGroups.find((g) => g.id === id);
+    const s = section(id);
+    return {
+      id,
+      labelKey: base?.labelKey ?? "",
+      icon: base?.icon ?? ((s.iconKey && BRAND_ICONS[s.iconKey]) || Folder),
+      label: s.label,
+      children: s.items,
+      ordered: s.ordered,
+    };
+  });
   const label = (item: ResolvedItem<NavItem>) => item.label ?? t(item.labelKey as string);
 
   const visibleGroups = brandedGroups
-    .map((g) => ({ ...g, children: orderVisible(g.children) }))
+    .map((g) => ({ ...g, children: orderVisible(g.children, g.ordered) }))
     .filter((g) => g.children.length > 0);
 
   // A group starts expanded whenever one of its children is the
@@ -160,19 +112,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   }, [activeGroupId]);
   const toggleGroup = (id: string) =>
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
-  // Only surface the account-name strip when it actually carries
-  // information. A solo user's personal account is named after them
-  // (the 017 signup trigger seeds it from `full_name`), so showing it
-  // here would just duplicate the user name in the footer below. Once
-  // the account is renamed or the user joins a shared account, the
-  // name diverges and the strip becomes meaningful — that's the signal
-  // we gate on. Wait for the profile fetch to settle first, otherwise
-  // the strip flashes in once the row resolves (a layout jump).
-  const showAccountStrip =
-    !profileLoading &&
-    !!account?.name &&
-    account.name !== profile?.full_name;
-
   // Close the drawer when route changes — users opened it to navigate,
   // so once they pick a destination the drawer should get out of the way.
   useEffect(() => {
@@ -268,9 +207,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         </div>
 
         {/* Main navigation */}
-        <nav className="flex-1 overflow-y-auto px-3.5 py-4">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3.5 py-4">
           <ul className="flex flex-col gap-0.5">
-            {orderVisible(topItems).map((item) => {
+            {orderVisible(topItems, section("top").ordered).map((item) => {
               const isActive = isItemActive(item.href);
 
               const showUnreadDot =
@@ -394,8 +333,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             </ul>
           )}
 
-          <ul className="mt-0.5 flex flex-col gap-0.5">
-            {section("bottom").items.map((item) => {
+          {/* Pinned to the foot of the sidebar (Access control, Sidebar menu, Settings). */}
+          <ul className="mt-auto flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+            {section("bottom").items.filter(isItemVisible).map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
                 <li key={item.href}>
@@ -409,111 +349,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Footer: account strip + user menu — the stacked cards at the
-            foot of the reference sidebar. */}
-        <div className="flex shrink-0 flex-col gap-3 px-3.5 pb-4">
-          {/* Account name display — surfaced only when the account
-              name differs from the user's own name (see
-              `showAccountStrip`). For a default solo account the two
-              match, so we hide it to avoid duplicating the user name
-              below; for renamed or shared accounts it tells the user
-              which account they're acting in. */}
-          {showAccountStrip && account?.name ? (
-            <div className="flex items-center gap-2.5 rounded-xl border border-border px-3 py-2.5">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#3E6FB5] text-xs font-bold text-white">
-                {account.name.slice(0, 2).toUpperCase()}
-              </span>
-              {/* `title=` exposes the full name on hover when it
-                  gets truncated (long account names + narrow
-                  sidebars). Cheap a11y win. */}
-              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground" title={account.name}>
-                {account.name}
-              </span>
-              {accountRole ? (
-                // Always render the chip — owners used to be
-                // invisible here, which made them indistinguishable
-                // from admins at a glance. Now everyone sees their
-                // role (with a colour cue) regardless of tier.
-                (() => {
-                  const meta = ROLE_CHIP[accountRole];
-                  const Icon = meta.icon;
-                  return (
-                    <span
-                      className={`ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${meta.className}`}
-                    >
-                      <Icon className="size-3" />
-                      {t(meta.labelKey as string)}
-                    </span>
-                  );
-                })()
-              ) : null}
-            </div>
-          ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-left transition-colors hover:bg-sunken focus:bg-sunken focus:outline-none data-popup-open:bg-sunken">
-              <Avatar className="size-8 shrink-0">
-                {profile?.avatar_url ? (
-                  <AvatarImage
-                    src={profile.avatar_url}
-                    alt={profile.full_name ?? t("defaultAvatar")}
-                  />
-                ) : null}
-                <AvatarFallback className="bg-sunken text-xs font-bold text-navy dark:bg-sunken dark:text-foreground">
-                  {profile?.full_name?.charAt(0)?.toUpperCase() ??
-                    profile?.email?.charAt(0)?.toUpperCase() ??
-                    "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-foreground">
-                  {profile?.full_name ?? t("defaultUser")}
-                </p>
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {profile?.email ?? ""}
-                </p>
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              side="top"
-              sideOffset={6}
-              className="min-w-56 bg-popover text-popover-foreground ring-border"
-            >
-              <DropdownMenuItem
-                render={
-                  <Link
-                    href="/settings?tab=profile"
-                    onClick={onClose}
-                    className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-                  />
-                }
-              >
-                <User className="size-4" />
-                {t("menuProfile")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                render={
-                  <Link
-                    href="/settings?tab=whatsapp"
-                    onClick={onClose}
-                    className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-                  />
-                }
-              >
-                <Settings className="size-4" />
-                {t("menuSettings")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem
-                onClick={signOut}
-                className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <LogOut className="size-4" />
-                {t("menuSignOut")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </aside>
     </>
   );

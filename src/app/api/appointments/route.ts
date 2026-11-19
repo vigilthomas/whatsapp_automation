@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { validateAppointmentInput } from '@/lib/appointments/model'
 import { APPOINTMENT_SELECT, assertRefsInAccount } from '@/lib/appointments/server'
+import { OUT_OF_SCOPE_MESSAGE, rowInScope, scopeFilter } from '@/lib/auth/data-scope'
 
 // Appointments — GET lists a time window (the calendar's visible week,
 // or "today" for the dashboard); POST creates. Same split as the other
@@ -11,25 +12,34 @@ import { APPOINTMENT_SELECT, assertRefsInAccount } from '@/lib/appointments/serv
 // role write after an explicit role check + account scope.
 //
 // Query params: from / to (ISO, inclusive/exclusive on starts_at),
-// clinic_id, doctor_id, status. Without from/to the list is capped
+// branch_id, doctor_id, status. Without from/to the list is capped
 // at the most recent 200 rows so a bare call stays cheap.
+//
+// Data scope (Access control → Data access): the role may be limited
+// to some branches or to the caller's own appointments. GET narrows
+// the list (RLS from 058 does too, this works without it); POST
+// refuses a new appointment outside that scope.
 
 export async function GET(request: Request) {
   try {
-    const { supabase } = await requirePermission('appointments', 'read')
+    const ctx = await requirePermission('appointments', 'read')
+    const { supabase } = ctx
+    const scope = await scopeFilter(supabaseAdmin(), 'appointments', ctx)
+    if (scope && scope.values.length === 0) return NextResponse.json({ appointments: [] })
     const url = new URL(request.url)
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
-    const clinicId = url.searchParams.get('clinic_id')
+    const branchId = url.searchParams.get('branch_id')
     const doctorId = url.searchParams.get('doctor_id')
     const status = url.searchParams.get('status')
 
     let q = supabase.from('appointments').select(APPOINTMENT_SELECT)
     if (from) q = q.gte('starts_at', from)
     if (to) q = q.lt('starts_at', to)
-    if (clinicId) q = q.eq('clinic_id', clinicId)
+    if (branchId) q = q.eq('branch_id', branchId)
     if (doctorId) q = q.eq('doctor_id', doctorId)
     if (status) q = q.eq('status', status)
+    if (scope) q = q.in(scope.column, scope.values)
     q = q.order('starts_at', { ascending: !!from })
     if (!from && !to) q = q.limit(200)
 
@@ -56,6 +66,12 @@ export async function POST(request: Request) {
   const admin = supabaseAdmin()
   const refCheck = await assertRefsInAccount(admin, result.values, ctx.accountId)
   if (refCheck) return refCheck
+
+  const scope = await scopeFilter(admin, 'appointments', ctx).catch(() => undefined)
+  if (scope === undefined) return NextResponse.json({ error: 'Could not check data access' }, { status: 500 })
+  if (!rowInScope(scope, result.values as Record<string, unknown>)) {
+    return NextResponse.json({ error: OUT_OF_SCOPE_MESSAGE }, { status: 403 })
+  }
 
   const { data, error } = await admin
     .from('appointments')

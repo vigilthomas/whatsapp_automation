@@ -16,6 +16,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import type { ModuleId } from '@/lib/auth/module-access';
+
 /**
  * Settings information architecture for the redesigned page.
  *
@@ -53,7 +55,7 @@ export const MASTER_SECTIONS = [
   'templates',
   'quick-replies',
   'fields',
-  'deals',
+  'members',
 ] as const satisfies readonly SettingsSection[];
 
 export type MasterSection = (typeof MASTER_SECTIONS)[number];
@@ -70,6 +72,27 @@ export function masterHref(section: MasterSection): string {
 }
 
 /**
+ * Sections served from `/workspace/<section>`. Branding, WhatsApp and API
+ * keys moved back into Settings (a "Workspace" group in the rail); only
+ * the Sidebar menu editor keeps its own route, linked from the foot of
+ * the sidebar.
+ */
+export const WORKSPACE_SECTIONS = ['menu'] as const satisfies readonly SettingsSection[];
+
+export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
+
+export function isWorkspaceSection(value: unknown): value is WorkspaceSection {
+  return (
+    typeof value === 'string' &&
+    (WORKSPACE_SECTIONS as readonly string[]).includes(value)
+  );
+}
+
+export function workspaceHref(section: WorkspaceSection): string {
+  return `/workspace/${section}`;
+}
+
+/**
  * Sections that now live on their own top-level route rather than in
  * the settings rail. The settings page forwards `?tab=<section>` to
  * the href so Overview tiles and older links keep working. Master
@@ -78,6 +101,7 @@ export function masterHref(section: MasterSection): string {
  */
 export function movedSectionHref(section: SettingsSection): string | null {
   if (isMasterSection(section)) return masterHref(section);
+  if (isWorkspaceSection(section)) return workspaceHref(section);
   if (section === 'access') return '/access-control';
   return null;
 }
@@ -89,36 +113,39 @@ export interface SectionMeta {
   id: SettingsSection;
   label: string;
   icon: LucideIcon;
-  /** `master` / `moved` sections render on their own routes, not in the settings rail. */
-  group: 'top' | 'account' | 'workspace' | 'master' | 'moved';
+  /** `master` / `workspace` / `moved` sections render on their own routes, not in the settings rail. */
+  group: 'top' | 'account' | 'preferences' | 'workspace' | 'master' | 'moved';
   /** Only account owners and admins see it in the rail. */
   adminOnly?: boolean;
   /** Only the clinic's own owners and admins (see `can_edit_branding`, migration 047). */
   clinicAdminOnly?: boolean;
+  /** Access control gates it on this module (view → in the rail, read → opens, write → saves). */
+  module?: ModuleId;
 }
 
 export const SECTION_META: Record<SettingsSection, SectionMeta> = {
-  overview: { id: 'overview', label: 'Overview', icon: LayoutGrid, group: 'top' },
-  profile: { id: 'profile', label: 'Your profile', icon: User, group: 'account' },
-  security: { id: 'security', label: 'Login & security', icon: Shield, group: 'account' },
-  appearance: { id: 'appearance', label: 'Appearance', icon: Palette, group: 'account' },
+  overview: { id: 'overview', label: 'Overview', icon: LayoutGrid, group: 'top', module: 'settings-overview' },
+  profile: { id: 'profile', label: 'Your profile', icon: User, group: 'account', module: 'settings-profile' },
+  security: { id: 'security', label: 'Login & security', icon: Shield, group: 'account', module: 'settings-security' },
+  appearance: { id: 'appearance', label: 'Appearance', icon: Palette, group: 'account', module: 'settings-appearance' },
   branding: { id: 'branding', label: 'Branding', icon: Paintbrush, group: 'workspace', clinicAdminOnly: true },
-  menu: { id: 'menu', label: 'Sidebar menu', icon: PanelLeft, group: 'workspace', clinicAdminOnly: true },
+  menu: { id: 'menu', label: 'Sidebar menu', icon: PanelLeft, group: 'moved', clinicAdminOnly: true },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
   templates: { id: 'templates', label: 'Templates', icon: FileText, group: 'master' },
   'quick-replies': { id: 'quick-replies', label: 'Quick replies', icon: Zap, group: 'master' },
   fields: { id: 'fields', label: 'Fields & tags', icon: Tags, group: 'master' },
-  deals: { id: 'deals', label: 'Deals & currency', icon: Coins, group: 'master' },
-  members: { id: 'members', label: 'Team members', icon: UsersRound, group: 'workspace' },
+  deals: { id: 'deals', label: 'Currency', icon: Coins, group: 'preferences', module: 'deals' },
+  members: { id: 'members', label: 'Team members', icon: UsersRound, group: 'master' },
   access: { id: 'access', label: 'Access control', icon: LockKeyhole, group: 'moved' },
   api: { id: 'api', label: 'API keys', icon: KeyRound, group: 'workspace' },
 };
 
 // `master` and `moved` are intentionally absent — those sections live
-// in the sidebar (Master group / top-level), not the settings rail.
+// in the sidebar (Master group, Access control, Sidebar menu).
 export const RAIL_GROUPS: { label: string | null; group: SectionMeta['group'] }[] = [
   { label: null, group: 'top' },
   { label: 'Account', group: 'account' },
+  { label: 'Preferences', group: 'preferences' },
   { label: 'Workspace', group: 'workspace' },
 ];
 
@@ -139,7 +166,34 @@ export function resolveSection(raw: string | null): SettingsSection {
 }
 
 /** Whether the settings rail lists a section for this member. */
-export function railShows(meta: SectionMeta, who: { canManageMembers: boolean; canEditBranding: boolean }): boolean {
+export function railShows(
+  meta: SectionMeta,
+  who: {
+    canManageMembers: boolean;
+    canEditBranding: boolean;
+    /** Access control's view tick; omitted = allowed. */
+    canView?: (module: ModuleId) => boolean;
+  },
+): boolean {
+  if (meta.module && who.canView && !who.canView(meta.module)) return false;
   if (meta.clinicAdminOnly) return who.canEditBranding;
   return !meta.adminOnly || who.canManageMembers;
+}
+
+/** The Settings rail sections that live on the settings page itself, in rail order. */
+export const PAGE_SECTIONS = SETTINGS_SECTIONS.filter((s) => SECTION_META[s].module);
+
+/**
+ * Which section the settings page should open: the asked-for one when
+ * `canRead` allows it, else the first page section that's allowed, else
+ * null (none — send them away). Sections without a module (the moved
+ * ones, which forward elsewhere) always pass.
+ */
+export function allowedSection(
+  section: SettingsSection,
+  canRead: (module: ModuleId) => boolean,
+): SettingsSection | null {
+  const gate = SECTION_META[section].module;
+  if (!gate || canRead(gate)) return section;
+  return PAGE_SECTIONS.find((s) => canRead(SECTION_META[s].module!)) ?? null;
 }

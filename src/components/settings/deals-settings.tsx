@@ -1,5 +1,6 @@
 "use client";
 
+import { NativeSelect } from '@/components/ui/native-select';
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Coins, Loader2 } from "lucide-react";
@@ -88,7 +89,7 @@ export function DealsSettings() {
         <CardContent className="space-y-4">
           <div className="grid gap-2 sm:max-w-xs">
             <Label className="text-muted-foreground">{t("currencyLabel")}</Label>
-            <select
+            <NativeSelect
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
               disabled={!canEditSettings || profileLoading}
@@ -99,7 +100,7 @@ export function DealsSettings() {
                   {c.code} — {c.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             {!canEditSettings && (
               <p className="text-xs text-muted-foreground">
                 {t("adminOnlyHint")}

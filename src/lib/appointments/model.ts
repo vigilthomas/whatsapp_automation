@@ -21,7 +21,7 @@ export type AppointmentSource = (typeof APPOINTMENT_SOURCES)[number];
 /** Row as returned by /api/appointments — joined display names included. */
 export interface Appointment {
   id: string;
-  clinic_id: string | null;
+  branch_id: string | null;
   doctor_id: string | null;
   contact_id: string;
   service: string;
@@ -35,7 +35,7 @@ export interface Appointment {
   /** Joined for display; null when the FK is null or the row was removed. */
   contact: { id: string; name: string | null; phone: string } | null;
   doctor: { id: string; name: string } | null;
-  clinic: { id: string; name: string } | null;
+  branch: { id: string; name: string } | null;
 }
 
 export function isAppointmentStatus(v: unknown): v is AppointmentStatus {
@@ -48,7 +48,7 @@ export function isAppointmentSource(v: unknown): v is AppointmentSource {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type AppointmentInput = {
-  clinic_id?: string | null;
+  branch_id?: string | null;
   doctor_id?: string | null;
   contact_id?: string;
   service?: string;
@@ -81,7 +81,7 @@ export function validateAppointmentInput(
   const v: AppointmentInput = {};
   const has = (k: string) => Object.prototype.hasOwnProperty.call(b, k);
 
-  const optionalUuid = (k: "clinic_id" | "doctor_id"): string | null | undefined => {
+  const optionalUuid = (k: "branch_id" | "doctor_id"): string | null | undefined => {
     if (!has(k)) return undefined;
     const raw = b[k];
     if (raw === null || raw === "") return null;
@@ -90,8 +90,8 @@ export function validateAppointmentInput(
   };
 
   try {
-    const clinic = optionalUuid("clinic_id");
-    if (clinic !== undefined) v.clinic_id = clinic;
+    const branch = optionalUuid("branch_id");
+    if (branch !== undefined) v.branch_id = branch;
     const doctor = optionalUuid("doctor_id");
     if (doctor !== undefined) v.doctor_id = doctor;
   } catch (e) {

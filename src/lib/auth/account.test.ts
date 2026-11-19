@@ -22,6 +22,7 @@ function makeClient(opts: {
   user: { id: string } | null;
   userErr?: unknown;
   byTable: Record<string, { data: unknown; error: unknown }>;
+  superAdmin?: boolean;
 }) {
   const calls: BuilderCall[] = [];
 
@@ -57,6 +58,12 @@ function makeClient(opts: {
           }),
       },
       from,
+      rpc: (name: string) =>
+        Promise.resolve(
+          name === "is_super_admin"
+            ? { data: opts.superAdmin ?? false, error: null }
+            : { data: null, error: { message: "unknown rpc" } },
+        ),
     },
   };
 }
@@ -104,6 +111,21 @@ describe("getCurrentAccount", () => {
     expect(calls[0].eqArgs).toEqual([["user_id", "user-1"]]);
     expect(calls[1].columns).not.toMatch(/accounts!/);
     expect(calls[1].eqArgs).toEqual([["id", "acct-1"]]);
+  });
+
+  it("a super admin acts as owner whatever their profile role", async () => {
+    const { client } = makeClient({
+      user: { id: "user-1" },
+      superAdmin: true,
+      byTable: {
+        profiles: { data: { account_id: "acct-1", account_role: "viewer" }, error: null },
+        accounts: { data: { id: "acct-1", name: "Acme" }, error: null },
+      },
+    });
+    createClient.mockReturnValue(client);
+
+    const ctx = await getCurrentAccount();
+    expect(ctx).toMatchObject({ role: "owner", superAdmin: true });
   });
 
   it("throws UnauthorizedError when there is no session", async () => {

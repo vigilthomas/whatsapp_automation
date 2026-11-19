@@ -24,23 +24,32 @@ import {
 
 export interface PermissionContext extends AccountContext {
   permissions: Permissions;
+  /** profiles.branch_id — what an "Assigned branch" data scope narrows to. */
+  branchId: string | null;
 }
 
 /** Load the caller's effective matrix. Exported for routes that need
  *  several checks off one lookup. */
 export async function loadPermissions(ctx: AccountContext): Promise<Permissions> {
-  const { designation, moduleAccess } = await loadInputs(ctx.supabase, ctx.userId, ctx.accountId);
-  return effectivePermissions({ role: ctx.role, designation, moduleAccess });
+  return (await loadPermissionState(ctx)).permissions;
+}
+
+async function loadPermissionState(ctx: AccountContext): Promise<{ permissions: Permissions; branchId: string | null }> {
+  const { designation, moduleAccess, branchId } = await loadInputs(ctx.supabase, ctx.userId, ctx.accountId);
+  const permissions = effectivePermissions({ role: ctx.role, designation, moduleAccess, superAdmin: ctx.superAdmin });
+  return { permissions, branchId };
 }
 
 async function loadInputs(supabase: SupabaseClient, userId: string, accountId: string) {
-  const [profileRes, accountRes] = await Promise.all([
+  const [profileRes, accountRes, branchRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("designation_id, designation:designations(permissions)")
       .eq("user_id", userId)
       .maybeSingle(),
     supabase.from("accounts").select("module_access").eq("id", accountId).maybeSingle(),
+    // Separate so a database without 054 (no branch_id) still loads the matrix.
+    supabase.from("profiles").select("branch_id").eq("user_id", userId).maybeSingle(),
   ]);
   // A missing column (043 not applied yet) surfaces as an error here;
   // treat it as "no designation" so older databases keep working on the
@@ -53,7 +62,8 @@ async function loadInputs(supabase: SupabaseClient, userId: string, accountId: s
   const permsRaw = Array.isArray(d) ? d[0]?.permissions : d?.permissions;
   const designation = raw?.designation_id && permsRaw !== undefined ? parsePermissions(permsRaw) : null;
   const moduleAccess = accountRes.error ? {} : parseModuleAccess(accountRes.data?.module_access);
-  return { designation, moduleAccess };
+  const branchId = branchRes.error ? null : ((branchRes.data as { branch_id: string | null } | null)?.branch_id ?? null);
+  return { designation, moduleAccess, branchId };
 }
 
 /**
@@ -62,9 +72,9 @@ async function loadInputs(supabase: SupabaseClient, userId: string, accountId: s
  */
 export async function requirePermission(module: ModuleId, action: Action): Promise<PermissionContext> {
   const ctx = await getCurrentAccount();
-  const permissions = await loadPermissions(ctx);
+  const { permissions, branchId } = await loadPermissionState(ctx);
   if (!can(permissions, module, action)) {
     throw new ForbiddenError(`You don't have '${action}' permission on ${module}`);
   }
-  return { ...ctx, permissions };
+  return { ...ctx, permissions, branchId };
 }

@@ -89,6 +89,8 @@ export interface AccountContext {
   role: AccountRole;
   /** Lightweight account meta — id + name. */
   account: { id: string; name: string };
+  /** A super admin (049): passes every role check and permission check. */
+  superAdmin?: boolean;
 }
 
 /**
@@ -163,13 +165,26 @@ export async function getCurrentAccount(): Promise<AccountContext> {
     throw new ForbiddenError("Profile is not linked to an account");
   }
 
+  const superAdmin = await isSuperAdmin(supabase);
   return {
     supabase,
     userId: user.id,
     accountId: data.account_id,
-    role: data.account_role,
+    // A super admin acts with the highest role, whatever their profile says.
+    role: superAdmin ? "owner" : data.account_role,
     account: { id: account.id, name: account.name },
+    superAdmin,
   };
+}
+
+/** Whether the signed-in user is a super admin (049). False if 049 isn't applied yet. */
+async function isSuperAdmin(supabase: SupabaseClient): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc("is_super_admin");
+    return !error && data === true;
+  } catch {
+    return false;
+  }
 }
 
 /**

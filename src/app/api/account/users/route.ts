@@ -4,6 +4,7 @@ import { toErrorResponse } from "@/lib/auth/account";
 import { requirePermission } from "@/lib/auth/permission-guard";
 import { isAccountRole, type AccountRole } from "@/lib/auth/roles";
 import { supabaseAdmin } from "@/lib/automations/admin-client";
+import { accessLevelFromRole, staffTypeFromRole, syncDoctorForUser, type StaffType } from "@/lib/master/staff";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/rate-limit";
 
 // ============================================================
@@ -39,8 +40,7 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/rate-limit
 // Owner can't be granted here (ownership goes through transfer).
 // ============================================================
 
-const STAFF_TYPES = ["doctor", "assistant", "other"] as const;
-type StaffType = (typeof STAFF_TYPES)[number];
+const STAFF_TYPES = ["doctor", "assistant", "other"] as const satisfies readonly StaffType[];
 
 interface Body {
   full_name?: unknown;
@@ -48,7 +48,7 @@ interface Body {
   password?: unknown;
   role?: unknown;
   designation_id?: unknown;
-  clinic_id?: unknown;
+  branch_id?: unknown;
   staff_type?: unknown;
   speciality?: unknown;
   phone?: unknown;
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       ? (body.staff_type as StaffType)
       : null;
   const designationId = typeof body.designation_id === "string" && body.designation_id ? body.designation_id : null;
-  const clinicId = typeof body.clinic_id === "string" && body.clinic_id ? body.clinic_id : null;
+  const branchId = typeof body.branch_id === "string" && body.branch_id ? body.branch_id : null;
   const speciality = typeof body.speciality === "string" ? body.speciality.trim() || null : null;
   const phone = typeof body.phone === "string" ? body.phone.trim() || null : null;
 
@@ -94,35 +94,33 @@ export async function POST(request: Request) {
 
   const admin = supabaseAdmin();
 
-  // Referenced designation / clinic must be this account's.
+  // Referenced role / branch must be this account's.
   if (designationId) {
     const { data } = await admin
       .from("designations")
-      .select("id, name")
+      .select("id, name, permissions")
       .eq("id", designationId)
       .eq("account_id", ctx.accountId)
+      .is("deleted_at", null)
       .maybeSingle();
-    if (!data) return NextResponse.json({ error: "designation not found" }, { status: 400 });
+    if (!data) return NextResponse.json({ error: "role not found" }, { status: 400 });
     const name = String(data.name ?? "");
     if (staffType === null) {
-      staffType = /\bdoctor\b|\bdr\b|physician|surgeon|dentist/i.test(name)
-        ? "doctor"
-        : /assistant|nurse|receptionist/i.test(name)
-          ? "assistant"
-          : "other";
+      staffType = staffTypeFromRole(name);
     }
     if (!isAccountRole(body.role)) {
-      role = /admin|manager|owner/i.test(name) ? "admin" : "agent";
+      role = accessLevelFromRole(name, data.permissions);
     }
   }
-  if (clinicId) {
+  if (branchId) {
     const { data } = await admin
-      .from("clinics")
+      .from("branches")
       .select("id")
-      .eq("id", clinicId)
+      .eq("id", branchId)
       .eq("account_id", ctx.accountId)
+      .is("deleted_at", null)
       .maybeSingle();
-    if (!data) return NextResponse.json({ error: "clinic not found" }, { status: 400 });
+    if (!data) return NextResponse.json({ error: "branch not found" }, { status: 400 });
   }
 
   // 1. Create the login.
@@ -155,7 +153,7 @@ export async function POST(request: Request) {
       account_id: ctx.accountId,
       account_role: role,
       designation_id: designationId,
-      clinic_id: clinicId,
+      branch_id: branchId,
       staff_type: staffType,
     })
     .eq("user_id", newUserId);
@@ -170,27 +168,22 @@ export async function POST(request: Request) {
     await admin.from("accounts").delete().eq("id", personalAccountId).eq("owner_user_id", newUserId);
   }
 
-  // 4. Doctors get a bookable record.
-  let doctorId: string | null = null;
+  // 4. Doctors get a bookable record (there is no separate Doctors list).
   if (staffType === "doctor") {
-    const { data: doc } = await admin
-      .from("doctors")
-      .insert({
-        account_id: ctx.accountId,
-        clinic_id: clinicId,
-        user_id: newUserId,
-        name: fullName,
-        email,
-        phone,
-        speciality,
-      })
-      .select("id")
-      .single();
-    doctorId = doc?.id ?? null;
+    await syncDoctorForUser(admin, {
+      accountId: ctx.accountId,
+      userId: newUserId,
+      isDoctor: true,
+      branchId,
+      name: fullName,
+      email,
+      phone,
+      speciality,
+    }).catch((err) => console.error("[users] doctor record failed:", err));
   }
 
   return NextResponse.json(
-    { user_id: newUserId, doctor_id: doctorId },
+    { user_id: newUserId },
     { status: 201 },
   );
 }

@@ -7,8 +7,8 @@ import { addDays } from '@/lib/appointments/model'
 // nothing here needs an account filter.
 
 const APPOINTMENT_SELECT =
-  'id, clinic_id, doctor_id, contact_id, service, starts_at, ends_at, status, source, notes, created_at, updated_at, ' +
-  'contact:contacts(id, name, phone), doctor:doctors(id, name), clinic:clinics(id, name)'
+  'id, branch_id, doctor_id, contact_id, service, starts_at, ends_at, status, source, notes, created_at, updated_at, ' +
+  'contact:contacts(id, name, phone), doctor:doctors(id, name), branch:branches(id, name)'
 
 export interface TrendPoint {
   /** YYYY-MM-DD local */
@@ -106,6 +106,7 @@ export async function loadDoctorLoad(db: SupabaseClient, today: Appointment[]): 
     .from('doctors')
     .select('id, name, speciality')
     .eq('is_active', true)
+    .is('deleted_at', null)
     .order('name', { ascending: true })
   if (error) throw error
   const counts = new Map<string, number>()

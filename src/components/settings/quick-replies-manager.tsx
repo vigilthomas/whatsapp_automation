@@ -1,5 +1,6 @@
 "use client";
 
+import { DataTable, useTableLayout, type DataColumn } from "@/components/ui/data-table";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, MessageSquare, Pencil, Plus, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -131,6 +132,43 @@ export function QuickRepliesManager() {
     [load, confirm],
   );
 
+  type QR = (typeof items)[number];
+  const columns: DataColumn<QR>[] = [
+    {
+      id: "title",
+      header: "Title",
+      hideable: false,
+      width: 220,
+      className: "font-medium text-foreground",
+      cell: (qr) => (
+        <span className="flex items-center gap-2">
+          {qr.kind === "interactive" ? (
+            <Zap className="h-4 w-4 shrink-0 text-primary" />
+          ) : (
+            <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
+          <span className="truncate">{qr.title}</span>
+        </span>
+      ),
+    },
+    {
+      id: "type",
+      header: "Type",
+      width: 120,
+      cell: (qr) => (qr.kind === "interactive" ? "Interactive" : "Text"),
+    },
+    {
+      id: "content",
+      header: "Message",
+      width: 380,
+      cell: (qr) =>
+        qr.kind === "interactive" && qr.interactive_payload
+          ? interactivePayloadPreviewText(qr.interactive_payload)
+          : qr.content_text,
+    },
+  ];
+  const table = useTableLayout("master.quick-replies", columns);
+
   return (
     <div>
       <SettingsPanelHead
@@ -144,51 +182,32 @@ export function QuickRepliesManager() {
         }
       />
 
-      {loading ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : items.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-          No quick replies yet. Create one to reuse it across conversations.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {items.map((qr) => (
-            <li
-              key={qr.id}
-              className="flex items-start gap-3 rounded-lg border border-border bg-card p-3"
-            >
-              {qr.kind === "interactive" ? (
-                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              ) : (
-                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{qr.title}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {qr.kind === "interactive" && qr.interactive_payload
-                    ? interactivePayloadPreviewText(qr.interactive_payload)
-                    : qr.content_text}
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-1">
-                <Button variant="ghost" size="icon-sm" onClick={() => openEdit(qr)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => remove(qr.id)}
-                  className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <DataTable
+        table={table}
+        rows={items}
+        rowKey={(qr) => qr.id}
+        loading={loading}
+        empty="No quick replies yet. Create one to reuse it across conversations."
+        trailing={{
+          width: 96,
+          cell: (qr) => (
+            <div className="flex justify-end gap-1">
+              <Button variant="ghost" size="icon-sm" onClick={() => openEdit(qr)} aria-label="Edit">
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => remove(qr.id)}
+                aria-label="Delete"
+                className="text-red-500 hover:bg-red-500/10 hover:text-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ),
+        }}
+      />
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent className="sm:max-w-2xl">

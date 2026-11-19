@@ -117,7 +117,6 @@ export default function DashboardPage() {
           <h1 className="font-heading text-[26px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
             {t(greetingKey, { name: firstName })} <span className="font-sans">👋</span>
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3.5">
           <div className="hidden items-center gap-2.5 border-r border-border pr-3.5 sm:flex">

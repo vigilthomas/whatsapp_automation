@@ -6,10 +6,10 @@
 import {
   BadgeCheck,
   Bell,
-  Building2,
+  CalendarOff,
+  Stethoscope,
   CalendarDays,
   ClipboardList,
-  Coins,
   Database,
   FileText,
   GitBranch,
@@ -17,11 +17,10 @@ import {
   LockKeyhole,
   MapPin,
   MessageSquare,
+  PanelLeft,
   Radio,
   Settings,
-  ShieldCheck,
   SlidersHorizontal,
-  Stethoscope,
   Tags,
   Users,
   UsersRound,
@@ -47,6 +46,8 @@ export interface NavItem {
   module?: ModuleId;
   /** Only render for roles that can manage members (admin+). */
   adminOnly?: boolean;
+  /** Only render for the clinic's own owners and admins (`can_edit_branding`). */
+  clinicAdminOnly?: boolean;
 }
 
 /**
@@ -77,13 +78,12 @@ export const navGroups: NavGroup[] = [
     labelKey: "master",
     icon: Database,
     children: [
-      { href: "/master/clinics", labelKey: "clinics", icon: Building2, module: "clinics" },
       { href: "/master/branches", labelKey: "branches", icon: MapPin, module: "branches" },
-      { href: "/master/clinic-admins", labelKey: "clinicAdmins", icon: ShieldCheck, module: "clinic-admins" },
-      { href: "/master/doctors", labelKey: "doctors", icon: Stethoscope, module: "doctors" },
       { href: "/master/services", labelKey: "services", icon: ClipboardList, module: "services" },
+      { href: "/master/doctor-services", labelKey: "doctorServices", icon: Stethoscope, module: "doctor-services" },
       { href: "/master/designations", labelKey: "designations", icon: BadgeCheck, module: "designations" },
       { href: "/master/users", labelKey: "users", icon: UsersRound, module: "users" },
+      { href: "/master/leaves", labelKey: "leaves", icon: CalendarOff, module: "leaves" },
       { href: "/contacts", labelKey: "contacts", icon: Users, module: "contacts" },
     ],
   },
@@ -102,17 +102,19 @@ export const navGroups: NavGroup[] = [
       { href: "/master/templates", labelKey: "templates", icon: FileText, module: "templates" },
       { href: "/master/quick-replies", labelKey: "quickReplies", icon: Zap, module: "quick-replies" },
       { href: "/master/fields", labelKey: "fields", icon: Tags, module: "fields" },
-      { href: "/master/deals", labelKey: "deals", icon: Coins, module: "deals" },
     ],
   },
+  // Branding, WhatsApp and API keys live in Settings → Workspace.
 ];
 
-// Rendered after the collapsible groups, before the divider.
-export const afterGroupItems: NavItem[] = [
-  { href: "/access-control", labelKey: "accessControl", icon: LockKeyhole, adminOnly: true },
-];
+// Rendered after the collapsible groups. Empty for now; kept as a section
+// so saved menus that mention it still resolve.
+export const afterGroupItems: NavItem[] = [];
 
+// Pinned to the foot of the sidebar: the admin tools, then Settings.
 export const bottomNavItems: NavItem[] = [
+  { href: "/access-control", labelKey: "accessControl", icon: LockKeyhole, adminOnly: true },
+  { href: "/workspace/menu", labelKey: "sidebarMenu", icon: PanelLeft, clinicAdminOnly: true },
   { href: "/settings", labelKey: "settings", icon: Settings },
 ];
 
