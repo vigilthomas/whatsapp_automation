@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { useAuth } from "@/hooks/use-auth";
 import { useBranding } from "@/hooks/use-branding";
 import { menuSections, navGroups, type NavItem } from "@/components/layout/nav-config";
 import { FIXED_SECTIONS, LOCKED_HREFS, MENU_LABEL_MAX, resolveMenu, type BrandMenu } from "@/lib/branding-menu";
@@ -47,12 +46,11 @@ function tidy(menu: BrandMenu, homeOf: Record<string, string>): BrandMenu {
 export function MenuPanel() {
   const t = useTranslations("Settings.menu");
   const ts = useTranslations("Sidebar");
-  const { canManageMembers } = useAuth();
-  const { branding, available, save } = useBranding();
+  const { branding, available, canEdit, save } = useBranding();
   const confirm = useConfirm();
   const [draft, setDraft] = useState<BrandMenu>(branding.menu);
   const [saving, setSaving] = useState(false);
-  const readOnly = !canManageMembers || !available;
+  const readOnly = !canEdit || !available;
 
   const sections = useMemo(() => menuSections(), []);
   const homeOf = useMemo(

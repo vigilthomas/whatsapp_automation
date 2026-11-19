@@ -14,9 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { useAuth } from "@/hooks/use-auth";
 import { useBranding } from "@/hooks/use-branding";
-import { checkLogoFile, checkLogoUrl, COLOR_KEYS, isHexColor, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
+import { checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, isHexColor, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 import { BrandingPreview } from "./branding-preview";
 import { SettingsPanelHead } from "./settings-panel-head";
@@ -55,14 +54,13 @@ const cleanText = (v: string | null) => (v && v.trim() ? v.trim().slice(0, TITLE
 
 export function BrandingPanel() {
   const t = useTranslations("Settings.branding");
-  const { canManageMembers } = useAuth();
-  const { branding, loaded, available, save } = useBranding();
+  const { branding, loaded, available, canEdit, save } = useBranding();
   const confirm = useConfirm();
   const [draft, setDraft] = useState<Branding>(branding);
   const [logoLink, setLogoLink] = useState("");
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const readOnly = !canManageMembers || !available;
+  const readOnly = !canEdit || !available;
 
   // Start from the saved branding once it has loaded.
   const [startedFrom, setStartedFrom] = useState(branding);
@@ -88,10 +86,13 @@ export function BrandingPanel() {
   const applyPreset = (p: Preset) => setDraft((d) => ({ ...d, ...p.values }));
   const presetActive = (p: Preset) => Object.entries(p.values).every(([k, v]) => (draft[k as ColorKey] ?? null) === v);
 
-  const pickFile = (file: File | undefined) => {
+  const pickFile = async (file: File | undefined) => {
     if (!file) return;
     const problem = checkLogoFile(file);
     if (problem) return toast.error(problem);
+    // The type comes from the file name; check the bytes so a renamed PDF can't be saved as the logo.
+    const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+    if (sniffImage(head) !== file.type) return toast.error(t("logoNotImage"));
     const reader = new FileReader();
     reader.onload = () => set("logo", String(reader.result));
     reader.readAsDataURL(file);
@@ -191,7 +192,7 @@ export function BrandingPanel() {
       {loaded && !available && (
         <p className="mb-4 rounded-lg border border-warn-fg/30 bg-warn-bg px-3.5 py-2.5 text-sm text-warn-fg">{t("notReady")}</p>
       )}
-      {available && !canManageMembers && (
+      {available && !canEdit && (
         <p className="mb-4 rounded-lg border border-border bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">{t("readOnly")}</p>
       )}
 

@@ -53,3 +53,13 @@ export function resolveMenu<T extends BaseItem>(sections: MenuSection<T>[], menu
 export function visibleAfterOverrides<T extends BaseItem>(items: T[], sidebarModules: string[], canManage: boolean): T[] {
   return items.filter((item) => (!item.module || sidebarModules.includes(item.module)) && (!item.adminOnly || canManage));
 }
+
+/** How the mobile tab bar shows the page at `href`: the same hiding, name and icon as the sidebar. */
+export function mobileTab(href: string, menu: BrandMenu): { hidden: boolean; label?: string; iconKey?: string } {
+  const o = menu?.items?.[href] ?? {};
+  const out: { hidden: boolean; label?: string; iconKey?: string } = { hidden: !!o.hidden && !LOCKED_HREFS.includes(href) };
+  const label = cleanLabel(o.label);
+  if (label) out.label = label;
+  if (o.icon && BRAND_ICON_KEYS.includes(o.icon)) out.iconKey = o.icon;
+  return out;
+}

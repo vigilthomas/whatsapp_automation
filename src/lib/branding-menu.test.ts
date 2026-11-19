@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveMenu, visibleAfterOverrides, type MenuSection } from "./branding-menu";
+import { mobileTab, resolveMenu, visibleAfterOverrides, type BrandMenu, type MenuSection } from "./branding-menu";
 
 const I = (href: string, module?: string) => ({ href, labelKey: href.slice(1), icon: "x", module });
 const sections = (): MenuSection<ReturnType<typeof I>>[] => [
@@ -54,5 +54,16 @@ describe("visibleAfterOverrides", () => {
     const out = resolveMenu(sections(), { items: { "/broadcasts": { label: "Blasts", group: "top" } } });
     const visible = visibleAfterOverrides(out.flatMap((s) => s.items), ["inbox"], false);
     expect(visible.map((i) => i.href)).toEqual(["/dashboard", "/inbox", "/settings"]);
+  });
+});
+
+describe("mobile tab bar follows the menu overrides", () => {
+  it("hides, renames and re-icons a tab; Home can't be hidden", () => {
+    const menu: BrandMenu = { items: { "/inbox": { hidden: true }, "/appointments": { label: " Bookings ", icon: "calendar-check" }, "/dashboard": { hidden: true } } };
+    expect(mobileTab("/inbox", menu).hidden).toBe(true);
+    expect(mobileTab("/appointments", menu)).toEqual({ hidden: false, label: "Bookings", iconKey: "calendar-check" });
+    expect(mobileTab("/dashboard", menu).hidden).toBe(false);
+    expect(mobileTab("/contacts", {})).toEqual({ hidden: false });
+    expect(mobileTab("/contacts", { items: { "/contacts": { icon: "not-an-icon" } } })).toEqual({ hidden: false });
   });
 });

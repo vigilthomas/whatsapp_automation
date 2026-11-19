@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLANK_BRANDING, brandingCss, checkLogoFile, checkLogoUrl, isHexColor, retitle } from "./branding";
+import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, DARK_BG, brandBootJs, brandingCss, checkLogoFile, checkLogoUrl, contrast, inkOn, isHexColor, retitle, sniffImage } from "./branding";
 
 describe("brandingCss", () => {
   it("is empty when nothing is set (untouched install looks like Clinicoro)", () => {
@@ -12,7 +12,7 @@ describe("brandingCss", () => {
     expect(light).toContain('html[data-mode="light"][data-brand]');
     expect(light).toContain("--primary:#112233");
     expect(light).toContain("--primary-soft:color-mix(");
-    expect(dark).toContain("--primary:#112233");
+    expect(dark).toContain("--primary:#"); // lightened for the navy page, see "dark mode lightens"
     expect(dark).not.toContain("--background");
   });
 
@@ -68,5 +68,47 @@ describe("logo checks", () => {
     expect(checkLogoUrl("http://x.example/logo.png")).toMatch(/https/);
     expect(checkLogoUrl("https://x.example/logo.png")).toBeNull();
     expect(checkLogoUrl(`https://x.example/${"a".repeat(2001)}`)).toMatch(/long/);
+  });
+});
+
+describe("review fixes", () => {
+  it("retitle leaves a title alone when it already ends with the new name (no endless loop)", () => {
+    expect(retitle("Inbox — Glow — Clinicoro", "Clinicoro", "Glow — Clinicoro")).toBe("Inbox — Glow — Clinicoro");
+  });
+
+  it("text on the main colour is dark on light colours and white on dark ones", () => {
+    expect(inkOn("#FBBF24")).not.toBe("#ffffff");
+    expect(inkOn("#334155")).toBe("#ffffff");
+    const css = brandingCss({ ...BLANK_BRANDING, theme_primary: "#FBBF24", sidebar_accent: "#FDE68A" });
+    const light = css.split('html[data-mode="dark"]')[0];
+    expect(light).toContain(`--primary-foreground:${inkOn("#FBBF24")}`);
+    expect(light).toContain(`--sidebar-primary-foreground:${inkOn("#FDE68A")}`);
+  });
+
+  it("dark mode lightens an accent that would vanish on the navy background", () => {
+    const dark = brandingCss({ ...BLANK_BRANDING, theme_primary: "#334155" }).split('html[data-mode="dark"][data-brand]')[1];
+    const accent = /--primary:(#[0-9a-fA-F]{6})/.exec(dark)![1];
+    expect(contrast(accent, DARK_BG)).toBeGreaterThanOrEqual(3);
+    expect(dark).toContain(`--primary-foreground:${inkOn(accent)}`);
+    // A colour that already reads well is kept as it is.
+    expect(brandingCss({ ...BLANK_BRANDING, theme_primary: "#0E9F9A" }).split('data-mode="dark"')[1]).toContain("--primary:#0E9F9A");
+  });
+
+  it("recognises real image files by their first bytes, not their name", () => {
+    const bytes = (...b: number[]) => new Uint8Array(b);
+    const text = (s: string) => new TextEncoder().encode(s);
+    expect(sniffImage(bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))).toBe("image/png");
+    expect(sniffImage(bytes(0xff, 0xd8, 0xff, 0xe0))).toBe("image/jpeg");
+    expect(sniffImage(text("RIFF\x00\x00\x00\x00WEBPVP8 "))).toBe("image/webp");
+    expect(sniffImage(text('﻿  <?xml version="1.0"?><svg'))).toBe("image/svg+xml");
+    expect(sniffImage(text("<svg xmlns='http://www.w3.org/2000/svg'>"))).toBe("image/svg+xml");
+    expect(sniffImage(text("%PDF-1.7"))).toBeNull();
+  });
+
+  it("the boot script reads the same cache key and style id as the provider", () => {
+    const js = brandBootJs();
+    expect(js).toContain(JSON.stringify(BRANDING_CACHE_KEY));
+    expect(js).toContain(JSON.stringify(BRAND_STYLE_ID));
+    expect(js).not.toContain("undefined");
   });
 });

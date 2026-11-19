@@ -93,6 +93,8 @@ export interface SectionMeta {
   group: 'top' | 'account' | 'workspace' | 'master' | 'moved';
   /** Only account owners and admins see it in the rail. */
   adminOnly?: boolean;
+  /** Only the clinic's own owners and admins (see `can_edit_branding`, migration 047). */
+  clinicAdminOnly?: boolean;
 }
 
 export const SECTION_META: Record<SettingsSection, SectionMeta> = {
@@ -100,8 +102,8 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   profile: { id: 'profile', label: 'Your profile', icon: User, group: 'account' },
   security: { id: 'security', label: 'Login & security', icon: Shield, group: 'account' },
   appearance: { id: 'appearance', label: 'Appearance', icon: Palette, group: 'account' },
-  branding: { id: 'branding', label: 'Branding', icon: Paintbrush, group: 'workspace', adminOnly: true },
-  menu: { id: 'menu', label: 'Sidebar menu', icon: PanelLeft, group: 'workspace', adminOnly: true },
+  branding: { id: 'branding', label: 'Branding', icon: Paintbrush, group: 'workspace', clinicAdminOnly: true },
+  menu: { id: 'menu', label: 'Sidebar menu', icon: PanelLeft, group: 'workspace', clinicAdminOnly: true },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
   templates: { id: 'templates', label: 'Templates', icon: FileText, group: 'master' },
   'quick-replies': { id: 'quick-replies', label: 'Quick replies', icon: Zap, group: 'master' },
@@ -134,4 +136,10 @@ export function resolveSection(raw: string | null): SettingsSection {
   if (raw === 'tags' || raw === 'custom-fields') return 'fields';
   if (isSection(raw)) return raw;
   return DEFAULT_SECTION;
+}
+
+/** Whether the settings rail lists a section for this member. */
+export function railShows(meta: SectionMeta, who: { canManageMembers: boolean; canEditBranding: boolean }): boolean {
+  if (meta.clinicAdminOnly) return who.canEditBranding;
+  return !meta.adminOnly || who.canManageMembers;
 }

@@ -12,12 +12,12 @@
  * - If the table doesn't exist yet (migration not run), everything quietly
  *   stays the Clinicoro default.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { BLANK_BRANDING, COLOR_KEYS, brandingCss, retitle, type Branding } from "@/lib/branding";
+import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, COLOR_KEYS, brandingCss, retitle, type Branding } from "@/lib/branding";
 
-export const BRANDING_CACHE_KEY = "clinicoro.branding.v1";
-export const BRAND_STYLE_ID = "brand-css";
+
+
 const COLUMNS = ["title", "subtitle", "logo", "menu", ...COLOR_KEYS].join(",");
 const DEFAULT_TITLE = "Clinicoro";
 
@@ -27,6 +27,8 @@ type BrandingContextValue = {
   loaded: boolean;
   /** False when the table can't be read (migration 046 not run yet). */
   available: boolean;
+  /** The signed-in member is an owner or admin of the clinic's own account (migration 047). */
+  canEdit: boolean;
   /** Show a branding without saving it (live preview); `null` returns to the saved one. */
   preview: (b: Branding | null) => void;
   reload: () => Promise<void>;
@@ -38,6 +40,7 @@ const BrandingContext = createContext<BrandingContextValue>({
   branding: BLANK_BRANDING,
   loaded: false,
   available: false,
+  canEdit: false,
   preview: () => {},
   reload: async () => {},
   save: async () => "Branding isn't available here.",
@@ -49,13 +52,21 @@ function normalise(row: Partial<Branding> | null | undefined): Branding {
   return b;
 }
 
-function readCache(): Branding {
-  if (typeof window === "undefined") return BLANK_BRANDING;
+/** The cached row as stored (a string, so React can compare snapshots); null on the server or when empty. */
+function readCacheRaw(): string | null {
   try {
-    const raw = localStorage.getItem(BRANDING_CACHE_KEY);
+    return localStorage.getItem(BRANDING_CACHE_KEY);
+  } catch {
+    return null; // private mode
+  }
+}
+const noSubscribe = () => () => {};
+
+function parseCache(raw: string | null): Branding {
+  try {
     if (raw) return normalise(JSON.parse(raw).branding);
   } catch {
-    // Private mode or a broken cache: start from the defaults.
+    // A broken cache: start from the defaults.
   }
   return BLANK_BRANDING;
 }
@@ -88,10 +99,17 @@ function writeCache(b: Branding) {
 }
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
-  const [saved, setSaved] = useState<Branding>(readCache);
+  // The first render uses the defaults on the server and in the browser alike (no hydration
+  // mismatch); React then re-renders with the cache. The boot script has already put the
+  // cached colours on the page, so there's no flash.
+  const cacheRaw = useSyncExternalStore(noSubscribe, readCacheRaw, () => null);
+  const cached = useMemo(() => parseCache(cacheRaw), [cacheRaw]);
+  const [fetched, setSaved] = useState<Branding | null>(null);
+  const saved = fetched ?? cached;
   const [previewing, setPreviewing] = useState<Branding | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [available, setAvailable] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const branding = previewing ?? saved;
 
@@ -114,7 +132,31 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     setLoaded(true);
   }, []);
 
-  const reload = useCallback(async () => take(await fetchRow()), [fetchRow, take]);
+  /** Only the clinic's own owners and admins may change the branding; any signed-up user owns an account of their own. */
+  const checkEdit = useCallback(async () => {
+    const { data, error } = await supabase.rpc("can_edit_branding");
+    setCanEdit(!error && data === true);
+  }, [supabase]);
+
+  const reload = useCallback(async () => {
+    take(await fetchRow());
+    await checkEdit();
+  }, [fetchRow, take, checkEdit]);
+
+  useEffect(() => {
+    let active = true;
+    const run = () => {
+      supabase.rpc("can_edit_branding").then(({ data, error }) => {
+        if (active) setCanEdit(!error && data === true);
+      });
+    };
+    run();
+    const { data } = supabase.auth.onAuthStateChange(() => run());
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   useEffect(() => {
     let active = true;
@@ -170,8 +212,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ branding, loaded, available, preview: setPreviewing, reload, save }),
-    [branding, loaded, available, reload, save],
+    () => ({ branding, loaded, available, canEdit, preview: setPreviewing, reload, save }),
+    [branding, loaded, available, canEdit, reload, save],
   );
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }

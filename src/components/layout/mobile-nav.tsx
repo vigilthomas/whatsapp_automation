@@ -14,6 +14,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
+import { useBranding } from "@/hooks/use-branding";
+import { mobileTab } from "@/lib/branding-menu";
+import { BRAND_ICONS } from "@/lib/branding-icons";
 import type { ModuleId } from "@/lib/auth/module-access";
 
 interface Tab {
@@ -41,8 +44,12 @@ export function MobileNav({ onOpenMenu }: { onOpenMenu: () => void }) {
   const pathname = usePathname();
   const { sidebarModules } = useAuth();
   const unread = useTotalUnread();
+  const { branding } = useBranding();
 
-  const tabs = TABS.filter((tab) => !tab.module || sidebarModules.includes(tab.module));
+  // Same hiding, names and icons as Settings → Sidebar menu gives the sidebar.
+  const tabs = TABS.filter((tab) => !tab.module || sidebarModules.includes(tab.module))
+    .map((tab) => ({ ...tab, ...mobileTab(tab.href, branding.menu) }))
+    .filter((tab) => !tab.hidden);
 
   const itemClass = (active: boolean) =>
     cn(
@@ -59,10 +66,11 @@ export function MobileNav({ onOpenMenu }: { onOpenMenu: () => void }) {
       {tabs.map((tab) => {
         const active =
           pathname === tab.href || (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
+        const Icon = (tab.iconKey && BRAND_ICONS[tab.iconKey]) || tab.icon;
         return (
           <Link key={tab.href} href={tab.href} className={itemClass(active)}>
-            <tab.icon className="size-[22px]" strokeWidth={active ? 2 : 1.75} />
-            {t(tab.labelKey)}
+            <Icon className="size-[22px]" strokeWidth={active ? 2 : 1.75} />
+            <span className="max-w-full truncate px-1">{tab.label ?? t(tab.labelKey)}</span>
             {tab.href === "/inbox" && unread > 0 && !active && (
               <i className="absolute top-1 right-[22px] size-[7px] rounded-full border-2 border-card bg-[#E0533E]" />
             )}

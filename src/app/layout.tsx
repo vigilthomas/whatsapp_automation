@@ -5,7 +5,8 @@ import { Manrope, Sora } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { BRANDING_CACHE_KEY, BRAND_STYLE_ID, BrandingProvider } from "@/hooks/use-branding";
+import { BrandingProvider } from "@/hooks/use-branding";
+import { brandBootJs } from "@/lib/branding";
 import { ThemedToaster } from "@/components/themed-toaster";
 import {
   DEFAULT_MODE,
@@ -77,14 +78,7 @@ const THEME_BOOT_SCRIPT = `
     var savedMode = localStorage.getItem(MODE_KEY);
     d.dataset.mode = MODES.indexOf(savedMode) !== -1 ? savedMode : MODE_DEFAULT;
 
-    var brand = JSON.parse(localStorage.getItem(${JSON.stringify(BRANDING_CACHE_KEY)}) || "null");
-    if (brand && typeof brand.css === "string" && brand.css) {
-      var style = document.createElement("style");
-      style.id = ${JSON.stringify(BRAND_STYLE_ID)};
-      style.textContent = brand.css;
-      document.head.appendChild(style);
-      d.dataset.brand = "1";
-    }
+${brandBootJs()}
   } catch (_e) {
     d.dataset.theme = ${JSON.stringify(DEFAULT_THEME)};
     d.dataset.mode = ${JSON.stringify(DEFAULT_MODE)};
