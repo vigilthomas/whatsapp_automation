@@ -12,9 +12,9 @@
  * - If the table doesn't exist yet (migration not run), everything quietly
  *   stays the Clinicoro default.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { BLANK_BRANDING, COLOR_KEYS, brandingCss, type Branding } from "@/lib/branding";
+import { BLANK_BRANDING, COLOR_KEYS, brandingCss, retitle, type Branding } from "@/lib/branding";
 
 export const BRANDING_CACHE_KEY = "clinicoro.branding.v1";
 export const BRAND_STYLE_ID = "brand-css";
@@ -87,12 +87,6 @@ function writeCache(b: Branding) {
   }
 }
 
-/** "Inbox — Clinicoro" → "Inbox — <clinic name>". */
-function brandTitle(title: string, name: string | null) {
-  if (!name || name === DEFAULT_TITLE) return title;
-  return title === DEFAULT_TITLE ? name : title.replace(/ — Clinicoro$/, ` — ${name}`);
-}
-
 export function BrandingProvider({ children }: { children: ReactNode }) {
   const [saved, setSaved] = useState<Branding>(readCache);
   const [previewing, setPreviewing] = useState<Branding | null>(null);
@@ -136,11 +130,16 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     applyCss(branding);
   }, [branding]);
 
-  // Browser tab title follows the clinic name, including after client-side navigation.
+  // Browser tab title follows the clinic name, including after client-side
+  // navigation (Next writes "Page — Clinicoro"). `shown` is the name in the
+  // tab now, so clearing the name puts "Clinicoro" back.
+  const shown = useRef(DEFAULT_TITLE);
   useEffect(() => {
-    const name = saved.title;
+    const name = saved.title || DEFAULT_TITLE;
     const fix = () => {
-      const next = brandTitle(document.title, name);
+      let next = retitle(document.title, shown.current, name);
+      if (shown.current !== DEFAULT_TITLE) next = retitle(next, DEFAULT_TITLE, name); // a fresh "— Clinicoro" from Next
+      shown.current = name;
       if (next !== document.title) document.title = next;
     };
     fix();

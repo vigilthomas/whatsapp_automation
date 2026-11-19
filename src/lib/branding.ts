@@ -86,12 +86,37 @@ export function brandingCss(b: Branding): string {
   if (!light.length) return "";
 
   let css = `html[data-mode="light"][data-brand]{${light.join(";")}}`;
+
+  // The sidebar's rows are styled with the app-wide tokens (muted text, mint,
+  // navy, teal, sunken), so inside the sidebar point those at its own colours;
+  // otherwise a dark sidebar preset leaves grey text on a dark background.
+  const text = isHexColor(b.sidebar_text) ? b.sidebar_text : null;
+  const accentSide = isHexColor(b.sidebar_accent) ? b.sidebar_accent : null;
+  const side: string[] = [];
+  if (text) {
+    side.push(`--muted-foreground:${text}`, `--foreground:${text}`, `--navy:${text}`);
+    side.push(`--sunken:color-mix(in oklab, ${text} 12%, transparent)`);
+    side.push(`--border:color-mix(in oklab, ${text} 18%, transparent)`);
+  }
+  if (accentSide) {
+    side.push(`--teal:${accentSide}`, `--teal-700:${accentSide}`);
+    side.push(`--mint:color-mix(in oklab, ${accentSide} 18%, transparent)`);
+  }
+  if (side.length) css += `html[data-mode="light"][data-brand] aside[aria-label="Primary"]{${side.join(";")}}`;
   const accent = isHexColor(b.theme_primary) ? b.theme_primary : isHexColor(b.sidebar_accent) ? b.sidebar_accent : null;
   if (accent) {
     const dark = ["--primary", "--ring", "--chart-1", "--sidebar-primary", "--sidebar-ring"].map((t) => `${t}:${accent}`);
     css += `html[data-mode="dark"][data-brand]{${[...dark, ...derived(accent)].join(";")}}`;
   }
   return css;
+}
+
+/** Replace the app name `from` with `to` in a tab title ("Inbox — Clinicoro" or just "Clinicoro"). */
+export function retitle(title: string, from: string, to: string): string {
+  if (from === to) return title;
+  if (title === from) return to;
+  const suffix = ` — ${from}`;
+  return title.endsWith(suffix) ? title.slice(0, -suffix.length) + ` — ${to}` : title;
 }
 
 /** An error message for an uploaded logo, or null when it's fine. */

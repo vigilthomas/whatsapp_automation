@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLANK_BRANDING, brandingCss, checkLogoFile, checkLogoUrl, isHexColor } from "./branding";
+import { BLANK_BRANDING, brandingCss, checkLogoFile, checkLogoUrl, isHexColor, retitle } from "./branding";
 
 describe("brandingCss", () => {
   it("is empty when nothing is set (untouched install looks like Clinicoro)", () => {
@@ -28,10 +28,31 @@ describe("brandingCss", () => {
     expect(css.split('data-mode="dark"')[1]).toContain("--primary:#0E9F9A");
   });
 
+  it("sidebar colours also reach the menu rows inside the sidebar (light mode only)", () => {
+    const css = brandingCss({ ...BLANK_BRANDING, sidebar_bg: "#0B3B2E", sidebar_text: "#F0FDF4", sidebar_accent: "#16A34A" });
+    const scoped = css.split('aside[aria-label="Primary"]')[1] ?? "";
+    expect(css).toContain('html[data-mode="light"][data-brand] aside[aria-label="Primary"]');
+    expect(scoped).toContain("--muted-foreground:#F0FDF4");
+    expect(scoped).toContain("--navy:#F0FDF4");
+    expect(scoped).toContain("--teal:#16A34A");
+    expect(scoped).toContain("--mint:color-mix(in oklab, #16A34A");
+    expect(scoped).toContain("--sunken:color-mix(in oklab, #F0FDF4");
+  });
+
   it("skips values that aren't #RRGGBB", () => {
     expect(brandingCss({ ...BLANK_BRANDING, theme_primary: "red" })).toBe("");
     expect(isHexColor("#12345G")).toBe(false);
     expect(isHexColor("#abcdef")).toBe(true);
+  });
+});
+
+describe("retitle", () => {
+  it("swaps the app name in the tab title, and back again", () => {
+    expect(retitle("Clinicoro", "Clinicoro", "Glow Clinic")).toBe("Glow Clinic");
+    expect(retitle("Inbox — Clinicoro", "Clinicoro", "Glow Clinic")).toBe("Inbox — Glow Clinic");
+    expect(retitle("Inbox — Glow Clinic", "Glow Clinic", "Clinicoro")).toBe("Inbox — Clinicoro");
+    expect(retitle("Glow Clinic", "Glow Clinic", "Clinicoro")).toBe("Clinicoro");
+    expect(retitle("Inbox — Clinicoro", "Glow Clinic", "Clinicoro")).toBe("Inbox — Clinicoro");
   });
 });
 
