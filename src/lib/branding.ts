@@ -29,6 +29,8 @@ export type Branding = {
   subtitle: string | null;
   /** https URL or data:image/...;base64 (uploaded); null = Clinicoro logo. */
   logo: string | null;
+  /** How the logo is framed; null = as uploaded. */
+  logo_shape: LogoShape | null;
   menu: BrandMenu;
 } & Record<ColorKey, string | null>;
 
@@ -36,9 +38,20 @@ export const BLANK_BRANDING: Branding = {
   title: null,
   subtitle: null,
   logo: null,
+  logo_shape: null,
   menu: {},
   ...(Object.fromEntries(COLOR_KEYS.map((k) => [k, null])) as Record<ColorKey, null>),
 };
+
+export const LOGO_SHAPES = ["original", "circle", "rounded"] as const;
+export type LogoShape = (typeof LOGO_SHAPES)[number];
+
+/** Classes for the logo <img>: the whole image as uploaded, or filled and clipped to a circle or rounded square. */
+export function logoShapeClass(shape: LogoShape | null): string {
+  if (shape === "circle") return "rounded-full object-cover";
+  if (shape === "rounded") return "rounded-[22%] object-cover";
+  return "object-contain";
+}
 
 export const TITLE_MAX = 40;
 /** localStorage key for `{branding, css}`; read by the provider and by the root layout's boot script. */

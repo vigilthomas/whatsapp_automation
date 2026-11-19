@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ImageUp, RotateCcw, X } from "lucide-react";
+import { Crop, ImageUp, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,8 @@ import { useBranding } from "@/hooks/use-branding";
 import { checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, isHexColor, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 import { BrandingPreview } from "./branding-preview";
+import { LogoCropDialog } from "./logo-crop-dialog";
+import { LogoShapePicker } from "./logo-shape-picker";
 import { SettingsPanelHead } from "./settings-panel-head";
 
 const SIDEBAR_KEYS: ColorKey[] = ["sidebar_bg", "sidebar_text", "sidebar_accent", "title_color", "subtitle_color"];
@@ -47,7 +49,7 @@ const PAGE_PRESETS: Preset[] = [
   { name: "Graphite", values: { theme_primary: "#334155", theme_text: "#0B0F14", theme_muted: "#64748B", theme_bg: "#F3F4F6", theme_surface: "#FFFFFF", theme_danger: "#DC2626" } },
 ];
 
-const EDITABLE = ["title", "subtitle", "logo", ...COLOR_KEYS] as const;
+const EDITABLE = ["title", "subtitle", "logo", "logo_shape", ...COLOR_KEYS] as const;
 type Editable = (typeof EDITABLE)[number];
 
 const cleanText = (v: string | null) => (v && v.trim() ? v.trim().slice(0, TITLE_MAX) : null);
@@ -58,6 +60,8 @@ export function BrandingPanel() {
   const confirm = useConfirm();
   const [draft, setDraft] = useState<Branding>(branding);
   const [logoLink, setLogoLink] = useState("");
+  /** An uploaded image waiting in the crop dialog. */
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const readOnly = !canEdit || !available;
@@ -94,7 +98,7 @@ export function BrandingPanel() {
     const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
     if (sniffImage(head) !== file.type) return toast.error(t("logoNotImage"));
     const reader = new FileReader();
-    reader.onload = () => set("logo", String(reader.result));
+    reader.onload = () => setCropSrc(String(reader.result));
     reader.readAsDataURL(file);
   };
   const useLink = () => {
@@ -111,7 +115,7 @@ export function BrandingPanel() {
   };
 
   const onSave = async () => {
-    const names = changed.map((k) => (k === "title" ? t("name") : k === "subtitle" ? t("subtitle") : k === "logo" ? t("logo") : t(`fields.${k}`)));
+    const names = changed.map((k) => (k === "title" ? t("name") : k === "subtitle" ? t("subtitle") : k === "logo" ? t("logo") : k === "logo_shape" ? t("logoShape") : t(`fields.${k}`)));
     if (!(await confirm({ title: t("saveTitle"), description: `${t("saveDesc")} (${names.join(", ")})`, confirmLabel: t("save") }))) return;
     setSaving(true);
     const patch = Object.fromEntries(
@@ -226,6 +230,11 @@ export function BrandingPanel() {
                 <Button type="button" variant="ghost" size="sm" disabled={readOnly || !logoLink.trim()} onClick={useLink}>
                   {t("useLink")}
                 </Button>
+                {draft.logo?.startsWith("data:") && (
+                  <Button type="button" variant="ghost" size="sm" disabled={readOnly} onClick={() => setCropSrc(draft.logo)}>
+                    <Crop className="size-4" /> {t("crop")}
+                  </Button>
+                )}
                 {draft.logo && (
                   <Button type="button" variant="ghost" size="sm" disabled={readOnly} onClick={() => set("logo", null)}>
                     <X className="size-4" /> {t("removeLogo")}
@@ -233,6 +242,12 @@ export function BrandingPanel() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">{t("logoHint")}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("logoShape")}</Label>
+              <div>
+                <LogoShapePicker value={draft.logo_shape} disabled={readOnly} onChange={(v) => set("logo_shape", v)} />
+              </div>
             </div>
           </div>
 
@@ -268,6 +283,16 @@ export function BrandingPanel() {
           {dirty && <p className="text-xs text-warn-fg">{t("unsaved")}</p>}
         </aside>
       </div>
+      <LogoCropDialog
+        src={cropSrc}
+        shape={draft.logo_shape}
+        onShape={(v) => set("logo_shape", v)}
+        onCancel={() => setCropSrc(null)}
+        onDone={(url) => {
+          set("logo", url);
+          setCropSrc(null);
+        }}
+      />
     </section>
   );
 }

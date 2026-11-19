@@ -18,7 +18,7 @@ import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, COLOR_KEYS, brandin
 
 
 
-const COLUMNS = ["title", "subtitle", "logo", "menu", ...COLOR_KEYS].join(",");
+const COLUMNS = ["title", "subtitle", "logo", "logo_shape", "menu", ...COLOR_KEYS].join(",");
 const DEFAULT_TITLE = "Clinicoro";
 
 type BrandingContextValue = {

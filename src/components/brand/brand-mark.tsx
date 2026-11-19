@@ -2,6 +2,7 @@
 
 import { Logo } from "@/components/brand/logo";
 import { useBranding } from "@/hooks/use-branding";
+import { logoShapeClass } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,7 +19,7 @@ export function BrandMark({ className, title = "" }: { className?: string; title
       src={branding.logo}
       alt={title}
       aria-hidden={title ? undefined : true}
-      className={cn("shrink-0 object-contain", className)}
+      className={cn("shrink-0", logoShapeClass(branding.logo_shape), className)}
     />
   );
 }

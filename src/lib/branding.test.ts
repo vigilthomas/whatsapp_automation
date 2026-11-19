@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, DARK_BG, brandBootJs, brandingCss, checkLogoFile, checkLogoUrl, contrast, inkOn, isHexColor, retitle, sniffImage } from "./branding";
+import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, DARK_BG, brandBootJs, brandingCss, checkLogoFile, checkLogoUrl, contrast, inkOn, isHexColor, retitle, sniffImage, logoShapeClass } from "./branding";
 
 describe("brandingCss", () => {
   it("is empty when nothing is set (untouched install looks like Clinicoro)", () => {
@@ -110,5 +110,18 @@ describe("review fixes", () => {
     expect(js).toContain(JSON.stringify(BRANDING_CACHE_KEY));
     expect(js).toContain(JSON.stringify(BRAND_STYLE_ID));
     expect(js).not.toContain("undefined");
+  });
+});
+
+describe("logo shape", () => {
+  it("as uploaded keeps the whole image; circle and rounded fill and clip it", () => {
+    expect(BLANK_BRANDING.logo_shape).toBeNull();
+    expect(logoShapeClass(null)).toBe("object-contain");
+    expect(logoShapeClass("original")).toBe("object-contain");
+    expect(logoShapeClass("circle")).toContain("rounded-full");
+    expect(logoShapeClass("circle")).toContain("object-cover");
+    expect(logoShapeClass("rounded")).toContain("object-cover");
+    expect(logoShapeClass("rounded")).not.toContain("rounded-full");
+    expect(logoShapeClass("bogus" as never)).toBe("object-contain");
   });
 });

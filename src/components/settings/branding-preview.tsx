@@ -2,7 +2,8 @@
 
 import { LayoutDashboard, MessageSquare, CalendarDays } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
-import { isHexColor, type Branding } from "@/lib/branding";
+import { isHexColor, logoShapeClass, type Branding } from "@/lib/branding";
+import { cn } from "@/lib/utils";
 
 /** Clinicoro's light-mode colours, used where the branding leaves a colour unset. */
 const BASE = {
@@ -37,7 +38,7 @@ export function BrandingPreview({ draft }: { draft: Branding }) {
         <div className="flex items-center gap-2">
           {draft.logo ? (
             // eslint-disable-next-line @next/next/no-img-element -- data: or https logo, preview only
-            <img src={draft.logo} alt="" className="h-6 w-6 object-contain" />
+            <img src={draft.logo} alt="" className={cn("h-6 w-6", logoShapeClass(draft.logo_shape))} />
           ) : (
             <Logo className="h-6 w-6" title="" />
           )}
