@@ -1447,7 +1447,8 @@
       "serviceRequired": "서비스를 입력하세요.",
       "invalidTime": "올바른 날짜와 시간을 입력하세요.",
       "branch": "지점",
-      "noBranch": "— 의사의 지점 사용 —"
+      "noBranch": "— 의사의 지점 사용 —",
+      "overlap": "이 의사는 해당 시간에 이미 예약이 있습니다. 다른 시간을 선택하세요."
     },
     "allBranches": "모든 지점",
     "filterBranch": "지점으로 거르기"
@@ -2207,7 +2208,7 @@
       "manageDesignations": "역할 관리",
       "matrixTitle": "권한",
       "matrixTitleFor": "권한 — {name}",
-      "matrixDesc": "보기는 사이드바에 모듈을 표시하고, 읽기는 열 수 있게 하며, 생성·수정·삭제·내보내기는 해당 작업을 허용합니다. 다른 권한에는 읽기가 필요합니다. 이름 옆 원을 누르면 행 전체를, 그룹 옆 원을 누르면 그룹 전체를 켜고 끕니다. 허용된 행의 핸들을 끌어 그룹 안의 순서를 정합니다.",
+      "matrixDesc": "보기는 사이드바에 모듈을 표시하고, 읽기는 열 수 있게 하며, 생성·수정·삭제·내보내기는 해당 작업을 허용합니다. 다른 권한에는 읽기가 필요합니다. 이름 옆 원을 누르면 행 전체를, 그룹 옆 원을 누르면 그룹 전체를 켜고 끕니다. 허용된 행의 핸들을 끌어 그룹 안의 순서를 정합니다. 데이터 접근은 지점에 속한 모듈에서 볼 수 있는 기록의 범위를 제한합니다.",
       "pickDesignation": "위에서 역할을 선택해 권한을 편집하세요.",
       "moduleColumn": "모듈",
       "cellAria": "{module}에 대한 {action}",
@@ -2268,7 +2269,28 @@
       "readOnlyAll": "보기·읽기만",
       "deselectAll": "모두 해제",
       "selectGroup": "{group} 전체 선택",
-      "selectRow": "{module} 전체 선택"
+      "selectRow": "{module} 전체 선택",
+      "dataAccess": "데이터 접근",
+      "scopeAria": "{module} 데이터 접근",
+      "scope": {
+        "all": "모든 지점",
+        "branch": "배정된 지점",
+        "own": "본인 배정 항목",
+        "custom": "직접 선택"
+      },
+      "scopeDesc": {
+        "all": "모든 지점의 기록.",
+        "branch": "마스터 → 사용자에서 설정한 각 구성원의 지점만. 지점이 없는 구성원은 아무것도 볼 수 없습니다.",
+        "custom": "아래에서 선택한 지점만."
+      },
+      "scopeOwnDesc": {
+        "appointments": "본인이 담당 의사인 예약만.",
+        "leaves": "본인의 휴가만."
+      },
+      "customCount": "{count, plural, =0 {선택한 지점 없음} other {지점 #개}}",
+      "customNone": "지점을 하나 이상 선택하세요. 선택하지 않으면 이 역할의 구성원은 여기서 아무것도 볼 수 없습니다.",
+      "noBranches": "아직 지점이 없습니다. 마스터 → 지점에서 추가하세요.",
+      "branchesLoading": "지점 불러오는 중…"
     },
     "deals": {
       "title": "통화",

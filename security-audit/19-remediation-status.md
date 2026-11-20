@@ -18,7 +18,7 @@ Fixes applied after the audit, at the owner's request. Nothing is committed or d
 | F-06 data scope | Open | Being finished or removed in its own session. |
 | F-07 CSP enforcement | Open | Needs a week of report-only data first. |
 | F-08 MFA | Open | Feature work (Supabase TOTP + AAL2 checks). |
-| F-11 booking race / audit log | Open | An exclusion constraint will fail if existing data overlaps; check data first. |
+| F-11 booking race / audit log | **Partly fixed** | Appointment create/edit now refuse an overlap with the same doctor's booking in any branch (409), and the booking dialog reads busy times from `/api/appointments/busy`, which ignores Data access and returns times only. Without that, a role limited to one branch saw another branch's bookings as free slots. **Open:** two requests at the same instant can still both pass (needs a DB exclusion constraint once existing overlaps are cleaned up); no audit log yet. |
 | F-13, F-16 privacy | Open | Disclosure, export/erasure and retention are product work. |
 
 ## Behaviour changes to tell admins

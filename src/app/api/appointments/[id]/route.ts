@@ -3,7 +3,7 @@ import { toErrorResponse } from '@/lib/auth/account'
 import { requirePermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { validateAppointmentInput } from '@/lib/appointments/model'
-import { APPOINTMENT_SELECT, assertRefsInAccount } from '@/lib/appointments/server'
+import { APPOINTMENT_SELECT, assertRefsInAccount, findOverlap, overlapResponse } from '@/lib/appointments/server'
 import { OUT_OF_SCOPE_MESSAGE, rowInScope, scopeFilter, type ScopeFilter } from '@/lib/auth/data-scope'
 import type { PermissionContext } from '@/lib/auth/permission-guard'
 
@@ -33,7 +33,7 @@ async function checkExisting(
   }
   const { data, error } = await admin
     .from('appointments')
-    .select('id, branch_id, doctor_id')
+    .select('id, branch_id, doctor_id, starts_at, ends_at, status')
     .eq('id', id)
     .eq('account_id', ctx.accountId)
     .maybeSingle()
@@ -63,6 +63,33 @@ export async function PATCH(request: Request, { params }: Params) {
   if (existing instanceof NextResponse) return existing
   if (!rowInScope(existing.scope, { ...existing.row, ...(result.values as Record<string, unknown>) })) {
     return NextResponse.json({ error: OUT_OF_SCOPE_MESSAGE }, { status: 403 })
+  }
+
+  // No double booking: check the row as it will be after this edit.
+  const next = { ...existing.row, ...(result.values as Record<string, unknown>) }
+  const touchesSlot = ['doctor_id', 'starts_at', 'ends_at', 'status'].some((k) => k in result.values)
+  if (
+    touchesSlot &&
+    typeof next.doctor_id === 'string' &&
+    typeof next.starts_at === 'string' &&
+    typeof next.ends_at === 'string' &&
+    next.status !== 'cancelled'
+  ) {
+    if (new Date(next.ends_at) <= new Date(next.starts_at)) {
+      return NextResponse.json({ error: 'ends_at must be after starts_at' }, { status: 400 })
+    }
+    try {
+      const clash = await findOverlap(admin, {
+        accountId: ctx.accountId,
+        doctorId: next.doctor_id,
+        startsAt: next.starts_at,
+        endsAt: next.ends_at,
+        excludeId: id,
+      })
+      if (clash) return overlapResponse(clash)
+    } catch {
+      return NextResponse.json({ error: 'Could not check availability' }, { status: 500 })
+    }
   }
 
   const { data, error } = await admin

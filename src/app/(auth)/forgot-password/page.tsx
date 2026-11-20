@@ -14,8 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckCircle, ArrowLeft } from "lucide-react";
-import { BrandMark } from "@/components/brand/brand-mark";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthCardLogo, AuthShell } from "@/components/auth/auth-shell";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -79,9 +78,7 @@ export default function ForgotPasswordPage() {
     <AuthShell>
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <BrandMark className="h-8 w-8" />
-          </div>
+          <AuthCardLogo />
           <CardTitle className="text-xl text-foreground">Reset password</CardTitle>
           <CardDescription className="text-muted-foreground">
             Enter your email and we&apos;ll send you a reset link

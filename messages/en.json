@@ -1447,7 +1447,8 @@
       "serviceRequired": "Enter a service.",
       "invalidTime": "Enter a valid date and time.",
       "branch": "Branch",
-      "noBranch": "— Use doctor's branch —"
+      "noBranch": "— Use doctor's branch —",
+      "overlap": "This doctor already has an appointment at that time. Pick another slot."
     },
     "allBranches": "All branches",
     "filterBranch": "Filter by branch"
@@ -2207,7 +2208,7 @@
       "manageDesignations": "Manage roles",
       "matrixTitle": "Permissions",
       "matrixTitleFor": "Permissions — {name}",
-      "matrixDesc": "View shows the module in the sidebar; Read lets them open it; Create, Edit, Delete and Export unlock those actions. Read is required for anything else. Tick the circle beside a name to switch a whole row, or beside a group to switch the whole group. Drag the handle on a granted row to set its order inside the group.",
+      "matrixDesc": "View shows the module in the sidebar; Read lets them open it; Create, Edit, Delete and Export unlock those actions. Read is required for anything else. Tick the circle beside a name to switch a whole row, or beside a group to switch the whole group. Drag the handle on a granted row to set its order inside the group. Data access limits whose records they see in modules that belong to a branch.",
       "pickDesignation": "Choose a role above to edit its permissions.",
       "moduleColumn": "Module",
       "cellAria": "{action} on {module}",
@@ -2268,7 +2269,28 @@
       "readOnlyAll": "View & read only",
       "deselectAll": "Deselect all",
       "selectGroup": "Tick everything in {group}",
-      "selectRow": "Tick everything for {module}"
+      "selectRow": "Tick everything for {module}",
+      "dataAccess": "Data access",
+      "scopeAria": "Data access for {module}",
+      "scope": {
+        "all": "All branches",
+        "branch": "Assigned branch",
+        "own": "Assigned to them",
+        "custom": "Custom"
+      },
+      "scopeDesc": {
+        "all": "Records from every branch.",
+        "branch": "Only each member's own branch, set under Master → Users. Members with no branch see nothing.",
+        "custom": "Only the branches you pick below."
+      },
+      "scopeOwnDesc": {
+        "appointments": "Only appointments where they are the doctor.",
+        "leaves": "Only their own leaves."
+      },
+      "customCount": "{count, plural, =0 {No branches picked} one {# branch} other {# branches}}",
+      "customNone": "Pick at least one branch, or members with this role will see nothing here.",
+      "noBranches": "No branches yet. Add them under Master → Branches.",
+      "branchesLoading": "Loading branches…"
     },
     "deals": {
       "title": "Currency",

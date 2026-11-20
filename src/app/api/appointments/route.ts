@@ -3,7 +3,7 @@ import { toErrorResponse } from '@/lib/auth/account'
 import { requirePermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { validateAppointmentInput } from '@/lib/appointments/model'
-import { APPOINTMENT_SELECT, assertRefsInAccount } from '@/lib/appointments/server'
+import { APPOINTMENT_SELECT, assertRefsInAccount, findOverlap, overlapResponse } from '@/lib/appointments/server'
 import { OUT_OF_SCOPE_MESSAGE, rowInScope, scopeFilter } from '@/lib/auth/data-scope'
 
 // Appointments — GET lists a time window (the calendar's visible week,
@@ -71,6 +71,22 @@ export async function POST(request: Request) {
   if (scope === undefined) return NextResponse.json({ error: 'Could not check data access' }, { status: 500 })
   if (!rowInScope(scope, result.values as Record<string, unknown>)) {
     return NextResponse.json({ error: OUT_OF_SCOPE_MESSAGE }, { status: 403 })
+  }
+
+  // No double booking, even across branches the caller can't see.
+  const v = result.values
+  if (v.doctor_id && v.starts_at && v.ends_at && v.status !== 'cancelled') {
+    try {
+      const clash = await findOverlap(admin, {
+        accountId: ctx.accountId,
+        doctorId: v.doctor_id,
+        startsAt: v.starts_at,
+        endsAt: v.ends_at,
+      })
+      if (clash) return overlapResponse(clash)
+    } catch {
+      return NextResponse.json({ error: 'Could not check availability' }, { status: 500 })
+    }
   }
 
   const { data, error } = await admin

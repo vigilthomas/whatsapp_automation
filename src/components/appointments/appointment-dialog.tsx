@@ -235,29 +235,30 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
   }, [query, form]);
 
   // Booked windows for the chosen doctor + day, to strike through slots.
+  // From /api/appointments/busy, which covers EVERY branch: the plain
+  // list honours the role's Data access, so a branch-limited role would
+  // otherwise see another branch's bookings as free slots. The server
+  // also refuses an overlapping booking (409), so this is the preview.
   const dateKey = form?.date ?? "";
   const doctorKey = form?.doctor_id ?? "";
   useEffect(() => {
-    if (!dateKey) return;
+    if (!dateKey || !doctorKey) return;
     const from = parseLocal(dateKey, "00:00");
     const to = new Date(from.getTime() + 86_400_000);
-    const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
-    if (doctorKey) params.set("doctor_id", doctorKey);
+    const params = new URLSearchParams({ doctor_id: doctorKey, from: from.toISOString(), to: to.toISOString() });
     let cancelled = false;
-    fetch(`/api/appointments?${params}`, { cache: "no-store" })
+    fetch(`/api/appointments/busy?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return;
-        const rows: Appointment[] = Array.isArray(d.appointments) ? d.appointments : [];
+        const rows: Pick<Appointment, "id" | "starts_at" | "ends_at" | "service">[] = Array.isArray(d.busy) ? d.busy : [];
         setBusy(
-          rows
-            .filter((a) => a.status !== "cancelled")
-            .map((a) => ({
-              id: a.id,
-              start: new Date(a.starts_at).getTime(),
-              end: new Date(a.ends_at).getTime(),
-              service: a.service,
-            })),
+          rows.map((a) => ({
+            id: a.id,
+            start: new Date(a.starts_at).getTime(),
+            end: new Date(a.ends_at).getTime(),
+            service: a.service,
+          })),
         );
       })
       .catch(() => setBusy([]));
@@ -407,7 +408,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error ?? t("saveFailed"));
+        toast.error(data.code === "overlap" ? t("overlap") : (data.error ?? t("saveFailed")));
         return;
       }
       toast.success(form.id ? t("updated") : t("created"));

@@ -16,8 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UsersRound } from "lucide-react";
-import { BrandMark } from "@/components/brand/brand-mark";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthCardLogo, AuthShell } from "@/components/auth/auth-shell";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless it sits under a Suspense boundary. We split the form into
@@ -80,13 +79,13 @@ function LoginPageInner() {
     <AuthShell>
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            {inviteToken ? (
+          {inviteToken ? (
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <UsersRound className="h-6 w-6 text-primary" />
-            ) : (
-              <BrandMark className="h-8 w-8" />
-            )}
-          </div>
+            </div>
+          ) : (
+            <AuthCardLogo />
+          )}
           <CardTitle className="text-xl text-foreground">
             {inviteToken ? t('titleAccept') : t('titleWelcome')}
           </CardTitle>

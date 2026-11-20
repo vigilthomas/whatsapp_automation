@@ -15,8 +15,12 @@
  * pages only swap their outer wrapper for this, so each keeps its own card.
  * `preview` draws a miniature for the Branding picker without the
  * full-screen height.
+ *
+ * Split and spotlight already show the logo outside the card, so a card
+ * puts its own logo in `<AuthCardLogo />`, which only draws in classic —
+ * otherwise the page would show it twice.
  */
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { useBranding } from "@/hooks/use-branding";
 import { lockscreenOf, type Lockscreen } from "@/lib/branding";
@@ -24,11 +28,43 @@ import { cn } from "@/lib/utils";
 
 const DEFAULT_NAME = "Clinicoro";
 
+const AuthLayoutContext = createContext<Lockscreen>("classic");
+
+/** The card's own logo: only in the classic layout, where nothing else shows one. */
+export function AuthCardLogo() {
+  if (useContext(AuthLayoutContext) !== "classic") return null;
+  return (
+    <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+      <BrandMark className="h-8 w-8" />
+    </div>
+  );
+}
+
 export function AuthShell({ children, layout }: { children: ReactNode; layout?: Lockscreen }) {
   const { branding } = useBranding();
   const chosen = layout ?? lockscreenOf(branding);
   const name = branding.title || DEFAULT_NAME;
   const tagline = branding.subtitle;
+  return (
+    <AuthLayoutContext.Provider value={chosen}>
+      <Frame layout={chosen} name={name} tagline={tagline}>
+        {children}
+      </Frame>
+    </AuthLayoutContext.Provider>
+  );
+}
+
+function Frame({
+  children,
+  layout: chosen,
+  name,
+  tagline,
+}: {
+  children: ReactNode;
+  layout: Lockscreen;
+  name: string;
+  tagline: string | null | undefined;
+}) {
 
   if (chosen === "split") {
     return (

@@ -34,7 +34,11 @@ import {
   moveWithin,
   setModulesAll,
   parsePermissions,
+  scopeOf,
+  scopesFor,
+  setScope,
   togglePermission,
+  type DataScope,
   type Action,
   type Permissions,
 } from "@/lib/auth/permissions";
@@ -47,6 +51,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { DataScopePicker, type BranchOption } from "./data-scope-picker";
 
 /**
  * Circular tick toggle for one matrix cell. Colours come straight from
@@ -279,6 +284,10 @@ export function AccessControlPanel() {
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   // Earlier drafts, newest last, for Undo. Cleared on save or a new pick.
   const [history, setHistory] = useState<Permissions[]>([]);
+  // For Data access → Custom. Loaded once; a caller without Branches
+  // read just gets an empty list (the picker says there are none).
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -307,6 +316,24 @@ export function AccessControlPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/master/branches", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { records: [] }))
+      .then((data: { records?: MasterRecord[] }) => {
+        if (cancelled) return;
+        const rows = Array.isArray(data.records) ? data.records : [];
+        setBranches(rows.map((r) => ({ id: r.id, name: String(r.name ?? "") })));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBranchesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selected = useMemo(
     () => designations.find((d) => d.id === selectedId) ?? null,
@@ -379,7 +406,15 @@ export function AccessControlPanel() {
 
   /** View and Read on every module, nothing else. */
   const readOnlyAll = () =>
-    change(MODULES.map((module) => ({ module, actions: ["view", "read"] as Action[] })));
+    change(
+      MODULES.map((module) => {
+        const scope = draft.find((e) => e.module === module)?.scope;
+        const actions = ["view", "read"] as Action[];
+        return scope ? { module, actions, scope } : { module, actions };
+      }),
+    );
+
+  const setModuleScope = (module: ModuleId, scope: DataScope) => change(setScope(draft, module, scope));
 
   /** Group toggle state: every applicable tick, some, or none. */
   const stateOf = (modules: readonly ModuleId[]) => {
@@ -535,6 +570,7 @@ export function AccessControlPanel() {
                                   {tActions(a)}
                                 </TableHead>
                               ))}
+                              <TableHead className="w-40 min-w-36 text-muted-foreground">{t("dataAccess")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <SortableContext items={granted} strategy={verticalListSortingStrategy}>
@@ -592,6 +628,28 @@ export function AccessControlPanel() {
                                             )}
                                           </TableCell>
                                         ))}
+                                        <TableCell
+                                          className={cn(
+                                            "pr-3",
+                                            i === granted.length && granted.length > 0 && "border-t-2 border-t-border",
+                                          )}
+                                        >
+                                          {isGranted && scopesFor(module).length > 0 ? (
+                                            <DataScopePicker
+                                              module={module}
+                                              moduleName={nameOf(module)}
+                                              scope={scopeOf(draft, module)}
+                                              branches={branches}
+                                              branchesLoading={branchesLoading}
+                                              disabled={!editable}
+                                              onChange={(next) => setModuleScope(module, next)}
+                                            />
+                                          ) : (
+                                            <span className="text-muted-foreground" aria-label={t("notApplicable")}>
+                                              –
+                                            </span>
+                                          )}
+                                        </TableCell>
                                       </>
                                     )}
                                   </ModuleRow>
