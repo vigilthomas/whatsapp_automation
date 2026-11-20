@@ -22,6 +22,7 @@ import {
   Settings,
   SlidersHorizontal,
   Tags,
+  UserCheck,
   Users,
   UsersRound,
   Workflow,
@@ -80,6 +81,7 @@ export const navGroups: NavGroup[] = [
     children: [
       { href: "/master/branches", labelKey: "branches", icon: MapPin, module: "branches" },
       { href: "/master/services", labelKey: "services", icon: ClipboardList, module: "services" },
+      { href: "/master/staff", labelKey: "doctors", icon: UserCheck, module: "staff" },
       { href: "/master/doctor-services", labelKey: "doctorServices", icon: Stethoscope, module: "doctor-services" },
       { href: "/master/designations", labelKey: "designations", icon: BadgeCheck, module: "designations" },
       { href: "/master/users", labelKey: "users", icon: UsersRound, module: "users" },

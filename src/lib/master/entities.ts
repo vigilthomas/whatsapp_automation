@@ -17,6 +17,7 @@ import type { ModuleId } from "@/lib/auth/module-access";
 export const MASTER_ENTITY_SLUGS = [
   "branches",
   "doctors",
+  "staff",
   "services",
   "doctor-services",
   "leaves",
@@ -142,6 +143,30 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
     table: "doctors",
     module: "appointments",
     readOnly: true,
+    labelKey: "doctors",
+    fields: [
+      name,
+      { key: "speciality", labelKey: "speciality", type: "text", list: true },
+      branch,
+      phone,
+      { key: "whatsapp_number", labelKey: "whatsappNumber", type: "text" },
+      email,
+      notes,
+      isActive,
+    ],
+  },
+  // The same `doctors` table as above, as an editable Master page
+  // (Master → Stylists / Doctors…, in the install's staff word). Two
+  // entries on purpose: `doctors` stays gated by Appointments so anyone
+  // who can book can still list who to book with, while adding and
+  // editing bookable staff needs this page's own module. Bookable staff
+  // can exist without a login (a stylist who never signs in); one who
+  // has a login is still kept in step from Users (syncDoctorForUser),
+  // so the API refuses to delete those here.
+  staff: {
+    slug: "staff",
+    table: "doctors",
+    module: "staff",
     labelKey: "doctors",
     fields: [
       name,

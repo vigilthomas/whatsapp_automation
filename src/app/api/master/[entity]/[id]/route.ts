@@ -134,6 +134,25 @@ export async function DELETE(_request: Request, { params }: Params) {
     }
   }
 
+  // Bookable staff with a login belong to Users: deleting the row here
+  // would be undone the next time their user changes (syncDoctorForUser
+  // revives it). Switch them off here, or remove the user.
+  if (entity.table === 'doctors') {
+    const { data: linked, error: linkedError } = await admin
+      .from('doctors')
+      .select('user_id')
+      .eq('id', id)
+      .eq('account_id', ctx.accountId)
+      .maybeSingle()
+    if (linkedError) return NextResponse.json({ error: linkedError.message }, { status: 500 })
+    if (linked?.user_id) {
+      return NextResponse.json(
+        { error: 'This person has a login. Remove them from Master → Users, or switch them off here.' },
+        { status: 409 },
+      )
+    }
+  }
+
   // Soft delete: the row stays (appointments and history still point at
   // it) but is switched off and hidden from every list. Undo by clearing
   // deleted_at in the database.
