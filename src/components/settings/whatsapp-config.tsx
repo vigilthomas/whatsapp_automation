@@ -106,10 +106,63 @@ export function WhatsAppConfig() {
   const [registrationProbe, setRegistrationProbe] =
     useState<RegistrationProbe | null>(null);
 
-  const webhookUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/api/whatsapp/webhook`
-      : '';
+  // The callback URL to paste into Meta (migration 067). Loaded from
+  // /api/whatsapp/webhook-url: the URL an admin saved, else
+  // NEXT_PUBLIC_SITE_URL from .env, else this server's own address — no
+  // longer just the browser's origin, which is useless on localhost.
+  // `webhookDraft` is the input; `webhookSaved` what's stored (null = the
+  // fallback applies).
+  const [webhookSaved, setWebhookSaved] = useState<string | null>(null);
+  const [webhookFallback, setWebhookFallback] = useState(
+    typeof window !== 'undefined' ? `${window.location.origin}/api/whatsapp/webhook` : '',
+  );
+  const [webhookDraft, setWebhookDraft] = useState(webhookFallback);
+  const [savingWebhook, setSavingWebhook] = useState(false);
+  const webhookUrl = webhookSaved ?? webhookFallback;
+  const webhookDirty = webhookDraft.trim() !== webhookUrl;
+
+  useEffect(() => {
+    if (!accountId) return;
+    let cancelled = false;
+    fetch('/api/whatsapp/webhook-url', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { saved: string | null; fallback: string } | null) => {
+        if (cancelled || !d) return;
+        setWebhookSaved(d.saved);
+        setWebhookFallback(d.fallback);
+        setWebhookDraft(d.saved ?? d.fallback);
+      })
+      .catch(() => {
+        // Keep the browser-origin fallback; the box still works for copying.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId]);
+
+  async function saveWebhookUrl(next: string | null) {
+    setSavingWebhook(true);
+    try {
+      const res = await fetch('/api/whatsapp/webhook-url', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: next }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { saved?: string | null; fallback?: string; error?: string };
+      if (!res.ok) {
+        toast.error(d.error || t('webhookSaveFailed'));
+        return;
+      }
+      setWebhookSaved(d.saved ?? null);
+      if (d.fallback) setWebhookFallback(d.fallback);
+      setWebhookDraft(d.saved ?? d.fallback ?? '');
+      toast.success(next ? t('webhookSaved') : t('webhookReset'));
+    } catch {
+      toast.error(t('webhookSaveFailed'));
+    } finally {
+      setSavingWebhook(false);
+    }
+  }
 
   const fetchConfig = useCallback(async (acctId: string) => {
     setLoading(true);
@@ -710,22 +763,54 @@ export function WhatsAppConfig() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <Label className="text-muted-foreground">{t('webhookUrl')}</Label>
+              <Label htmlFor="webhook-url" className="text-muted-foreground">{t('webhookUrl')}</Label>
               <div className="flex gap-2">
                 <Input
-                  readOnly
-                  value={webhookUrl}
-                  className="bg-muted border-border text-muted-foreground font-mono text-sm"
+                  id="webhook-url"
+                  readOnly={!canEditSettings}
+                  value={webhookDraft}
+                  onChange={(e) => setWebhookDraft(e.target.value)}
+                  maxLength={500}
+                  spellCheck={false}
+                  className="bg-muted border-border text-foreground font-mono text-sm"
                 />
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={handleCopyWebhookUrl}
+                  aria-label={t('webhookCopy')}
                   className="shrink-0 border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                 >
                   <Copy className="size-4" />
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {webhookSaved ? t('webhookSourceSaved') : t('webhookSourceDefault')}
+              </p>
+              {canEditSettings && (webhookDirty || webhookSaved) ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {webhookDirty ? (
+                    <Button
+                      size="sm"
+                      onClick={() => saveWebhookUrl(webhookDraft.trim() || null)}
+                      disabled={savingWebhook}
+                    >
+                      {savingWebhook ? <Loader2 className="size-4 animate-spin" /> : null}
+                      {t('webhookSave')}
+                    </Button>
+                  ) : null}
+                  {webhookSaved ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => saveWebhookUrl(null)}
+                      disabled={savingWebhook}
+                    >
+                      {t('webhookUseDefault')}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>
