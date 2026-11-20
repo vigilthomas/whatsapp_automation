@@ -36,14 +36,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ProfileForm() {
   const t = useTranslations('Settings.profile');
-  const tRoles = useTranslations('Settings.roles');
-  const { user, profile, refreshProfile, accountRole, isSuperAdmin } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const supabase = createClient();
-  // The Role (designation, migration 043) the user was given in Users.
-  // Read here rather than from `profile.role`: that column is the legacy
-  // free-text field from 001, defaults to 'user' for everyone and is never
-  // used for access. `undefined` = still loading, `null` = no role.
-  const [designationName, setDesignationName] = useState<string | null | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState('');
@@ -60,26 +54,6 @@ export function ProfileForm() {
   const [linkedAvatar, setLinkedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [emailChangePending, setEmailChangePending] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    createClient()
-      .from('profiles')
-      .select('designation:designations(name)')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        const d = (data as { designation: { name: string } | { name: string }[] | null } | null)?.designation;
-        const name = Array.isArray(d) ? d[0]?.name : d?.name;
-        // A failed lookup (e.g. 043 not applied) reads as "no role".
-        setDesignationName(error ? null : (name ?? null));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   // Seed form state once the profile loads.
   useEffect(() => {
@@ -275,13 +249,6 @@ export function ProfileForm() {
       linkedAvatar !== null ||
       removeAvatar);
 
-  const joined = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : '—';
 
   return (
     <section className="max-w-2xl animate-in fade-in-50 duration-200">
@@ -415,41 +382,6 @@ export function ProfileForm() {
                 </span>
               </p>
             )}
-          </div>
-
-          {/* Read-only block */}
-          <div className="rounded-lg border border-border bg-muted p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {t('accountDetails')}
-            </p>
-            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-muted-foreground">{t('designation')}</dt>
-                <dd className="mt-0.5 text-foreground">
-                  {isSuperAdmin
-                    ? t('superAdmin')
-                    : designationName === undefined
-                      ? '—'
-                      : (designationName ?? t('noDesignation'))}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t('role')}</dt>
-                <dd className="mt-0.5 text-foreground">
-                  {isSuperAdmin ? tRoles('owner') : accountRole ? tRoles(accountRole) : '—'}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t('joined')}</dt>
-                <dd className="mt-0.5 text-foreground">{joined}</dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-muted-foreground">{t('userId')}</dt>
-                <dd className="mt-0.5 break-all font-mono text-xs text-muted-foreground">
-                  {user?.id ?? '—'}
-                </dd>
-              </div>
-            </dl>
           </div>
 
           {!profile && (
