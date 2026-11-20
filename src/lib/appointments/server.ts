@@ -82,7 +82,7 @@ export async function findOverlap(
 export function overlapResponse(clash: { starts_at: string; ends_at: string }): NextResponse {
   return NextResponse.json(
     {
-      error: 'This doctor already has an appointment at that time. Pick another slot.',
+      error: 'That person is already booked at that time. Pick another slot.',
       code: 'overlap',
       conflict: { starts_at: clash.starts_at, ends_at: clash.ends_at },
     },

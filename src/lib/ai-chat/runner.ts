@@ -24,8 +24,9 @@ import { supabaseAdmin } from "@/lib/automations/admin-client";
 import { decrypt } from "@/lib/whatsapp/encryption";
 import { sendMessageToConversation } from "@/lib/whatsapp/send-message";
 import { parseClinicSettings } from "@/lib/clinic/settings";
+import { parseVocabulary, resolveTerms } from "@/lib/vocabulary";
 import { DEFAULT_HANDOFF_REPLY, buildSystemPrompt, effectiveMode, parseModelReply, toTurns } from "./model";
-import { complete, isAiProvider } from "./provider";
+import { PROVIDERS, complete, isAiProvider } from "./provider";
 
 export interface AiInbound {
   accountId: string;
@@ -55,7 +56,12 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
     .select("provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id")
     .eq("account_id", accountId)
     .maybeSingle();
-  if (!cfg?.is_active || !cfg.api_key || !isAiProvider(cfg.provider)) return none;
+  if (!cfg?.is_active || !isAiProvider(cfg.provider)) return none;
+  // Hosted providers need a key; a local Ollama server doesn't.
+  if (!cfg.api_key && PROVIDERS[cfg.provider].needsKey) return none;
+  // Separate read: before migration 065 the column doesn't exist, and a
+  // failed select must not switch the assistant off.
+  const { data: server } = await db.from("ai_configs").select("base_url").eq("account_id", accountId).maybeSingle();
 
   const { data: conv, error: convError } = await db
     .from("conversations")
@@ -70,7 +76,7 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
   const handoff = (reason: string, reply = DEFAULT_HANDOFF_REPLY) =>
     handOff(db, { accountId, conversationId, contactId, reason, reply, agentId: (cfg.handoff_agent_id as string | null) ?? (conv.assigned_agent_id as string | null) });
 
-  if (!text.trim()) return handoff("The patient sent an attachment.");
+  if (!text.trim()) return handoff("They sent an attachment.");
 
   const { data: claimed } = await db.rpc("claim_ai_reply_slot", {
     conversation_id: conversationId,
@@ -92,7 +98,8 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
     const raw = await complete({
       provider: cfg.provider,
       model: cfg.model as string,
-      apiKey: decrypt(cfg.api_key as string),
+      apiKey: cfg.api_key ? decrypt(cfg.api_key as string) : "",
+      baseUrl: (server?.base_url as string | null | undefined) ?? null,
       system,
       turns,
     });
@@ -109,8 +116,11 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
 
 /** Everything the model may answer from, all scoped to the account. */
 async function clinicFacts(db: Db, accountId: string, instructions: string | null) {
-  const [branding, clinic, services, doctors] = await Promise.all([
+  const [branding, vocab, clinic, services, doctors] = await Promise.all([
     db.from("app_branding").select("title").eq("id", 1).maybeSingle(),
+    // Separate read: before migration 064 the column doesn't exist, and a
+    // failed select must not lose the business name above.
+    db.from("app_branding").select("vocabulary").eq("id", 1).maybeSingle(),
     db.from("clinic_settings").select("config").eq("account_id", accountId).maybeSingle(),
     db.from("services").select("name, duration_min, is_active").eq("account_id", accountId).is("deleted_at", null),
     db.from("doctors").select("name, is_active, branch:branches(name)").eq("account_id", accountId).is("deleted_at", null),
@@ -118,7 +128,8 @@ async function clinicFacts(db: Db, accountId: string, instructions: string | nul
   type Svc = { name: string; duration_min: number | null; is_active: boolean | null };
   type Doc = { name: string; is_active: boolean | null; branch: { name: string } | { name: string }[] | null };
   return {
-    clinicName: (branding.data?.title as string | null) || "the clinic",
+    clinicName: (branding.data?.title as string | null) || "our business",
+    terms: resolveTerms(parseVocabulary(vocab.error ? null : vocab.data?.vocabulary), "en"),
     clinic: parseClinicSettings(clinic.data?.config),
     services: ((services.data ?? []) as Svc[])
       .filter((s) => s.is_active !== false)

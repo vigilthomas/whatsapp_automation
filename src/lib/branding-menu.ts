@@ -5,6 +5,7 @@
  * order follows the designation's order (Access control).
  */
 import { BRAND_ICON_KEYS } from "./branding-icon-keys";
+import type { SettingsMenu } from "./settings-menu";
 
 export type BrandMenu = {
   items?: Record<string, { label?: string; icon?: string; group?: string; hidden?: boolean }>;
@@ -21,6 +22,8 @@ export type BrandMenu = {
    * points at a missing section is ignored by `resolveMenu`).
    */
   customGroups?: CustomGroup[];
+  /** The Settings page's side list: names, icons, hiding, order (lib/settings-menu). */
+  settings?: SettingsMenu;
 };
 
 export type CustomGroup = { id: string; label: string; icon?: string };

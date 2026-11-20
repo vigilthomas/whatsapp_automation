@@ -14,13 +14,15 @@ interface PipelineDonutProps {
 }
 
 import { useTranslations } from 'next-intl'
+import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 export function PipelineDonut({ data, loading, currency }: PipelineDonutProps) {
   const t = useTranslations('Dashboard.pipelineDonut')
+  const meta = useCardMeta()
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-card">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       <header className="border-b border-border px-5 py-4">
-        <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><CardTitleIcon /><span className="truncate">{meta?.title ?? t('title')}</span></h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {t('description')}
         </p>

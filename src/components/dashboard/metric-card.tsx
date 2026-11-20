@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { cn } from '@/lib/utils'
+import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 interface MetricCardProps {
   title: string
@@ -21,11 +22,13 @@ interface MetricCardProps {
   subtitle?: string
 }
 
-export function MetricCard({ title, value, icon: Icon, delta, subtitle }: MetricCardProps) {
+export function MetricCard({ title, value, icon: GivenIcon, delta, subtitle }: MetricCardProps) {
+  const meta = useCardMeta()
+  const Icon = meta?.Icon ?? GivenIcon
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-start justify-between">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+    <div className={`rounded-2xl border border-border bg-card p-5 shadow-card ${meta ? 'h-full overflow-hidden' : ''}`}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="truncate text-sm font-medium text-muted-foreground">{meta?.title ?? title}</p>
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Icon className="h-4 w-4" />
         </div>

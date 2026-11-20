@@ -1,9 +1,9 @@
 "use client";
 
 import { TimeInput } from '@/components/ui/date-time-input';
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -47,6 +47,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { BookingPreview } from "@/components/automations/booking-preview";
+import { useBranding } from "@/hooks/use-branding";
+import { resolveTerms } from "@/lib/vocabulary";
 import {
   BEFORE_DATETIME,
   DEFAULT_CONFIG,
@@ -55,6 +57,7 @@ import {
   TEXTS,
   WEEKDAYS,
   normaliseSteps,
+  withVocabulary,
   type BookingConfig,
   type BookingQuestion,
   type QuestionType,
@@ -63,7 +66,7 @@ import {
 } from "@/lib/booking/settings";
 
 const ZONES = ["Asia/Kolkata", "Asia/Dubai", "Asia/Singapore", "Asia/Seoul", "Europe/London", "America/New_York", "UTC"];
-// Monday first, the way clinics read a week.
+// Monday first, the way most businesses read a week.
 const WEEK_ORDER: Weekday[] = [1, 2, 3, 4, 5, 6, 0];
 
 const TEXT_GROUPS: { id: string; keys: TextKey[] }[] = [
@@ -127,6 +130,9 @@ export function BookingSettings() {
   const { can } = useAuth();
   const confirm = useConfirm();
   const editable = can("automations", "edit");
+  const { branding } = useBranding();
+  const locale = useLocale();
+  const terms = useMemo(() => resolveTerms(branding.vocabulary, locale), [branding.vocabulary, locale]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -146,12 +152,16 @@ export function BookingSettings() {
   const snapshot = (e: boolean, c: BookingConfig, k: string, x: string) => JSON.stringify({ e, c, k, x });
   const dirty = !loading && snapshot(enabled, config, keywordsText, cancelText) !== saved;
 
-  // What the preview runs: the edits so far, with the word lists applied.
-  const live: BookingConfig = {
-    ...config,
-    keywords: splitWords(keywordsText).length ? splitWords(keywordsText) : config.keywords,
-    cancelWords: splitWords(cancelText).map((w) => w.toLowerCase()),
-  };
+  // What the preview runs: the edits so far, with the word lists applied
+  // and the install's business words filled in, as the bot sends them.
+  const live: BookingConfig = withVocabulary(
+    {
+      ...config,
+      keywords: splitWords(keywordsText).length ? splitWords(keywordsText) : config.keywords,
+      cancelWords: splitWords(cancelText).map((w) => w.toLowerCase()),
+    },
+    terms,
+  );
 
   const apply = (e: boolean, c: BookingConfig) => {
     const k = c.keywords.join(", ");

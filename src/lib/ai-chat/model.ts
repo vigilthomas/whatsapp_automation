@@ -1,3 +1,4 @@
+import { resolveTerms, type Terms } from "@/lib/vocabulary";
 // ============================================================
 // AI chat assistant — pure, unit-testable, no I/O.
 //
@@ -32,6 +33,8 @@ export function effectiveMode(chatMode: string | null | undefined, newChatsStart
 
 export interface ClinicFacts {
   clinicName: string;
+  /** Business words for the prompt; default = the install default sector. */
+  terms?: Terms;
   clinic: ClinicSettings;
   services: { name: string; minutes: number }[];
   doctors: { name: string; branch?: string | null }[];
@@ -62,6 +65,13 @@ function closuresText(c: ClinicSettings): string {
 
 /** The system prompt: role, hard rules, then the facts. */
 export function buildSystemPrompt(f: ClinicFacts): string {
+  // The install's own words (Settings → Branding → Business type), in
+  // English for the model; it still replies in the customer's language.
+  const w = f.terms ?? resolveTerms(null, "en");
+  const lc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+  const business = lc(w.business.one);
+  const customer = lc(w.customer.one);
+  const staffMany = w.staff.many;
   const services = f.services.length
     ? f.services.map((s) => `- ${s.name} (about ${s.minutes} min)`).join("\n")
     : "- not listed";
@@ -70,19 +80,19 @@ export function buildSystemPrompt(f: ClinicFacts): string {
     : "- not listed";
   const extra = (f.instructions ?? "").trim().slice(0, MAX_INSTRUCTIONS);
   return [
-    `You are the WhatsApp receptionist for ${f.clinicName}. Today is ${f.today}.`,
+    `You are the WhatsApp receptionist for ${f.clinicName}, a ${business}. Today is ${f.today}.`,
     "",
     "Rules:",
-    "- Answer ONLY from the clinic facts and instructions below. Never invent prices, availability, policies or medical advice.",
-    "- If the answer is not in them, if the patient asks for a person, is upset or complaining, or asks anything medical beyond simple logistics, hand the chat to staff.",
+    `- Answer ONLY from the ${business} facts and instructions below. Never invent prices, availability, policies or professional advice (medical, legal, financial or similar).`,
+    `- If the answer is not in them, if the ${customer} asks for a person, is upset or complaining, or asks for advice beyond simple logistics, hand the chat to staff.`,
     "- For booking, explain that they can send the word \"book\" to start booking, or hand over if they want staff to book.",
-    "- Reply in the patient's language, briefly and warmly, as plain WhatsApp text (no markdown headings, at most a few short lines).",
+    `- Reply in the ${customer}'s language, briefly and warmly, as plain WhatsApp text (no markdown headings, at most a few short lines).`,
     "",
     'Respond with ONLY a JSON object: {"reply": string, "handoff": boolean, "reason": string}.',
-    '- handoff false: "reply" answers the patient.',
-    '- handoff true: "reply" is a short message telling the patient a team member will get back to them; "reason" says briefly, for staff, what the patient needs.',
+    `- handoff false: "reply" answers the ${customer}.`,
+    `- handoff true: "reply" is a short message telling the ${customer} a team member will get back to them; "reason" says briefly, for staff, what the ${customer} needs.`,
     "",
-    "Clinic facts:",
+    `${w.business.one} facts:`,
     `Name: ${f.clinicName}`,
     "Opening hours:",
     hoursText(f.clinic),
@@ -90,9 +100,9 @@ export function buildSystemPrompt(f: ClinicFacts): string {
     closuresText(f.clinic),
     "Services:",
     services,
-    "Doctors:",
+    `${staffMany}:`,
     doctors,
-    ...(extra ? ["", "Clinic instructions (from the clinic, follow them):", extra] : []),
+    ...(extra ? ["", `Instructions from the ${business} (follow them):`, extra] : []),
   ].join("\n");
 }
 

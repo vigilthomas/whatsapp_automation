@@ -23,6 +23,7 @@ import { BrandingPreview } from "./branding-preview";
 import { LogoCropDialog } from "./logo-crop-dialog";
 import { LogoShapePicker } from "./logo-shape-picker";
 import { SettingsPanelHead } from "./settings-panel-head";
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 const SIDEBAR_KEYS: ColorKey[] = ["sidebar_bg", "sidebar_text", "sidebar_accent", "title_color", "subtitle_color"];
 const PAGE_KEYS: ColorKey[] = ["theme_primary", "theme_text", "theme_muted", "theme_bg", "theme_surface", "theme_danger"];
@@ -32,7 +33,7 @@ const nulls = (keys: ColorKey[]) => Object.fromEntries(keys.map((k) => [k, null]
 
 // The base template's presets, plus "Clinicoro" (= every colour left at default).
 const SIDEBAR_PRESETS: Preset[] = [
-  { name: "Clinicoro", values: nulls(SIDEBAR_KEYS) },
+  { name: DEFAULT_APP_NAME, values: nulls(SIDEBAR_KEYS) },
   { name: "Midnight", values: { sidebar_bg: "#0F172A", sidebar_text: "#FFFFFF", sidebar_accent: "#6366F1", title_color: "#FFFFFF", subtitle_color: "#B8976D" } },
   { name: "Forest", values: { sidebar_bg: "#0B3B2E", sidebar_text: "#F0FDF4", sidebar_accent: "#16A34A", title_color: "#FFFFFF", subtitle_color: "#FBBF24" } },
   { name: "Maroon", values: { sidebar_bg: "#4A0E1C", sidebar_text: "#FFF1F2", sidebar_accent: "#E11D48", title_color: "#FFFFFF", subtitle_color: "#FCD34D" } },
@@ -41,7 +42,7 @@ const SIDEBAR_PRESETS: Preset[] = [
   { name: "Light", values: { sidebar_bg: "#FFFFFF", sidebar_text: "#0F172A", sidebar_accent: "#4F46E5", title_color: "#0F172A", subtitle_color: "#B8976D" } },
 ];
 const PAGE_PRESETS: Preset[] = [
-  { name: "Clinicoro", values: nulls(PAGE_KEYS) },
+  { name: DEFAULT_APP_NAME, values: nulls(PAGE_KEYS) },
   { name: "Indigo", values: { theme_primary: "#6366F1", theme_text: "#0F172A", theme_muted: "#64748B", theme_bg: "#F1F5F9", theme_surface: "#FFFFFF", theme_danger: "#EF4444" } },
   { name: "Teal", values: { theme_primary: "#0D9488", theme_text: "#0F172A", theme_muted: "#5B6B7A", theme_bg: "#EEF6F5", theme_surface: "#FFFFFF", theme_danger: "#DC2626" } },
   { name: "Emerald", values: { theme_primary: "#059669", theme_text: "#052E16", theme_muted: "#4B6358", theme_bg: "#F0F7F2", theme_surface: "#FFFFFF", theme_danger: "#DC2626" } },
@@ -58,6 +59,7 @@ const cleanText = (v: string | null) => (v && v.trim() ? v.trim().slice(0, TITLE
 
 export function BrandingPanel() {
   const t = useTranslations("Settings.branding");
+  const tSidebar = useTranslations("Sidebar");
   const { branding, loaded, available, canEdit, save } = useBranding();
   const confirm = useConfirm();
   const [draft, setDraft] = useState<Branding>(branding);
@@ -211,12 +213,12 @@ export function BrandingPanel() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="brand-title">{t("name")}</Label>
-                <Input id="brand-title" maxLength={TITLE_MAX} placeholder="Clinicoro" disabled={readOnly}
+                <Input id="brand-title" maxLength={TITLE_MAX} placeholder={DEFAULT_APP_NAME} disabled={readOnly}
                   value={draft.title ?? ""} onChange={(e) => set("title", e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="brand-subtitle">{t("subtitle")}</Label>
-                <Input id="brand-subtitle" maxLength={TITLE_MAX} placeholder="Your clinic's AI receptionist" disabled={readOnly}
+                <Input id="brand-subtitle" maxLength={TITLE_MAX} placeholder={tSidebar("tagline")} disabled={readOnly}
                   value={draft.subtitle ?? ""} onChange={(e) => set("subtitle", e.target.value)} />
               </div>
             </div>

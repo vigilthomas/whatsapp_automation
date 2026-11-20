@@ -15,16 +15,23 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, COLOR_KEYS, brandingCss, retitle, type Branding } from "@/lib/branding";
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 
 
-const COLUMNS = ["title", "subtitle", "logo", "logo_shape", "lockscreen", "menu", ...COLOR_KEYS].join(",");
-// Before 059 there's no `lockscreen` column; reading it would fail the whole
-// row and drop every other branding setting, so fall back to the older list.
-const COLUMNS_BEFORE_059 = ["title", "subtitle", "logo", "logo_shape", "menu", ...COLOR_KEYS].join(",");
+const BASE_COLUMNS = ["title", "subtitle", "logo", "logo_shape", "menu", ...COLOR_KEYS];
+// Newest schema first. Reading a column the database doesn't have yet fails
+// the whole row and would drop every other branding setting, so an older
+// database (064 or 059 not run) falls back to the column list it has.
+const COLUMN_SETS = [
+  [...BASE_COLUMNS, "lockscreen", "vocabulary", "dashboard"].join(","), // 064
+  [...BASE_COLUMNS, "lockscreen"].join(","), // 059
+  BASE_COLUMNS.join(","),
+];
+const COLUMNS = COLUMN_SETS[0];
 /** Postgres "undefined_column". */
 const UNDEFINED_COLUMN = "42703";
-const DEFAULT_TITLE = "Clinicoro";
+const DEFAULT_TITLE = DEFAULT_APP_NAME;
 
 type BrandingContextValue = {
   branding: Branding;
@@ -34,6 +41,8 @@ type BrandingContextValue = {
   available: boolean;
   /** The signed-in member is an owner or admin of the clinic's own account (migration 047). */
   canEdit: boolean;
+  /** Migration 064 has run: business wording and dashboard settings can be saved. */
+  hasVocabulary: boolean;
   /** Show a branding without saving it (live preview); `null` returns to the saved one. */
   preview: (b: Branding | null) => void;
   reload: () => Promise<void>;
@@ -46,6 +55,7 @@ const BrandingContext = createContext<BrandingContextValue>({
   loaded: false,
   available: false,
   canEdit: false,
+  hasVocabulary: false,
   preview: () => {},
   reload: async () => {},
   save: async () => "Branding isn't available here.",
@@ -54,6 +64,8 @@ const BrandingContext = createContext<BrandingContextValue>({
 function normalise(row: Partial<Branding> | null | undefined): Branding {
   const b = { ...BLANK_BRANDING, ...(row ?? {}) } as Branding;
   if (!b.menu || typeof b.menu !== "object") b.menu = {};
+  if (!b.vocabulary || typeof b.vocabulary !== "object") b.vocabulary = {};
+  if (!b.dashboard || typeof b.dashboard !== "object") b.dashboard = {};
   return b;
 }
 
@@ -117,17 +129,20 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const [canEdit, setCanEdit] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const branding = previewing ?? saved;
-  // Which column list the database has (see COLUMNS_BEFORE_059); learnt on the first read.
+  // Which column list the database has (see COLUMN_SETS); learnt on the first read.
   const columns = useRef(COLUMNS);
+  const [hasVocabulary, setHasVocabulary] = useState(false);
 
   /** Read the row; `null` when it can't be read (most likely migration 046 hasn't been run). */
   const fetchRow = useCallback(async (): Promise<Branding | null> => {
-    let { data, error } = await supabase.from("app_branding").select(COLUMNS).eq("id", 1).maybeSingle();
-    columns.current = COLUMNS;
-    if (error?.code === UNDEFINED_COLUMN) {
-      columns.current = COLUMNS_BEFORE_059;
-      ({ data, error } = await supabase.from("app_branding").select(COLUMNS_BEFORE_059).eq("id", 1).maybeSingle());
+    let data: unknown = null;
+    let error: { code?: string; message: string } | null = null;
+    for (const set of COLUMN_SETS) {
+      columns.current = set;
+      ({ data, error } = await supabase.from("app_branding").select(set).eq("id", 1).maybeSingle());
+      if (error?.code !== UNDEFINED_COLUMN) break;
     }
+    setHasVocabulary(!error && columns.current === COLUMN_SETS[0]);
     if (error) {
       console.warn("[branding] not loaded:", error.message); // keep the defaults, don't nag
       return null;
@@ -224,8 +239,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ branding, loaded, available, canEdit, preview: setPreviewing, reload, save }),
-    [branding, loaded, available, canEdit, reload, save],
+    () => ({ branding, loaded, available, canEdit, hasVocabulary, preview: setPreviewing, reload, save }),
+    [branding, loaded, available, canEdit, hasVocabulary, reload, save],
   );
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }

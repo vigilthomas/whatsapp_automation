@@ -15,6 +15,7 @@ import {
   type ColorKey,
 } from '@/lib/branding';
 import { cn } from '@/lib/utils';
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 /** Clinicoro's dark-mode colours (globals.css). Dark mode keeps these and only takes the main colour. */
 const DARK = {
@@ -37,6 +38,7 @@ const DARK = {
  */
 export function BrandingPreview({ draft }: { draft: Branding }) {
   const t = useTranslations('Settings.branding');
+  const tSidebar = useTranslations('Sidebar');
   const { mode: appMode } = useTheme();
   // Follows the app's mode until someone flips the switch here.
   const [picked, setMode] = useState<'light' | 'dark' | null>(null);
@@ -106,13 +108,13 @@ export function BrandingPreview({ draft }: { draft: Branding }) {
                 className="truncate text-[12px]"
                 style={{ color: c('title_color') }}
               >
-                {draft.title || 'Clinicoro'}
+                {draft.title || DEFAULT_APP_NAME}
               </strong>
               <span
                 className="truncate text-[9px]"
                 style={{ color: c('subtitle_color') }}
               >
-                {draft.subtitle || "Your clinic's AI receptionist"}
+                {draft.subtitle || tSidebar("tagline")}
               </span>
             </span>
           </div>

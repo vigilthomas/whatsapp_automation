@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/use-auth';
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 type InviteRole = 'admin' | 'agent' | 'viewer';
 
@@ -135,7 +136,7 @@ export function InviteMemberDialog({
         // string if `account` hasn't loaded yet (shouldn't happen
         // — the dialog requires admin+ which requires a loaded
         // profile — but stay safe).
-        accountName: account?.name ?? 'our Clinicoro account',
+        accountName: account?.name ?? DEFAULT_APP_NAME,
       });
       onCreated();
     } catch (err) {
@@ -164,7 +165,7 @@ export function InviteMemberDialog({
     // they're being invited to before clicking through. This matters
     // for users in multi-team contexts where "our wacrm account"
     // wouldn't be enough to disambiguate.
-    const accountName = result?.accountName ?? 'our Clinicoro account';
+    const accountName = result?.accountName ?? DEFAULT_APP_NAME;
     const message = t('whatsappMessage', { accountName, expiresInDays: result?.expiresInDays ?? 0, url });
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
   }

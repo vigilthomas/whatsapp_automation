@@ -17,7 +17,8 @@ import {
   engineSendText,
 } from "@/lib/flows/meta-send";
 import { continueBooking, startBooking, type BookingDeps, type BookingState, type Reply } from "./engine";
-import { matchesKeyword, parseBookingConfig } from "./settings";
+import { matchesKeyword, parseBookingConfig, withVocabulary } from "./settings";
+import { parseVocabulary, resolveTerms } from "@/lib/vocabulary";
 import { addDays, isFree, localDay, type Busy } from "./slots";
 import { withClinic } from "./clinic";
 import { parseClinicSettings } from "@/lib/clinic/settings";
@@ -62,6 +63,12 @@ async function clinicAware(
   return withClinic(config, parseClinicSettings(data.config), days);
 }
 
+/** The install's business words (migration 064); the default sector before it. */
+async function installTerms(db: ReturnType<typeof supabaseAdmin>) {
+  const { data, error } = await db.from("app_branding").select("vocabulary").eq("id", 1).maybeSingle();
+  return resolveTerms(parseVocabulary(error ? null : data?.vocabulary), process.env.NEXT_PUBLIC_APP_LOCALE || "en");
+}
+
 async function run(input: BookingInbound): Promise<{ consumed: boolean }> {
   const db = supabaseAdmin();
   const { accountId, contactId } = input;
@@ -72,7 +79,10 @@ async function run(input: BookingInbound): Promise<{ consumed: boolean }> {
     .eq("account_id", accountId)
     .maybeSingle();
   if (settingsError || !settings?.enabled) return { consumed: false };
-  const config = await clinicAware(db, accountId, parseBookingConfig(settings.config));
+  const config = withVocabulary(
+    await clinicAware(db, accountId, parseBookingConfig(settings.config)),
+    await installTerms(db),
+  );
 
   const { data: session } = await db
     .from("booking_sessions")

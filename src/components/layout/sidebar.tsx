@@ -207,7 +207,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         </div>
 
         {/* Main navigation */}
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3.5 py-4">
+        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3.5 py-4">
           <ul className="flex flex-col gap-0.5">
             {orderVisible(topItems, section("top").ordered).map((item) => {
               const isActive = isItemActive(item.href);
@@ -333,8 +333,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             </ul>
           )}
 
-          {/* Pinned to the foot of the sidebar (Access control, Sidebar menu, Settings). */}
-          <ul className="mt-auto flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+        </nav>
+
+        {/* Pinned to the foot of the sidebar (Access control, Sidebar menu,
+            Settings). Outside the scrolling <nav> so it stays in view however
+            many groups are open. */}
+        <div className="shrink-0 px-3.5 pb-4">
+          <ul className="flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
             {section("bottom").items.filter(isItemVisible).map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
@@ -347,8 +352,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               );
             })}
           </ul>
-        </nav>
-
+        </div>
       </aside>
     </>
   );

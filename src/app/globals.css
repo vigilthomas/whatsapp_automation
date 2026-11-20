@@ -299,3 +299,22 @@ html[data-theme="rose"] {
   }
 }
 
+
+/* ---------------------------------------------------------------
+ * Dashboard grid (react-grid-layout, components/dashboard/dashboard-grid)
+ * The library placeholder is red; use the theme main colour, and keep
+ * the resize corner above the edit-mode drag surface.
+ * ------------------------------------------------------------- */
+.react-grid-item.react-grid-placeholder {
+  background: var(--primary);
+  opacity: 0.12;
+  border-radius: 1rem;
+}
+.dashboard-editing .react-grid-item > .react-resizable-handle {
+  z-index: 30;
+}
+.dashboard-editing .react-grid-item > .react-resizable-handle::after {
+  border-color: var(--primary);
+  width: 9px;
+  height: 9px;
+}

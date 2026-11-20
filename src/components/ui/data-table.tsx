@@ -47,9 +47,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Bookmark, BookmarkCheck, GripVertical, Loader2, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { createClient } from "@/lib/supabase/client";
+import { debouncedStore, fetchLayouts, layoutDbKey, readLocal, storeLayout } from "@/lib/user-layouts";
 import type { CsvColumn } from "@/lib/master/csv";
 import {
   defaultLayout,
@@ -60,7 +63,6 @@ import {
   sameLayout,
   storageKey,
   toggleColumn,
-  writeStored,
   type LayoutColumn,
   type TableLayout,
 } from "@/lib/table-layout";
@@ -125,27 +127,47 @@ export function useTableLayout<T>(tableId: string, columns: DataColumn<T>[]): Ta
   const [preset, setPreset] = React.useState<TableLayout | null>(null);
   const [loadedFor, setLoadedFor] = React.useState<string | null>(null);
 
+  // Saved per user in the database (user_layouts, 064) so a layout follows
+  // the user between devices; localStorage is the instant cache and the
+  // fallback before 064 (see lib/user-layouts). Older per-browser keys
+  // (storageKey) are still read once so nobody loses a saved preset.
+  const tLayout = useTranslations("Layout");
+  const db = React.useMemo(() => createClient(), []);
+  const persist = React.useMemo(() => debouncedStore(db), [db]);
+  const currentKey = layoutDbKey(`table:${tableId}`, "current");
+  const presetKey = layoutDbKey(`table:${tableId}`, "preset");
+
   // Load after mount (localStorage isn't available during SSR, and reading
   // it in the initial state would mismatch hydration).
   const loadKey = `${tableId}|${userId ?? ""}|${signature}`;
   React.useEffect(() => {
+    let active = true;
     const cols = colsRef.current;
-    const current = readStored(storageKey(tableId, "current", userId));
-    const savedPreset = readStored(storageKey(tableId, "preset", userId));
+    const current = readLocal(currentKey, userId) ?? readStored(storageKey(tableId, "current", userId));
+    const savedPreset = readLocal(presetKey, userId) ?? readStored(storageKey(tableId, "preset", userId));
     setPreset(savedPreset ? normalizeLayout(cols, savedPreset) : null);
     setLayout(normalizeLayout(cols, current ?? savedPreset));
     setLoadedFor(loadKey);
-  }, [loadKey, tableId, userId]);
+    void fetchLayouts(db, userId, [currentKey, presetKey]).then((rows) => {
+      if (!active || !rows) return;
+      const c = colsRef.current;
+      if (presetKey in rows) setPreset(normalizeLayout(c, rows[presetKey]));
+      if (currentKey in rows) setLayout(normalizeLayout(c, rows[currentKey]));
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadKey, tableId, userId, db, currentKey, presetKey]);
 
   const update = React.useCallback(
     (fn: (l: TableLayout) => TableLayout) => {
       setLayout((prev) => {
         const next = fn(prev);
-        if (next !== prev) writeStored(storageKey(tableId, "current", userId), next);
+        if (next !== prev) persist(userId, currentKey, next);
         return next;
       });
     },
-    [tableId, userId],
+    [persist, userId, currentKey],
   );
 
   const byId = React.useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns]);
@@ -164,9 +186,9 @@ export function useTableLayout<T>(tableId: string, columns: DataColumn<T>[]): Ta
     resize: (id, width) => update((l) => resizeColumn(l, id, width, byId.get(id)?.minWidth)),
     reset: () => update(() => defaultLayout(colsRef.current)),
     savePreset: () => {
-      writeStored(storageKey(tableId, "preset", userId), layout);
+      void storeLayout(db, userId, presetKey, layout);
       setPreset(layout);
-      toast.success("Saved as your preset for this table");
+      toast.success(tLayout("presetSavedTable"));
     },
     applyPreset: () => {
       if (preset) update(() => normalizeLayout(colsRef.current, preset));
@@ -186,6 +208,7 @@ export function exportColumns<T>(table: TableController<T>): CsvColumn<T>[] {
 /* ───────────────────────────── Column menu ───────────────────────────── */
 
 function MenuRow<T>({ table, column }: { table: TableController<T>; column: DataColumn<T> }) {
+  const t = useTranslations("Layout");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: column.id });
   const shown = !table.layout.hidden.includes(column.id);
   return (
@@ -200,7 +223,7 @@ function MenuRow<T>({ table, column }: { table: TableController<T>; column: Data
       <button
         type="button"
         className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
-        aria-label={`Move ${column.header}`}
+        aria-label={t("moveItem", { name: column.header })}
         {...attributes}
         {...listeners}
       >
@@ -211,7 +234,7 @@ function MenuRow<T>({ table, column }: { table: TableController<T>; column: Data
           checked={shown}
           disabled={column.hideable === false}
           onCheckedChange={(c) => table.toggle(column.id, !!c)}
-          aria-label={`Show ${column.header}`}
+          aria-label={t("showItem", { name: column.header })}
         />
         <span className="truncate">{column.header}</span>
       </label>
@@ -220,6 +243,7 @@ function MenuRow<T>({ table, column }: { table: TableController<T>; column: Data
 }
 
 export function ColumnsMenu<T>({ table, className }: { table: TableController<T>; className?: string }) {
+  const t = useTranslations("Layout");
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -235,8 +259,8 @@ export function ColumnsMenu<T>({ table, className }: { table: TableController<T>
         render={
           <button
             type="button"
-            title="Columns and preset"
-            aria-label="Columns and preset"
+            title={t("columnsAndPreset")}
+            aria-label={t("columnsAndPreset")}
             className={cn(
               "flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary",
               className,
@@ -248,7 +272,7 @@ export function ColumnsMenu<T>({ table, className }: { table: TableController<T>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 gap-1 p-2">
         <p className="px-1.5 pt-0.5 pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Columns
+          {t("columns")}
         </p>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={ordered.map((c) => c.id)} strategy={verticalListSortingStrategy}>
@@ -260,14 +284,14 @@ export function ColumnsMenu<T>({ table, className }: { table: TableController<T>
           </SortableContext>
         </DndContext>
         <div className="mt-1 flex flex-col gap-0.5 border-t border-border pt-1.5">
-          <p className="px-1.5 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Preset</p>
+          <p className="px-1.5 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t("preset")}</p>
           <button
             type="button"
             onClick={table.savePreset}
             className="flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm text-popover-foreground hover:bg-muted"
           >
             <Bookmark className="size-4 text-muted-foreground" />
-            {table.hasPreset ? "Update my preset" : "Save as my preset"}
+            {table.hasPreset ? t("updatePreset") : t("savePreset")}
           </button>
           <button
             type="button"
@@ -276,7 +300,7 @@ export function ColumnsMenu<T>({ table, className }: { table: TableController<T>
             className="flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm text-popover-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
           >
             <BookmarkCheck className="size-4 text-muted-foreground" />
-            {table.onPreset ? "Using my preset" : "Apply my preset"}
+            {table.onPreset ? t("usingPreset") : t("applyPreset")}
           </button>
           <button
             type="button"
@@ -284,7 +308,7 @@ export function ColumnsMenu<T>({ table, className }: { table: TableController<T>
             className="flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm text-popover-foreground hover:bg-muted"
           >
             <RotateCcw className="size-4 text-muted-foreground" />
-            Reset to default
+            {t("resetDefault")}
           </button>
         </div>
       </PopoverContent>
@@ -305,6 +329,7 @@ function HeaderCell<T>({
   width: number;
   onLiveResize: (id: string, w: number | null) => void;
 }) {
+  const t = useTranslations("Layout");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: column.id });
   const thRef = React.useRef<HTMLTableCellElement | null>(null);
 
@@ -349,7 +374,7 @@ function HeaderCell<T>({
         <button
           type="button"
           className="-ml-1.5 cursor-grab touch-none text-muted-foreground/0 transition-colors group-hover/th:text-muted-foreground hover:text-foreground focus-visible:text-foreground active:cursor-grabbing"
-          aria-label={`Move ${column.header} column`}
+          aria-label={t("moveColumn", { name: column.header })}
           {...attributes}
           {...listeners}
         >
@@ -360,7 +385,7 @@ function HeaderCell<T>({
       <span
         role="separator"
         aria-orientation="vertical"
-        aria-label={`Resize ${column.header} column`}
+        aria-label={t("resizeColumn", { name: column.header })}
         onPointerDown={startResize}
         onDoubleClick={() => table.resize(column.id, column.width ?? DEFAULT_WIDTH)}
         className="absolute top-2 right-0 bottom-2 w-2 cursor-col-resize touch-none after:absolute after:inset-y-0 after:right-0.5 after:w-px after:bg-border hover:after:w-0.5 hover:after:bg-primary"
@@ -400,6 +425,7 @@ export function DataTable<T>({
   className,
   footer,
 }: DataTableProps<T>) {
+  const t = useTranslations("Layout");
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -463,7 +489,7 @@ export function DataTable<T>({
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={span} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                    {empty ?? "Nothing here yet."}
+                    {empty ?? t("nothingHere")}
                   </td>
                 </tr>
               ) : (

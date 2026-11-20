@@ -28,9 +28,11 @@ const VB_H = 240
 const PADDING = { top: 16, right: 16, bottom: 28, left: 40 }
 
 import { useTranslations } from 'next-intl'
+import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 export function ConversationsChart({ series, loading, range, onRangeChange }: ConversationsChartProps) {
   const t = useTranslations('Dashboard.conversationsChart')
+  const meta = useCardMeta()
   const data = series[range]
 
   // Memoise the max so per-day hover math doesn't recompute it.
@@ -49,10 +51,10 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
   }, [data])
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-card">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       <header className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><CardTitleIcon /><span className="truncate">{meta?.title ?? t('title')}</span></h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1">

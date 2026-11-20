@@ -14,7 +14,7 @@ export const CSV_TEMPLATES = {
   contacts: {
     filename: "contacts-import-template.csv",
     headers: ["phone", "name", "email", "company", "tags"],
-    example: ["+919876543210", "Asha Menon", "asha@example.com", "Acme Clinic", "VIP; Follow-up"],
+    example: ["+919876543210", "Asha Menon", "asha@example.com", "Acme Ltd", "VIP; Follow-up"],
   },
   broadcast: {
     filename: "broadcast-audience-template.csv",

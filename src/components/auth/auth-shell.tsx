@@ -25,8 +25,9 @@ import { BrandMark } from "@/components/brand/brand-mark";
 import { useBranding } from "@/hooks/use-branding";
 import { lockscreenOf, type Lockscreen } from "@/lib/branding";
 import { cn } from "@/lib/utils";
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
-const DEFAULT_NAME = "Clinicoro";
+const DEFAULT_NAME = DEFAULT_APP_NAME;
 
 const AuthLayoutContext = createContext<Lockscreen>("classic");
 

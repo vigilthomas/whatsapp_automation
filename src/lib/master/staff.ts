@@ -1,5 +1,6 @@
 import type { supabaseAdmin } from '@/lib/automations/admin-client'
 import { can, parsePermissions } from '@/lib/auth/permissions'
+import { parseVocabulary, resolveTerms } from '@/lib/vocabulary'
 
 // ============================================================
 // Staff ⇄ doctors.
@@ -18,11 +19,42 @@ import { can, parsePermissions } from '@/lib/auth/permissions'
 
 export type StaffType = 'doctor' | 'assistant' | 'other'
 
-/** Staff type implied by a role's name ("Doctor", "Dr", "Dentist" → doctor). */
-export function staffTypeFromRole(name: string): StaffType {
-  if (/\bdoctor\b|\bdr\b|physician|surgeon|dentist|consultant/i.test(name)) return 'doctor'
+/**
+ * Common titles of people customers book with, across the sectors the
+ * product is sold to. A role whose name contains one of these, or the
+ * install's own staff word (Settings → Branding → Business type, e.g.
+ * "Barber"), makes its members bookable. "doctor" stays the internal name
+ * for "bookable staff"; the UI calls them by the install's word.
+ */
+const BOOKABLE_TITLES =
+  /\bdoctor\b|\bdr\b|physician|surgeon|dentist|therapist|consultant|stylist|barber|beautician|trainer|coach|tutor|instructor|specialist|practitioner|artist/i
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** True when a role's name says its members take bookings. */
+export function isBookableRole(name: string, staffWords: readonly string[] = []): boolean {
+  if (BOOKABLE_TITLES.test(name)) return true
+  return staffWords.some((w) => {
+    const word = w.trim()
+    return word.length >= 2 && new RegExp(`(^|[^\\p{L}])${escapeRe(word)}($|[^\\p{L}])`, 'iu').test(name)
+  })
+}
+
+/** Staff type implied by a role's name ("Doctor", "Stylist", the install's own staff word → bookable). */
+export function staffTypeFromRole(name: string, staffWords: readonly string[] = []): StaffType {
+  if (isBookableRole(name, staffWords)) return 'doctor'
   if (/assistant|nurse|receptionist/i.test(name)) return 'assistant'
   return 'other'
+}
+
+/** The install's staff words (singular and plural) for `isBookableRole`. */
+export async function loadStaffWords(admin: ReturnType<typeof supabaseAdmin>): Promise<string[]> {
+  const { data, error } = await admin.from('app_branding').select('vocabulary').eq('id', 1).maybeSingle()
+  if (error || !data) return []
+  const terms = resolveTerms(parseVocabulary((data as { vocabulary: unknown }).vocabulary))
+  return [terms.staff.one, terms.staff.many]
 }
 
 /**

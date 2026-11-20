@@ -18,6 +18,7 @@ import type { DoctorLoad, RecentConversation, TrendPoint } from "@/lib/dashboard
 import { WORK_END_HOUR, WORK_START_HOUR } from "@/components/appointments/appointment-calendar";
 import { BarChart } from "@/components/tremor/bar-chart";
 import { Badge } from "@/components/ui/badge";
+import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 // Widgets for the clinic dashboard, one per card in the reference
 // layout (public/Main-html). Each is presentational: the page loads
@@ -67,15 +68,20 @@ export function CardShell({
   className?: string;
   bodyClassName?: string;
 }) {
+  const meta = useCardMeta();
   return (
     <section
       className={cn(
         "flex flex-col rounded-2xl border border-border bg-card shadow-card",
+        meta && "h-full min-h-0",
         className,
       )}
     >
-      <div className="flex items-center justify-between px-5 pt-[18px] pb-3.5">
-        <h3 className="font-heading text-[15px] font-semibold text-foreground">{title}</h3>
+      <div className="flex items-center justify-between gap-2 px-5 pt-[18px] pb-3.5">
+        <h3 className="flex min-w-0 items-center gap-2 font-heading text-[15px] font-semibold text-foreground">
+          <CardTitleIcon />
+          <span className="truncate">{meta?.title ?? title}</span>
+        </h3>
         {action ??
           (href && hrefLabel ? (
             <Link
@@ -86,7 +92,7 @@ export function CardShell({
             </Link>
           ) : null)}
       </div>
-      <div className={cn("flex flex-1 flex-col", bodyClassName)}>{children}</div>
+      <div className={cn("flex flex-1 flex-col", meta && "min-h-0 overflow-auto", bodyClassName)}>{children}</div>
     </section>
   );
 }
@@ -102,7 +108,7 @@ function Spinner() {
 // ---------------------------------------------------------------
 
 export function StatTile({
-  icon: Icon,
+  icon: GivenIcon,
   label,
   value,
   sub,
@@ -120,8 +126,10 @@ export function StatTile({
   /** Optional trend pill, e.g. { pct: 20, up: true }. */
   trend?: { pct: number; up: boolean } | null;
 }) {
+  const meta = useCardMeta();
+  const Icon = meta?.Icon ?? GivenIcon;
   return (
-    <div className="flex items-start gap-3.5 rounded-2xl border border-border bg-card p-5 shadow-card">
+    <div className={cn("flex items-start gap-3.5 rounded-2xl border border-border bg-card p-5 shadow-card", meta && "h-full overflow-hidden")}>
       <span
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-[11px]",
@@ -134,7 +142,7 @@ export function StatTile({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[13px] text-muted-foreground">{label}</p>
+          <p className="truncate text-[13px] text-muted-foreground">{meta?.title ?? label}</p>
           {trend ? (
             <span
               className={cn(

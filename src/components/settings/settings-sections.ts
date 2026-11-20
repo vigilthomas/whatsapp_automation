@@ -5,12 +5,14 @@ import {
   FileText,
   KeyRound,
   LockKeyhole,
+  LayoutDashboard,
   LayoutGrid,
   PanelLeft,
   Paintbrush,
   Palette,
   PlugZap,
   Shield,
+  Store,
   Tags,
   User,
   UsersRound,
@@ -34,6 +36,8 @@ export const SETTINGS_SECTIONS = [
   'security',
   'appearance',
   'branding',
+  'business',
+  'dashboard',
   'clinic',
   'ai',
   'menu',
@@ -133,7 +137,9 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   security: { id: 'security', label: 'Login & security', icon: Shield, group: 'account', module: 'settings-security' },
   appearance: { id: 'appearance', label: 'Appearance', icon: Palette, group: 'account', module: 'settings-appearance' },
   branding: { id: 'branding', label: 'Branding', icon: Paintbrush, group: 'workspace', clinicAdminOnly: true },
-  clinic: { id: 'clinic', label: 'Clinic', icon: Building2, group: 'workspace', module: 'settings-clinic' },
+  business: { id: 'business', label: 'Business type', icon: Store, group: 'workspace', clinicAdminOnly: true },
+  dashboard: { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'workspace', clinicAdminOnly: true },
+  clinic: { id: 'clinic', label: 'Business', icon: Building2, group: 'workspace', module: 'settings-clinic' },
   ai: { id: 'ai', label: 'AI assistant', icon: Bot, group: 'workspace', module: 'ai-assistant' },
   menu: { id: 'menu', label: 'Sidebar menu', icon: PanelLeft, group: 'moved', clinicAdminOnly: true },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
@@ -154,6 +160,15 @@ export const RAIL_GROUPS: { label: string | null; group: SectionMeta['group'] }[
   { label: 'Preferences', group: 'preferences' },
   { label: 'Workspace', group: 'workspace' },
 ];
+
+/**
+ * Every section the rail can list, per rail group, in default order. The
+ * Sidebar menu screen edits names, icons, hiding and order of these
+ * (lib/settings-menu); the rail applies the edits.
+ */
+export const RAIL_SECTION_IDS: Record<string, SettingsSection[]> = Object.fromEntries(
+  RAIL_GROUPS.map(({ group }) => [group, SETTINGS_SECTIONS.filter((s) => SECTION_META[s].group === group)]),
+);
 
 function isSection(value: string | null): value is SettingsSection {
   return !!value && (SETTINGS_SECTIONS as readonly string[]).includes(value);

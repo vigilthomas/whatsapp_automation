@@ -39,9 +39,11 @@ const KIND_THEME: Record<ActivityKind, KindTheme> = {
 }
 
 import { useTranslations } from 'next-intl'
+import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 export function ActivityFeed({ items, loading }: ActivityFeedProps) {
   const t = useTranslations('Dashboard.activityFeed')
+  const meta = useCardMeta()
   // Start at 5 — a quick scan of the most recent events without
   // dominating vertical real estate. User expands explicitly via the
   // footer control when they want deeper history.
@@ -57,9 +59,12 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
     i === 0 || totalLoaded > PAGE_SIZES[i - 1]
 
   return (
-    <section className="rounded-2xl border border-border bg-card shadow-card">
+    <section className={`rounded-2xl border border-border bg-card shadow-card ${meta ? 'flex h-full min-h-0 flex-col overflow-hidden' : ''}`}>
       <header className="flex items-center justify-between px-5 pt-[18px] pb-3.5">
-        <h3 className="font-heading text-[15px] font-semibold text-foreground">{t('title')}</h3>
+        <h3 className="flex min-w-0 items-center gap-2 font-heading text-[15px] font-semibold text-foreground">
+          <CardTitleIcon />
+          <span className="truncate">{meta?.title ?? t('title')}</span>
+        </h3>
         <Link
           href="/inbox"
           className="text-[13px] font-semibold text-teal-700 hover:text-teal"

@@ -8,6 +8,8 @@
  * generated <style> (see `brandingCss`).
  */
 import type { BrandMenu } from "./branding-menu";
+import type { Vocabulary } from "./vocabulary";
+import type { DashboardSettings } from "./dashboard/cards";
 
 export const COLOR_KEYS = [
   "sidebar_bg",
@@ -49,6 +51,10 @@ export type Branding = {
   /** Sign-in screen layout (059); null = classic. */
   lockscreen: Lockscreen | null;
   menu: BrandMenu;
+  /** Business type and wording (064); {} = install default. See lib/vocabulary. */
+  vocabulary: Vocabulary;
+  /** Dashboard default template and card titles/icons (064). See lib/dashboard/cards. */
+  dashboard: DashboardSettings;
 } & Record<ColorKey, string | null>;
 
 export const BLANK_BRANDING: Branding = {
@@ -58,6 +64,8 @@ export const BLANK_BRANDING: Branding = {
   logo_shape: null,
   lockscreen: null,
   menu: {},
+  vocabulary: {},
+  dashboard: {},
   ...(Object.fromEntries(COLOR_KEYS.map((k) => [k, null])) as Record<ColorKey, null>),
 };
 

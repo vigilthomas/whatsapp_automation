@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { Link2, Loader2, MailX, Plus, Trash2, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useBranding } from "@/hooks/use-branding";
+import { isBookableRole } from "@/lib/master/staff";
+import { resolveTerms } from "@/lib/vocabulary";
 import type { AccountMember } from "@/types";
 import type { MasterRecord } from "@/lib/master/entities";
 import { Button } from "@/components/ui/button";
@@ -57,7 +60,6 @@ const EMPTY: NewUser = {
 
 const selectCls = "h-9 w-full";
 
-const isDoctorRole = (name: string) => /\bdoctor\b|\bdr\b|physician|surgeon|dentist|consultant/i.test(name);
 
 /**
  * Master → Users: everyone who can sign in, in one place (the old Team
@@ -80,6 +82,8 @@ export function UsersPanel() {
   const tRoles = useTranslations("Settings.roles");
   const confirm = useConfirm();
   const { user, can, canManageMembers } = useAuth();
+  const { branding } = useBranding();
+  const staffTerm = resolveTerms(branding.vocabulary).staff;
   const canWrite = can("users", "write");
   const canEdit = can("users", "edit");
   const canDelete = can("users", "delete");
@@ -235,7 +239,8 @@ export function UsersPanel() {
   }
 
   const set = <K extends keyof NewUser>(k: K, v: NewUser[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
-  const draftIsDoctor = !!draft && isDoctorRole(roleName(draft.designation_id || null));
+  const staffWords = [staffTerm.one, staffTerm.many];
+  const draftIsDoctor = !!draft && isBookableRole(roleName(draft.designation_id || null), staffWords);
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
   const rowInfo = (m: AccountMember) => {

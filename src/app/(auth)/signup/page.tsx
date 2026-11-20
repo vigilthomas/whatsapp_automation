@@ -17,6 +17,7 @@ import {
 import { CheckCircle, UsersRound } from "lucide-react";
 import { AuthCardLogo, AuthShell } from "@/components/auth/auth-shell";
 import { useBranding } from "@/hooks/use-branding";
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless wrapped in Suspense — same pattern as /login.
@@ -36,7 +37,7 @@ function SignupPageInner() {
   // points back at /join/<token> so the user lands on the redeem
   // step after verifying instead of being dropped on /dashboard.
   const inviteToken = searchParams.get("invite");
-  const brandName = useBranding().branding.title || "Clinicoro";
+  const brandName = useBranding().branding.title || DEFAULT_APP_NAME;
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");

@@ -6,7 +6,9 @@ import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { BrandingProvider } from "@/hooks/use-branding";
+import { VocabularyIntlProvider } from "@/components/vocabulary-intl-provider";
 import { brandBootJs } from "@/lib/branding";
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 import { ThemedToaster } from "@/components/themed-toaster";
 import {
   DEFAULT_MODE,
@@ -31,10 +33,10 @@ const sora = Sora({
 
 export const metadata: Metadata = {
   title: {
-    default: "Clinicoro",
-    template: "%s — Clinicoro",
+    default: DEFAULT_APP_NAME,
+    template: `%s — ${DEFAULT_APP_NAME}`,
   },
-  description: "Clinicoro — WhatsApp CRM.",
+  description: `${DEFAULT_APP_NAME} — WhatsApp CRM.`,
   robots: {
     index: false,
     follow: false,
@@ -120,8 +122,10 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages} locale={locale}>
           <ThemeProvider>
             <BrandingProvider>
-              {children}
-              <ThemedToaster />
+              <VocabularyIntlProvider messages={messages} locale={locale}>
+                {children}
+                <ThemedToaster />
+              </VocabularyIntlProvider>
             </BrandingProvider>
           </ThemeProvider>
         </NextIntlClientProvider>

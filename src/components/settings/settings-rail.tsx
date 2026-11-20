@@ -8,11 +8,13 @@ import { useBranding } from '@/hooks/use-branding';
 import { cn } from '@/lib/utils';
 import {
   RAIL_GROUPS,
+  RAIL_SECTION_IDS,
   railShows,
   SECTION_META,
-  SETTINGS_SECTIONS,
   type SettingsSection,
 } from './settings-sections';
+import { BRAND_ICONS } from '@/lib/branding-icons';
+import { orderSettingsSections, settingsItemOf } from '@/lib/settings-menu';
 
 // Width at/above which the rail is a vertical column (already in view, so
 // no auto-scroll needed). Mirrors the Tailwind `lg:` breakpoint that
@@ -36,7 +38,8 @@ export function SettingsRail({
 }) {
   const t = useTranslations('Settings');
   const { canManageMembers, can } = useAuth();
-  const { canEdit: canEditBranding } = useBranding();
+  const { canEdit: canEditBranding, branding } = useBranding();
+  const menu = branding.menu?.settings;
   const activeRef = useRef<HTMLButtonElement>(null);
 
   // When horizontal (mobile), keep the active chip in view. On desktop
@@ -53,7 +56,7 @@ export function SettingsRail({
 
   return (
     <nav
-      aria-label="Settings sections"
+      aria-label={t('railLabel')}
       className={cn(
         'flex gap-1 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         'border-b border-border',
@@ -61,8 +64,12 @@ export function SettingsRail({
       )}
     >
       {RAIL_GROUPS.map(({ label, group }) => {
-        const items = SETTINGS_SECTIONS.filter(
-          (s) => SECTION_META[s].group === group && railShows(SECTION_META[s], { canManageMembers, canEditBranding, canView: (m) => can(m, 'view') }),
+        // Sidebar menu edits (order, hiding). A hidden section that is open
+        // right now stays listed, so the page never loses its own entry.
+        const items = (orderSettingsSections(RAIL_SECTION_IDS[group] ?? [], group, menu) as SettingsSection[]).filter(
+          (s) =>
+            railShows(SECTION_META[s], { canManageMembers, canEditBranding, canView: (m) => can(m, 'view') }) &&
+            (!settingsItemOf(menu, s).hidden || s === active),
         );
         if (items.length === 0) return null;
         return (
@@ -77,7 +84,8 @@ export function SettingsRail({
             ) : null}
             {items.map((s) => {
               const meta = SECTION_META[s];
-              const Icon = meta.icon;
+              const own = settingsItemOf(menu, s);
+              const Icon = (own.icon && BRAND_ICONS[own.icon]) || meta.icon;
               const isActive = s === active;
               return (
                 <button
@@ -95,7 +103,7 @@ export function SettingsRail({
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
-                  <span className="flex-1">{t(`sections.${s}`)}</span>
+                  <span className="flex-1">{own.label || t(`sections.${s}`)}</span>
                   {hints?.[s] != null ? (
                     <span
                       className={cn(

@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { cn } from "@/lib/utils";
+import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 /**
  * Clinicoro brand mark — an open "C" arc with a plus in the gap, on a
@@ -24,7 +25,7 @@ interface LogoProps {
   title?: string;
 }
 
-export function Logo({ className, title = "Clinicoro" }: LogoProps) {
+export function Logo({ className, title = DEFAULT_APP_NAME }: LogoProps) {
   // Unique per-instance gradient id so several logos on one page
   // (sidebar + a dialog, say) don't collide on the same <defs> id.
   const gradientId = useId();

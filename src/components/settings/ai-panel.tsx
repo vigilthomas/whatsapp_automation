@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SectionCard } from "@/components/ui/section-card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { MAX_INSTRUCTIONS } from "@/lib/ai-chat/model";
-import { AI_PROVIDERS, DEFAULT_MODELS, type AiProvider } from "@/lib/ai-chat/provider";
+import { AI_PROVIDERS, DEFAULT_MODELS, OLLAMA_DEFAULT_URL, PROVIDERS, isAiProvider, type AiProvider } from "@/lib/ai-chat/provider";
 import { SettingsPanelHead } from "./settings-panel-head";
 
 interface Form {
@@ -36,6 +36,8 @@ interface Form {
   model: string;
   api_key: string;
   has_key: boolean;
+  /** Server address, for a self-hosted provider (Ollama). */
+  base_url: string | null;
   system_prompt: string;
   is_active: boolean;
   auto_reply_enabled: boolean;
@@ -48,6 +50,7 @@ const BLANK: Form = {
   model: DEFAULT_MODELS.anthropic,
   api_key: "",
   has_key: false,
+  base_url: null,
   system_prompt: "",
   is_active: false,
   auto_reply_enabled: false,
@@ -79,7 +82,7 @@ export function AiPanel() {
           toast.error(s.d.error ?? t("loadFailed"));
           return;
         }
-        const f: Form = { ...BLANK, ...s.d, provider: s.d.provider === "openai" ? "openai" : "anthropic", api_key: "" };
+        const f: Form = { ...BLANK, ...s.d, provider: isAiProvider(s.d.provider) ? s.d.provider : "anthropic", api_key: "" };
         setSaved(f);
         setForm(f);
         setMembers(Array.isArray(m.members) ? m.members : []);
@@ -96,9 +99,11 @@ export function AiPanel() {
 
   const dirty = useMemo(() => comparable(form) !== comparable(saved), [form, saved]);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const info = PROVIDERS[form.provider];
+  const selfHosted = !info.baseUrl;
 
   async function save() {
-    if (form.is_active && !form.has_key && !form.api_key.trim()) {
+    if (form.is_active && info.needsKey && !form.has_key && !form.api_key.trim()) {
       toast.error(t("keyNeeded"));
       return;
     }
@@ -115,7 +120,7 @@ export function AiPanel() {
         toast.error(d.error ?? t("saveFailed"));
         return;
       }
-      const f: Form = { ...BLANK, ...d, provider: d.provider === "openai" ? "openai" : "anthropic", api_key: "" };
+      const f: Form = { ...BLANK, ...d, provider: isAiProvider(d.provider) ? d.provider : "anthropic", api_key: "" };
       setSaved(f);
       setForm(f);
       toast.success(t("saved"));
@@ -182,7 +187,12 @@ export function AiPanel() {
                   value={form.provider}
                   onChange={(e) => {
                     const p = e.target.value as AiProvider;
-                    setForm((f) => ({ ...f, provider: p, model: f.model === DEFAULT_MODELS[f.provider] ? DEFAULT_MODELS[p] : f.model }));
+                    setForm((f) => ({
+                      ...f,
+                      provider: p,
+                      model: f.model === DEFAULT_MODELS[f.provider] ? DEFAULT_MODELS[p] : f.model,
+                      base_url: !PROVIDERS[p].baseUrl ? f.base_url || OLLAMA_DEFAULT_URL : f.base_url,
+                    }));
                   }}
                   className="h-10 w-full"
                 >
@@ -198,9 +208,23 @@ export function AiPanel() {
                 <Input id="ai-model" value={form.model} onChange={(e) => set("model", e.target.value)} placeholder={DEFAULT_MODELS[form.provider]} />
               </div>
             </div>
+            {selfHosted && (
+              <div className="space-y-1.5">
+                <Label htmlFor="ai-base-url">{t("baseUrl")}</Label>
+                <Input
+                  id="ai-base-url"
+                  inputMode="url"
+                  autoComplete="off"
+                  value={form.base_url ?? ""}
+                  onChange={(e) => set("base_url", e.target.value)}
+                  placeholder={OLLAMA_DEFAULT_URL}
+                />
+                <p className="text-xs text-muted-foreground">{t("baseUrlHint")}</p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="ai-key" className="flex items-center gap-1.5">
-                <KeyRound className="size-3.5" /> {t("apiKey")}
+                <KeyRound className="size-3.5" /> {info.needsKey ? t("apiKey") : t("apiKeyOptional")}
               </Label>
               <Input
                 id="ai-key"
@@ -210,7 +234,7 @@ export function AiPanel() {
                 onChange={(e) => set("api_key", e.target.value)}
                 placeholder={form.has_key ? t("keySaved") : t("keyPlaceholder")}
               />
-              <p className="text-xs text-muted-foreground">{t("keyHint")}</p>
+              <p className="text-xs text-muted-foreground">{info.needsKey ? t("keyHint") : t("keyHintLocal")}</p>
             </div>
           </SectionCard>
 

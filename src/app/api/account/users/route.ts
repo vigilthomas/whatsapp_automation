@@ -4,7 +4,7 @@ import { toErrorResponse } from "@/lib/auth/account";
 import { requirePermission } from "@/lib/auth/permission-guard";
 import { isAccountRole, type AccountRole } from "@/lib/auth/roles";
 import { supabaseAdmin } from "@/lib/automations/admin-client";
-import { accessLevelFromRole, staffTypeFromRole, syncDoctorForUser, type StaffType } from "@/lib/master/staff";
+import { accessLevelFromRole, loadStaffWords, staffTypeFromRole, syncDoctorForUser, type StaffType } from "@/lib/master/staff";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/rate-limit";
 
 // ============================================================
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     if (!data) return NextResponse.json({ error: "role not found" }, { status: 400 });
     const name = String(data.name ?? "");
     if (staffType === null) {
-      staffType = staffTypeFromRole(name);
+      staffType = staffTypeFromRole(name, await loadStaffWords(admin));
     }
     if (!isAccountRole(body.role)) {
       role = accessLevelFromRole(name, data.permissions);

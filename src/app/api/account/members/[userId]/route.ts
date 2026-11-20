@@ -20,7 +20,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { toErrorResponse } from "@/lib/auth/account";
 import { supabaseAdmin } from "@/lib/automations/admin-client";
 import { isAccountRole } from "@/lib/auth/roles";
-import { accessLevelFromRole, retireDoctorForUser, staffTypeFromRole, syncDoctorForUser } from "@/lib/master/staff";
+import { accessLevelFromRole, loadStaffWords, retireDoctorForUser, staffTypeFromRole, syncDoctorForUser } from "@/lib/master/staff";
 import { requirePermission } from "@/lib/auth/permission-guard";
 import {
   checkRateLimit,
@@ -141,7 +141,7 @@ export async function PATCH(
       if (branchId !== undefined) update.branch_id = branchId;
       if (staffType !== undefined) update.staff_type = staffType;
       // A new role decides whether they're a doctor, unless told outright.
-      else if (designationId !== undefined) update.staff_type = roleName ? staffTypeFromRole(roleName) : null;
+      else if (designationId !== undefined) update.staff_type = roleName ? staffTypeFromRole(roleName, await loadStaffWords(admin)) : null;
       const { error } = await admin
         .from("profiles")
         .update(update)

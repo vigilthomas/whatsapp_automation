@@ -1,3 +1,4 @@
+import { fillTerms, type Terms } from "@/lib/vocabulary";
 // ============================================================
 // Booking assistant settings — pure, unit-testable, no I/O.
 //
@@ -60,20 +61,23 @@ export const BEFORE_DATETIME: readonly StepId[] = ["service", "doctor"];
 /**
  * Every customer-facing text, with its default and the most WhatsApp
  * allows (buttons 20 characters, list rows 24, list button 20).
- * Placeholders in {braces} are filled in by the bot.
+ * Placeholders in {braces} are filled in by the bot. Business words in
+ * [[double brackets]] ([[booking]], [[staff]], ...) are filled from the
+ * install's vocabulary by `withVocabulary` before anything is sent, so
+ * the defaults read right for a clinic, a salon or an agency.
  */
 export const TEXTS = {
-  welcome: { default: "Hello! I can book an appointment for you or show you the free times. What would you like to do?", max: 1000 },
-  btnBook: { default: "Book appointment", max: 20 },
+  welcome: { default: "Hello! I can book [[a:booking]] for you or show you the free times. What would you like to do?", max: 1000 },
+  btnBook: { default: "Book [[booking]]", max: 20 },
   btnCheck: { default: "Check availability", max: 20 },
 
   askService: { default: "Which service would you like?", max: 1000 },
   listService: { default: "Choose service", max: 20 },
   serviceMinutes: { default: "{minutes} min", max: 72 },
 
-  askDoctor: { default: "Which doctor would you like to see?", max: 1000 },
-  listDoctor: { default: "Choose doctor", max: 20 },
-  anyDoctor: { default: "Any available doctor", max: 24 },
+  askDoctor: { default: "Which [[staff]] would you like?", max: 1000 },
+  listDoctor: { default: "Choose [[staff]]", max: 20 },
+  anyDoctor: { default: "Anyone available", max: 24 },
 
   askDay: { default: "Which day suits you?", max: 1000 },
   listDay: { default: "Choose day", max: 20 },
@@ -89,14 +93,14 @@ export const TEXTS = {
   checked: { default: "Next free times for {service} with {doctor}:", max: 500 },
   btnBookTime: { default: "Book a time", max: 20 },
   btnDone: { default: "Done", max: 20 },
-  done: { default: "Okay! Send BOOK any time to book an appointment.", max: 1000 },
+  done: { default: "Okay! Send BOOK any time to book [[a:booking]].", max: 1000 },
 
   noTimes: { default: "Sorry, there are no free times for {service} in the next {days} days.", max: 1000 },
   btnChangeChoice: { default: "Change choice", max: 20 },
   dayFull: { default: "Sorry, that day has just filled up.", max: 1000 },
   timeTaken: { default: "Sorry, that time was just taken. Please pick another one.", max: 1000 },
 
-  askName: { default: "What is the patient's full name?", max: 1000 },
+  askName: { default: "What is the full name for the [[booking]]?", max: 1000 },
   btnYes: { default: "Yes", max: 20 },
   btnNo: { default: "No", max: 20 },
   btnSkip: { default: "Skip", max: 20 },
@@ -104,22 +108,22 @@ export const TEXTS = {
 
   summary: { default: "Please check your booking:", max: 500 },
   lblService: { default: "Service", max: 40 },
-  lblDoctor: { default: "Doctor", max: 40 },
+  lblDoctor: { default: "[[Staff]]", max: 40 },
   lblWhen: { default: "When", max: 40 },
-  lblPatient: { default: "Patient", max: 40 },
+  lblPatient: { default: "Name", max: 40 },
   btnConfirm: { default: "Confirm", max: 20 },
   btnChange: { default: "Change", max: 20 },
   btnCancel: { default: "Cancel", max: 20 },
 
   confirmed: {
     default:
-      "Your appointment is booked ✅\n{service} with {doctor}\n{date} at {time}\n\nReply here if you need to change it and we'll help you.",
+      "Your [[booking]] is booked ✅\n{service} with {doctor}\n{date} at {time}\n\nReply here if you need to change it and we'll help you.",
     max: 1000,
   },
   arriveEarly: { default: "Please arrive {early} min early so we can start on time.", max: 500 },
   cancelled: { default: "No problem — nothing was booked. Send BOOK any time to start again.", max: 1000 },
   pleaseChoose: { default: "Please choose one of the options below.", max: 500 },
-  anyDoctorName: { default: "our doctor", max: 40 },
+  anyDoctorName: { default: "our team", max: 40 },
 } as const;
 
 export type TextKey = keyof typeof TEXTS;
@@ -358,4 +362,15 @@ export function matchesKeyword(message: string, keywords: readonly string[]): bo
 /** Fill {placeholders}; unknown ones are left as they are. */
 export function fillTemplate(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (all, key: string) => (key in values ? String(values[key]) : all));
+}
+
+/**
+ * The texts with the install's business words filled in (lib/vocabulary)
+ * and cut to what WhatsApp allows: a filled word can be longer than the
+ * token it replaced ("Book [[booking]]" → "Book consultation").
+ */
+export function withVocabulary<C extends { texts: BookingTexts }>(config: C, terms: Terms): C {
+  const texts = { ...config.texts };
+  for (const key of TEXT_KEYS) texts[key] = fillTerms(texts[key], terms).slice(0, TEXTS[key].max);
+  return { ...config, texts };
 }
