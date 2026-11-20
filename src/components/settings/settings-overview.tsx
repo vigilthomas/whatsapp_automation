@@ -38,12 +38,33 @@ export function SettingsOverview({
 }: {
   onSelect: (section: SettingsSection) => void;
 }) {
-  const { user, profile, accountId, accountRole, defaultCurrency, canManageMembers, can } =
+  const { user, profile, accountId, accountRole, isSuperAdmin, defaultCurrency, canManageMembers, can } =
     useAuth();
   const { mode, theme } = useTheme();
   const t = useTranslations('Settings.overview');
   const tRoles = useTranslations('Settings.roles');
   const tSections = useTranslations('Settings.sections');
+  // The identity chip names the user's Role (designation, 043) — what
+  // decides their access day to day — and falls back to the database
+  // access level only for a member with no Role.
+  const [roleName, setRoleName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    createClient()
+      .from('profiles')
+      .select('designation:designations(name)')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const d = (data as { designation: { name: string } | { name: string }[] | null } | null)?.designation;
+        setRoleName((Array.isArray(d) ? d[0]?.name : d?.name) ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const [counts, setCounts] = useState<OverviewCounts | null>(null);
   const [countsLoading, setCountsLoading] = useState(true);
@@ -246,7 +267,7 @@ export function SettingsOverview({
         {roleMeta && RoleIcon ? (
           <SettingsChip variant={roleMeta.variant}>
             <RoleIcon />
-            {tRoles(accountRole!)}
+            {isSuperAdmin ? t('superAdmin') : (roleName ?? tRoles(accountRole!))}
           </SettingsChip>
         ) : null}
       </Card>

@@ -2,7 +2,8 @@
 // /api/account/invitations
 //
 //   GET  — list outstanding (un-redeemed, non-expired) invites.
-//   POST — create a new invite link.
+//   POST — create a new invite link for a Role (designation, 066);
+//          the access level is derived from the Role.
 //
 // Both admin+. The list endpoint is what the Members tab uses to
 // populate the "Pending invitations" section; create is what the
@@ -26,7 +27,7 @@ import {
   inviteExpiresAt,
   inviteUrl,
 } from "@/lib/auth/invitations";
-import { isAccountRole } from "@/lib/auth/roles";
+import { accessLevelFromRole } from "@/lib/master/staff";
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -140,15 +141,20 @@ export async function GET() {
   try {
     const ctx = await requireRole("admin");
 
-    const { data, error } = await ctx.supabase
-      .from("account_invitations")
-      .select(
-        "id, role, label, created_by_user_id, created_at, expires_at, accepted_at, accepted_by_user_id",
-      )
-      .eq("account_id", ctx.accountId)
-      .is("accepted_at", null)
-      .gt("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false });
+    const list = (columns: string) =>
+      ctx.supabase
+        .from("account_invitations")
+        .select(columns)
+        .eq("account_id", ctx.accountId)
+        .is("accepted_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false });
+    const base =
+      "id, role, label, created_by_user_id, created_at, expires_at, accepted_at, accepted_by_user_id";
+    let { data, error } = await list(`${base}, designation_id`);
+    // Before 066 there's no designation_id; list the invites without it
+    // rather than failing the whole Users page.
+    if (error?.code === "42703") ({ data, error } = await list(base));
 
     if (error) {
       console.error("[GET /api/account/invitations] fetch error:", error);
@@ -179,19 +185,33 @@ export async function POST(request: Request) {
     if (!limit.success) return rateLimitResponse(limit);
 
     const body = (await request.json().catch(() => null)) as
-      | { role?: unknown; expiresInDays?: unknown; label?: unknown }
+      | { designationId?: unknown; expiresInDays?: unknown; label?: unknown }
       | null;
 
-    const role = body?.role;
-    if (!isAccountRole(role) || role === "owner") {
-      // The DB CHECK already rejects 'owner', but failing fast
-      // here gives a clearer 400 than the eventual constraint
-      // violation surfaced as a 500.
-      return NextResponse.json(
-        { error: "'role' must be one of admin, agent, viewer" },
-        { status: 400 },
-      );
+    // Invites carry a Role (designation, migration 066). The access level
+    // stored in `role` — the database safety net redeem_invitation (019)
+    // applies — is derived from it exactly as the Users page does, so an
+    // invite can't hand out a level that disagrees with the Role. The
+    // derived level is only ever admin or agent, never owner.
+    const designationId = body?.designationId;
+    if (typeof designationId !== "string" || !designationId) {
+      return NextResponse.json({ error: "Pick a role for the invite" }, { status: 400 });
     }
+    const { data: designation, error: designationError } = await ctx.supabase
+      .from("designations")
+      .select("id, name, permissions, is_active")
+      .eq("id", designationId)
+      .eq("account_id", ctx.accountId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (designationError) {
+      console.error("[POST /api/account/invitations] role lookup error:", designationError);
+      return NextResponse.json({ error: "Failed to create invitation" }, { status: 500 });
+    }
+    if (!designation || designation.is_active === false) {
+      return NextResponse.json({ error: "That role doesn't exist or is switched off" }, { status: 400 });
+    }
+    const role = accessLevelFromRole(designation.name as string, designation.permissions);
 
     const expiresInDaysRaw = body?.expiresInDays;
     // `clampExpiryDays` tolerates undefined / NaN / negatives by
@@ -222,17 +242,24 @@ export async function POST(request: Request) {
         account_id: ctx.accountId,
         token_hash: hash,
         role,
+        designation_id: designation.id,
         created_by_user_id: ctx.userId,
         label,
         expires_at: expiresAt.toISOString(),
       })
-      .select("id, role, label, expires_at, created_at")
+      .select("id, role, designation_id, label, expires_at, created_at")
       .single();
 
     if (error || !data) {
       console.error("[POST /api/account/invitations] insert error:", error);
+      // 42703 / PGRST204: the designation_id column is missing.
+      const missingColumn = error?.code === "42703" || error?.code === "PGRST204";
       return NextResponse.json(
-        { error: "Failed to create invitation" },
+        {
+          error: missingColumn
+            ? "Invites need migration 066_invitation_role.sql — run it in Supabase first"
+            : "Failed to create invitation",
+        },
         { status: 500 },
       );
     }

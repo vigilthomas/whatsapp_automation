@@ -42,6 +42,8 @@ interface NewUser {
 interface Invitation {
   id: string;
   role: "admin" | "agent" | "viewer";
+  /** The invite's Role (066); null/absent on invites made before it. */
+  designation_id?: string | null;
   label: string | null;
   created_at: string;
   expires_at: string;
@@ -412,7 +414,7 @@ export function UsersPanel() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-foreground">{inv.label || t("untitledInvite")}</div>
                   <div className="text-xs text-muted-foreground">
-                    {tRoles(inv.role)} · {t("inviteDates", { created: fmtDate(inv.created_at), expires: fmtDate(inv.expires_at) })}
+                    {inv.designation_id ? roleName(inv.designation_id) : tRoles(inv.role)} · {t("inviteDates", { created: fmtDate(inv.created_at), expires: fmtDate(inv.expires_at) })}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => revoke(inv)} className="text-red-600 dark:text-red-400">

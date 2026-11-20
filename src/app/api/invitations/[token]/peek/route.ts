@@ -30,6 +30,7 @@ import {
   RATE_LIMITS,
 } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/automations/admin-client";
 
 /**
  * Best-effort client IP. The `x-forwarded-for` header is what
@@ -69,8 +70,9 @@ export async function GET(
   }
 
   const supabase = await createClient();
+  const tokenHash = hashInviteToken(token);
   const { data, error } = await supabase.rpc("peek_invitation", {
-    p_token_hash: hashInviteToken(token),
+    p_token_hash: tokenHash,
   });
 
   if (error) {
@@ -82,6 +84,19 @@ export async function GET(
   }
 
   // The RPC always returns a json object — either ok:true with
-  // metadata or ok:false with a reason. Forward verbatim.
+  // metadata or ok:false with a reason. Forward it, adding the
+  // invite's Role name (066) to a live invite: the RPC (019) predates
+  // Roles, and the join page should name the Role, not the raw access
+  // level. Missing column / no Role → `role_name` is simply absent.
+  if ((data as { ok?: boolean } | null)?.ok) {
+    const { data: inv } = await supabaseAdmin()
+      .from("account_invitations")
+      .select("designation:designations(name)")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+    const d = (inv as { designation: { name: string } | { name: string }[] | null } | null)?.designation;
+    const roleName = Array.isArray(d) ? d[0]?.name : d?.name;
+    if (roleName) return NextResponse.json({ ...(data as object), role_name: roleName });
+  }
   return NextResponse.json(data);
 }

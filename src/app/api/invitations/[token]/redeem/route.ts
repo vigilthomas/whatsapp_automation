@@ -12,6 +12,14 @@
 //   - SQLSTATE 23505 → 409 (caller's account already has data /
 //     they're already in this or another shared account)
 //
+// After the RPC succeeds, the invite's Role (designation, migration
+// 066) is copied onto the new member's profile with the service-role
+// client — the profile trigger (044) refuses designation changes from
+// the `authenticated` role, and the RPC predates Roles. A bookable Role
+// also gets its staff row (syncDoctorForUser), same as the Users page.
+// Best effort: if this step fails the member has still joined with the
+// right access level, and staff can set the Role on the Users page.
+//
 // Rate limit (per IP) is the same shape as peek but tighter —
 // a successful redeem changes data, and the RPC's data-loss
 // guard makes brute-force retries pointless past a few attempts.
@@ -27,6 +35,44 @@ import {
   RATE_LIMITS,
 } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/automations/admin-client";
+import { loadStaffWords, staffTypeFromRole, syncDoctorForUser } from "@/lib/master/staff";
+
+/** Give the new member the invite's Role. Never throws. */
+async function applyInviteRole(tokenHash: string, accountId: string, userId: string): Promise<void> {
+  try {
+    const admin = supabaseAdmin();
+    const { data: inv, error } = await admin
+      .from("account_invitations")
+      .select("designation_id")
+      .eq("token_hash", tokenHash)
+      .eq("account_id", accountId)
+      .maybeSingle();
+    // No column (066 not run) or no Role on this invite: nothing to apply.
+    if (error || !inv?.designation_id) return;
+
+    const { data: designation } = await admin
+      .from("designations")
+      .select("id, name")
+      .eq("id", inv.designation_id)
+      .eq("account_id", accountId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!designation) return;
+
+    const staffType = staffTypeFromRole(designation.name as string, await loadStaffWords(admin));
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({ designation_id: designation.id, staff_type: staffType })
+      .eq("user_id", userId)
+      .eq("account_id", accountId);
+    if (profileError) throw profileError;
+
+    await syncDoctorForUser(admin, { accountId, userId, isDoctor: staffType === "doctor" });
+  } catch (err) {
+    console.error("[redeem] could not apply the invite's role:", err);
+  }
+}
 
 function getClientIp(request: Request): string {
   const xff = request.headers.get("x-forwarded-for");
@@ -81,11 +127,14 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const tokenHash = hashInviteToken(token);
   const { data: accountId, error } = await supabase.rpc("redeem_invitation", {
-    p_token_hash: hashInviteToken(token),
+    p_token_hash: tokenHash,
   });
 
   if (error) return rpcErrorToResponse(error);
+
+  if (typeof accountId === "string") await applyInviteRole(tokenHash, accountId, user.id);
 
   return NextResponse.json({ ok: true, accountId });
 }

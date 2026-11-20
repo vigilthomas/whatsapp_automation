@@ -1705,6 +1705,7 @@
       "fieldsCount": "{count} custom {count, plural, =1 {field} other {fields}}",
       "appearance": "{mode} mode · {theme} accent",
       "yourAccount": "Your account",
+      "superAdmin": "Super admin",
       "loading": "Loading…"
     },
     "members": {
@@ -1755,7 +1756,11 @@
       "done": "Done",
       "dialogTitle": "Invite a teammate",
       "dialogDesc": "Generate a one-time invite link. Share it via WhatsApp, Slack, or any channel you like — no email service required.",
-      "roleLabel": "Access level",
+      "roleLabel": "Role",
+      "roleHint": "What they can see and do comes from this role (Access control).",
+      "pickRole": "Pick a role",
+      "loadingRoles": "Loading roles…",
+      "noRoles": "No roles yet. Create one in Access control first.",
       "validForLabel": "Link valid for",
       "days1": "1 day",
       "days7": "7 days",

@@ -57,6 +57,8 @@ interface PeekOk {
   ok: true;
   account_name: string;
   role: 'admin' | 'agent' | 'viewer';
+  /** The invite's Role (migration 066); absent on older invites. */
+  role_name?: string;
   expires_at: string;
 }
 interface PeekFail {
@@ -302,7 +304,7 @@ export default function JoinPage() {
         You&apos;ll join as{' '}
         <span className="inline-flex items-center gap-1 text-foreground">
           <ShieldCheck className="size-3.5 text-primary" />
-          {ROLE_LABEL[peek.role]}
+          {peek.role_name || ROLE_LABEL[peek.role]}
         </span>
         . Link valid until{' '}
         {new Date(peek.expires_at).toLocaleDateString(undefined, {

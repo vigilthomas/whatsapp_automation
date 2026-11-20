@@ -4,7 +4,9 @@
 // InviteMemberDialog
 //
 // Two-step modal:
-//   1. Form  — role + expiry + optional label → POST creates the invite.
+//   1. Form  — Role (designation, from Access control) + expiry +
+//              optional label → POST creates the invite. The database
+//              access level is derived from the Role server-side (066).
 //   2. Result — the share URL, returned ONCE. Copy-to-clipboard, plus a
 //              "Send via WhatsApp" deep link that pre-fills wa.me with
 //              a friendly message containing the URL.
@@ -14,7 +16,7 @@
 // shouts this in copy.
 // ============================================================
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Copy, Loader2, MessageCircle, Sparkles } from 'lucide-react';
 
@@ -40,7 +42,10 @@ import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/use-auth';
 import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
-type InviteRole = 'admin' | 'agent' | 'viewer';
+interface RoleOption {
+  id: string;
+  name: string;
+}
 
 interface InviteMemberDialogProps {
   open: boolean;
@@ -63,7 +68,8 @@ const MAX_LABEL_LEN = 80;
 
 interface CreatedInvite {
   url: string;
-  role: InviteRole;
+  /** The Role's name, for the confirmation text. */
+  roleName: string;
   expiresInDays: number;
   /** Snapshotted at creation time so a later account rename can't
    *  retroactively change the wa.me message text on the result step. */
@@ -76,16 +82,39 @@ export function InviteMemberDialog({
   onCreated,
 }: InviteMemberDialogProps) {
   const t = useTranslations('Settings.invite');
-  const tRoles = useTranslations('Settings.roles');
   const { account } = useAuth();
-  const [role, setRole] = useState<InviteRole>('agent');
+  const [roles, setRoles] = useState<RoleOption[] | null>(null);
+  const [roleId, setRoleId] = useState('');
   const [expiry, setExpiry] = useState<string>('7');
   const [label, setLabel] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<CreatedInvite | null>(null);
 
+  // The account's active Roles, loaded each time the dialog opens so a
+  // Role just created in Access control shows up.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch('/api/master/designations', { cache: 'no-store' })
+      .then((r) => r.json())
+      .catch(() => ({}))
+      .then((d: { records?: { id: string; name: unknown; is_active?: boolean | null }[] }) => {
+        if (cancelled) return;
+        setRoles(
+          (Array.isArray(d.records) ? d.records : [])
+            .filter((r) => r.is_active !== false)
+            .map((r) => ({ id: r.id, name: String(r.name) })),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const roleName = roles?.find((r) => r.id === roleId)?.name ?? '';
+
   function reset() {
-    setRole('agent');
+    setRoleId('');
     setExpiry('7');
     setLabel('');
     setResult(null);
@@ -100,6 +129,10 @@ export function InviteMemberDialog({
     // the limit kicks in on the next keystroke — this is the safety
     // net for that path.
     const trimmedLabel = label.trim();
+    if (!roleId) {
+      toast.error(t('pickRole'));
+      return;
+    }
     if (trimmedLabel.length > MAX_LABEL_LEN) {
       toast.error(t('labelTooLong', { max: MAX_LABEL_LEN }));
       return;
@@ -110,7 +143,7 @@ export function InviteMemberDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          role,
+          designationId: roleId,
           expiresInDays: Number(expiry),
           label: trimmedLabel || undefined,
         }),
@@ -129,7 +162,7 @@ export function InviteMemberDialog({
 
       setResult({
         url: data.url,
-        role,
+        roleName,
         expiresInDays: data.expiresInDays,
         // Snapshot the account name into the result so the wa.me
         // share message has team context. Falls back to a generic
@@ -191,7 +224,7 @@ export function InviteMemberDialog({
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
                 {t.rich('inviteCreatedDesc', {
-                  role: tRoles(result.role),
+                  role: result.roleName,
                   days: result.expiresInDays,
                   bold: (chunks: React.ReactNode) => <strong>{chunks}</strong>
                 })}
@@ -271,20 +304,25 @@ export function InviteMemberDialog({
               <div className="space-y-2">
                 <Label className="text-muted-foreground">{t('roleLabel')}</Label>
                 <Select
-                  value={role}
-                  onValueChange={(v) => v && setRole(v as InviteRole)}
+                  value={roleId}
+                  onValueChange={(v) => v && setRoleId(v)}
+                  disabled={!roles?.length}
                 >
                   <SelectTrigger className="w-full bg-muted border-border text-foreground">
-                    <SelectValue>{tRoles(role)}</SelectValue>
+                    <SelectValue>
+                      {roleName || (roles === null ? t('loadingRoles') : t('pickRole'))}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">{tRoles('admin')}</SelectItem>
-                    <SelectItem value="agent">{tRoles('agent')}</SelectItem>
-                    <SelectItem value="viewer">{tRoles('viewer')}</SelectItem>
+                    {(roles ?? []).map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  {tRoles(`${role}Hint` as 'adminHint' | 'agentHint' | 'viewerHint')}
+                  {roles && roles.length === 0 ? t('noRoles') : t('roleHint')}
                 </p>
               </div>
 
@@ -335,7 +373,7 @@ export function InviteMemberDialog({
               </Button>
               <Button
                 onClick={handleCreate}
-                disabled={submitting}
+                disabled={submitting || !roleId}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 {submitting ? (
