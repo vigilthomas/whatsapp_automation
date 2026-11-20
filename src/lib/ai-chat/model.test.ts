@@ -35,6 +35,11 @@ describe("parseModelReply", () => {
     expect(out.handoff).toBe(false);
     // An unknown tool is not a tool call; with no reply it is a handoff.
     expect(parseModelReply('{"tool":"cancel_all"}')).toMatchObject({ handoff: true });
+    // "action" is the wording the prompt uses now.
+    expect(parseModelReply('{"action":"find_times","service":"Hair Spa","stylist":"any","date":""}').tool).toMatchObject({
+      tool: "find_times",
+      service: "Hair Spa",
+    });
   });
 
   it("hands over when the answer is unreadable or empty — never guesses", () => {
@@ -70,8 +75,8 @@ describe("buildSystemPrompt", () => {
       ...base,
       booking: { todayIso: "2025-11-24", timezone: "Asia/Kolkata", daysAhead: 14, customerName: "Meera" },
     });
-    expect(withBooking).toContain('"tool": "find_times"');
-    expect(withBooking).toContain('"tool": "book"');
+    expect(withBooking).toContain('"action": "find_times"');
+    expect(withBooking).toContain('"action": "book"');
     expect(withBooking).toContain("Today is 2025-11-24");
     expect(withBooking).toContain("Their saved name is Meera");
     expect(withBooking).not.toContain('send the word "book"');

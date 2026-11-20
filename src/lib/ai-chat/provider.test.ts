@@ -63,6 +63,35 @@ describe("complete (OpenAI-compatible providers)", () => {
     expect(init.redirect).toBe("error");
   });
 
+  it("uses Groq's failed JSON generation instead of failing the reply", async () => {
+    const failed = '{"reply":"Hi"} {"reply":"again"}';
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({ error: { message: "Failed to validate JSON.", code: "json_validate_failed", failed_generation: failed } }),
+          { status: 400 },
+        ),
+      ),
+    );
+    const out = await complete({ provider: "groq", model: "m", apiKey: "k", system: "s", turns: [] });
+    expect(out).toBe(failed);
+    // Nothing usable handed back: one retry without JSON mode.
+    const retry = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { code: "json_validate_failed", message: "x", failed_generation: "" } }), { status: 400 }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"ok"}' } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", retry);
+    expect(await complete({ provider: "groq", model: "m", apiKey: "k", system: "s", turns: [] })).toBe('{"reply":"ok"}');
+    expect(retry).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String((retry.mock.calls[1] as unknown as [string, RequestInit])[1].body)).response_format).toBeUndefined();
+    // Any other 400 is still an error.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { message: "bad model" } }), { status: 400 })));
+    await expect(complete({ provider: "groq", model: "m", apiKey: "k", system: "s", turns: [] })).rejects.toThrow("Groq 400: bad model");
+  });
+
   it("refuses a bad Ollama address and reports provider errors", async () => {
     vi.stubGlobal("fetch", vi.fn());
     await expect(

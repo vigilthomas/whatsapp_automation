@@ -48,7 +48,11 @@ export const DEFAULT_MODELS: Record<AiProvider, string> = Object.fromEntries(
 export const OLLAMA_DEFAULT_URL = "http://localhost:11434";
 export const BASE_URL_MAX = 200;
 
-const MAX_TOKENS = 600;
+// Room for the answer *and* a reasoning model's hidden thinking (e.g.
+// gpt-oss on Groq), which counts against max_tokens. At 600 the thinking
+// after a long booking-tool result used the budget up and the JSON was
+// cut off mid-object. Replies themselves are capped far lower (MAX_REPLY).
+const MAX_TOKENS = 2000;
 
 export class AiProviderError extends Error {}
 
@@ -122,21 +126,39 @@ export async function complete({
     if (!base) throw new AiProviderError(`${name}: the server address isn't valid`);
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-    const res = await fetch(`${base}/v1/chat/completions`, {
-      method: "POST",
-      signal,
-      headers,
-      // No redirects: a redirect could point the request somewhere the
-      // address check never saw.
-      redirect: "error",
-      body: JSON.stringify({
-        model,
-        max_tokens: MAX_TOKENS,
-        ...(info.jsonMode ? { response_format: { type: "json_object" } } : {}),
-        messages: [{ role: "system", content: system }, ...turns],
-      }),
-    });
-    const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string } }[]; error?: { message?: string } | string } | null;
+    const post = async (jsonMode: boolean) => {
+      const res = await fetch(`${base}/v1/chat/completions`, {
+        method: "POST",
+        signal,
+        headers,
+        // No redirects: a redirect could point the request somewhere the
+        // address check never saw.
+        redirect: "error",
+        body: JSON.stringify({
+          model,
+          max_tokens: MAX_TOKENS,
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+          messages: [{ role: "system", content: system }, ...turns],
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        choices?: { message?: { content?: string } }[];
+        error?: { message?: string; code?: string; failed_generation?: string } | string;
+      } | null;
+      return { res, data };
+    };
+
+    let { res, data } = await post(info.jsonMode);
+    // JSON mode: Groq refuses (400 json_validate_failed) an answer that
+    // isn't one clean JSON object. When it hands back what the model wrote
+    // (two objects, text around it…) use that — parseModelReply copes, and
+    // turns anything unusable into a handoff. When it hands back nothing
+    // (seen with reasoning models like gpt-oss), ask once more without JSON
+    // mode rather than failing the reply; the prompt still asks for JSON.
+    if (!res.ok && typeof data?.error === "object" && data.error.code === "json_validate_failed") {
+      if (data.error.failed_generation) return data.error.failed_generation;
+      ({ res, data } = await post(false));
+    }
     if (!res.ok) {
       const msg = typeof data?.error === "string" ? data.error : data?.error?.message;
       throw new AiProviderError(`${name} ${res.status}: ${msg ?? "request failed"}`);

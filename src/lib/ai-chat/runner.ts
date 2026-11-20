@@ -155,7 +155,7 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
       }
       turns.push(
         { role: "assistant", content: JSON.stringify(call) },
-        { role: "user", content: `TOOL RESULT for ${call.tool} (from the system, not the customer):\n${JSON.stringify(result)}` },
+        { role: "user", content: `ACTION RESULT for ${call.tool} (from the system, not the customer):\n${JSON.stringify(result)}` },
       );
       decision = parseModelReply(await ask());
     }
