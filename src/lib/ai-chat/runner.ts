@@ -11,7 +11,12 @@
 //   1. ai_configs row active with a key (migration 029)
 //   2. the chat is in Bot mode (061; NULL → auto_reply_enabled)
 //   3. a reply slot is free (claim_ai_reply_slot, 029 — atomic cap)
-// Then the model answers from the clinic's facts (model.ts). If it can't,
+// Then the model answers from the clinic's facts (model.ts). It can also
+// check free times and book (booking.ts): each tool call is run and its
+// result fed back as the next turn, at most MAX_TOOL_ROUNDS per inbound
+// message. Booking uses the booking assistant's engine and `book`
+// (booking/runner.ts → loadDeps) with the clinic's own opening hours, so
+// it works whether or not the booking bot itself is switched on. If it can't,
 // or anything fails, the chat is handed to staff: switched to Human,
 // assigned to the handoff agent, the agent notified, and the patient told
 // someone will reply. A failure never leaves the patient unanswered by
@@ -25,8 +30,18 @@ import { decrypt } from "@/lib/whatsapp/encryption";
 import { sendMessageToConversation } from "@/lib/whatsapp/send-message";
 import { parseClinicSettings } from "@/lib/clinic/settings";
 import { parseVocabulary, resolveTerms } from "@/lib/vocabulary";
-import { DEFAULT_HANDOFF_REPLY, buildSystemPrompt, effectiveMode, parseModelReply, toTurns } from "./model";
+import { DEFAULT_HANDOFF_REPLY, buildSystemPrompt, effectiveMode, parseModelReply, toTurns, type ModelDecision } from "./model";
 import { PROVIDERS, complete, isAiProvider } from "./provider";
+import { runTool } from "./booking";
+import { loadDeps } from "@/lib/booking/runner";
+import { parseBookingConfig, type BookingConfig } from "@/lib/booking/settings";
+import { withClinic } from "@/lib/booking/clinic";
+import { addDays, localDay } from "@/lib/booking/slots";
+import type { BookingDeps } from "@/lib/booking/engine";
+import type { ClinicSettings } from "@/lib/clinic/settings";
+
+/** Booking tool calls allowed while answering one inbound message. */
+const MAX_TOOL_ROUNDS = 3;
 
 export interface AiInbound {
   accountId: string;
@@ -84,9 +99,21 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
   });
   if (claimed !== true) return handoff("The assistant reached its reply limit for this chat.");
 
-  let decision;
+  let decision: ModelDecision;
   try {
-    const system = buildSystemPrompt(await clinicFacts(db, accountId, cfg.system_prompt as string | null));
+    const facts = await clinicFacts(db, accountId, cfg.system_prompt as string | null);
+    const bookingConfig = await aiBookingConfig(db, accountId, facts.clinic);
+    const { data: contact } = await db.from("contacts").select("name").eq("id", contactId).eq("account_id", accountId).maybeSingle();
+    const customerName = (contact?.name as string | null)?.trim() || null;
+    const system = buildSystemPrompt({
+      ...facts,
+      booking: {
+        todayIso: localDay(new Date(), bookingConfig.timezone),
+        timezone: bookingConfig.timezone,
+        daysAhead: bookingConfig.daysAhead,
+        customerName,
+      },
+    });
     const { data: recent } = await db
       .from("messages")
       .select("sender_type, content_text, created_at")
@@ -95,15 +122,43 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
       .limit(20);
     const turns = toTurns(((recent ?? []) as { sender_type: string; content_text: string | null }[]).reverse());
     if (!turns.length) turns.push({ role: "user", content: text });
-    const raw = await complete({
-      provider: cfg.provider,
-      model: cfg.model as string,
-      apiKey: cfg.api_key ? decrypt(cfg.api_key as string) : "",
-      baseUrl: (server?.base_url as string | null | undefined) ?? null,
-      system,
-      turns,
-    });
-    decision = parseModelReply(raw);
+    const ask = () =>
+      complete({
+        provider: cfg.provider,
+        model: cfg.model as string,
+        apiKey: cfg.api_key ? decrypt(cfg.api_key as string) : "",
+        baseUrl: (server?.base_url as string | null | undefined) ?? null,
+        system,
+        turns,
+      });
+
+    // Booking deps are loaded on the first tool call only: most messages
+    // are plain questions and shouldn't pay for the extra queries.
+    let deps: BookingDeps | null = null;
+    decision = parseModelReply(await ask());
+    for (let round = 0; decision.tool; round++) {
+      if (round >= MAX_TOOL_ROUNDS) {
+        decision = { reply: DEFAULT_HANDOFF_REPLY, handoff: true, reason: "The assistant couldn't finish the booking." };
+        break;
+      }
+      const call = decision.tool;
+      deps ??= await loadDeps({ accountId, contactId }, bookingConfig);
+      const result = await runTool(deps, call);
+      if (call.tool === "book" && result.ok && call.name && !customerName) {
+        // Like the booking assistant: fill in a missing contact name, never overwrite one.
+        await db
+          .from("contacts")
+          .update({ name: call.name })
+          .eq("id", contactId)
+          .eq("account_id", accountId)
+          .or("name.is.null,name.eq.");
+      }
+      turns.push(
+        { role: "assistant", content: JSON.stringify(call) },
+        { role: "user", content: `TOOL RESULT for ${call.tool} (from the system, not the customer):\n${JSON.stringify(result)}` },
+      );
+      decision = parseModelReply(await ask());
+    }
   } catch (err) {
     console.error("[ai-chat] model call failed:", err);
     return handoff("The assistant couldn't reach the AI provider.");
@@ -112,6 +167,21 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
   if (decision.handoff) return handoff(decision.reason, decision.reply);
   await sendAsBot(db, accountId, conversationId, decision.reply);
   return { replied: true, handedOff: false };
+}
+
+/**
+ * The booking window for the AI: the booking assistant's settings (time
+ * zone, days ahead, notice, slot gap — defaults when never saved), but
+ * the business's own opening hours, holidays and closed dates from
+ * Settings → Business. Read whether or not the booking bot is enabled:
+ * the AI books on its own. Scoped by account_id (service-role client).
+ */
+async function aiBookingConfig(db: Db, accountId: string, clinic: ClinicSettings): Promise<BookingConfig> {
+  const { data, error } = await db.from("booking_settings").select("config").eq("account_id", accountId).maybeSingle();
+  const base = parseBookingConfig(error ? null : data?.config);
+  const today = localDay(new Date(), base.timezone);
+  const days = Array.from({ length: base.daysAhead + 1 }, (_, i) => addDays(today, i));
+  return withClinic({ ...base, hours: clinic.hours }, clinic, days);
 }
 
 /** Everything the model may answer from, all scoped to the account. */

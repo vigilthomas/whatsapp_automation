@@ -29,6 +29,14 @@ describe("parseModelReply", () => {
     });
   });
 
+  it("reads a booking tool call and trims its arguments", () => {
+    const out = parseModelReply('{"tool":"book","service":" Hair Spa ","stylist":"any","start":"2025-11-25 10:00","name":"Meera"}');
+    expect(out.tool).toEqual({ tool: "book", service: "Hair Spa", stylist: "any", date: "", start: "2025-11-25 10:00", name: "Meera" });
+    expect(out.handoff).toBe(false);
+    // An unknown tool is not a tool call; with no reply it is a handoff.
+    expect(parseModelReply('{"tool":"cancel_all"}')).toMatchObject({ handoff: true });
+  });
+
   it("hands over when the answer is unreadable or empty — never guesses", () => {
     expect(parseModelReply("I think we open at 8?")).toMatchObject({ handoff: true, reply: DEFAULT_HANDOFF_REPLY });
     expect(parseModelReply('{"reply":"","handoff":false}').handoff).toBe(true);
@@ -53,6 +61,20 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("Cleaning (about 30 min)");
     expect(prompt).toContain("Dr Rao (Kochi)");
     expect(prompt).toContain("Consultation fee is 500 rupees.");
+  });
+
+  it("adds the booking tools only when booking is on", () => {
+    const base = { clinicName: "X", clinic: DEFAULT_CLINIC_SETTINGS, services: [], doctors: [], today: "today" };
+    expect(buildSystemPrompt(base)).toContain('send the word "book"');
+    const withBooking = buildSystemPrompt({
+      ...base,
+      booking: { todayIso: "2025-11-24", timezone: "Asia/Kolkata", daysAhead: 14, customerName: "Meera" },
+    });
+    expect(withBooking).toContain('"tool": "find_times"');
+    expect(withBooking).toContain('"tool": "book"');
+    expect(withBooking).toContain("Today is 2025-11-24");
+    expect(withBooking).toContain("Their saved name is Meera");
+    expect(withBooking).not.toContain('send the word "book"');
   });
 
   it("says when nothing is listed instead of leaving blanks", () => {

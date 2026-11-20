@@ -132,7 +132,15 @@ async function run(input: BookingInbound): Promise<{ consumed: boolean }> {
   return { consumed: true };
 }
 
-async function loadDeps(input: BookingInbound, config: BookingDeps["config"]): Promise<BookingDeps> {
+/**
+ * Everything the engine needs to find and book times for one contact.
+ * Also used by the AI assistant (src/lib/ai-chat/runner.ts), which books
+ * through the same `book` (re-checks the time right before saving).
+ */
+export async function loadDeps(
+  input: Pick<BookingInbound, "accountId" | "contactId">,
+  config: BookingDeps["config"],
+): Promise<BookingDeps> {
   const db = supabaseAdmin();
   const { accountId, contactId } = input;
   const [services, doctors, contact] = await Promise.all([

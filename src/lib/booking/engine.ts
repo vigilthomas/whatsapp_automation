@@ -237,7 +237,9 @@ async function toDoctor(state: BookingState, deps: BookingDeps): Promise<StepRes
 }
 
 /** The service the customer picked, with its length and buffer. */
-function withService(state: BookingState, s: BookService | undefined, deps: BookingDeps): BookingState {
+// withService / doctorsFor / slotsByDay are also used by the AI assistant
+// (src/lib/ai-chat/booking.ts) so both bots offer exactly the same times.
+export function withService(state: BookingState, s: BookService | undefined, deps: BookingDeps): BookingState {
   return {
     ...state,
     serviceId: s?.id ?? null,
@@ -251,7 +253,7 @@ function withService(state: BookingState, s: BookService | undefined, deps: Book
  * Doctors who offer the chosen service. A service nobody is linked to in
  * Doctor services can be booked with any doctor.
  */
-function doctorsFor(state: BookingState, deps: BookingDeps): BookDoctor[] {
+export function doctorsFor(state: BookingState, deps: BookingDeps): BookDoctor[] {
   const links = (deps.doctorServices ?? []).filter((l) => l.service_id === state.serviceId);
   if (!state.serviceId || links.length === 0) return deps.doctors;
   const ids = new Set(links.map((l) => l.doctor_id));
@@ -299,7 +301,7 @@ function awayOn(day: string, deps: BookingDeps): { doctorId: string; start: numb
 }
 
 /** Free slots per open day over the booking window (one busy query). */
-async function slotsByDay(state: BookingState, deps: BookingDeps, days: string[]): Promise<Map<string, Slot[]>> {
+export async function slotsByDay(state: BookingState, deps: BookingDeps, days: string[]): Promise<Map<string, Slot[]>> {
   const out = new Map<string, Slot[]>();
   if (days.length === 0) return out;
   const tz = deps.config.timezone;
