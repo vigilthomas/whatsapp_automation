@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getCurrentAccount, requireRole, toErrorResponse } from '@/lib/auth/account'
+import { getCurrentAccount, toErrorResponse } from '@/lib/auth/account'
+import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 
@@ -26,7 +27,7 @@ export async function GET() {
 export async function POST(request: Request) {
   let ctx
   try {
-    ctx = await requireRole('agent')
+    ctx = await requireRoleAndPermission('agent', 'quick-replies', 'write')
   } catch (err) {
     return toErrorResponse(err)
   }

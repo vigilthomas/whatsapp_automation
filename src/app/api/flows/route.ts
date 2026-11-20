@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { toErrorResponse } from '@/lib/auth/account'
+import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { getFlowTemplate } from '@/lib/flows/templates'
 
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   // `agent`, but this route inserts via the service-role client which
   // bypasses RLS, so the role must be enforced here.
   try {
-    await requireRole('agent')
+    await requireRoleAndPermission('agent', 'flows', 'write')
   } catch (err) {
     return toErrorResponse(err)
   }

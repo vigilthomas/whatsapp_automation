@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server'
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requireRole,
-  toErrorResponse,
-} from '@/lib/auth/account'
+import { ForbiddenError, UnauthorizedError, toErrorResponse } from '@/lib/auth/account'
+import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
@@ -133,7 +129,7 @@ export async function POST() {
     // settings-class data: `canEditSettings` and the message_templates
     // insert/update RLS policies (migration 017) both require 'admin'.
     // Resolving account_id off the profile only proved membership.
-    const { supabase, accountId, userId } = await requireRole('admin')
+    const { supabase, accountId, userId } = await requireRoleAndPermission('admin', 'templates', 'write')
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')

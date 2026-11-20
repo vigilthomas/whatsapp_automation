@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, DARK_BG, brandBootJs, brandingCss, checkLogoFile, checkLogoUrl, contrast, inkOn, isHexColor, retitle, sniffImage, logoShapeClass } from "./branding";
+import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, DARK_BG, brandBootJs, brandingCss, checkLogoFile, checkLogoUrl, contrast, inkOn, isHexColor, retitle, sniffImage, logoShapeClass, lockscreenOf } from "./branding";
 
 describe("brandingCss", () => {
   it("is empty when nothing is set (untouched install looks like Clinicoro)", () => {
@@ -123,5 +123,14 @@ describe("logo shape", () => {
     expect(logoShapeClass("rounded")).toContain("object-cover");
     expect(logoShapeClass("rounded")).not.toContain("rounded-full");
     expect(logoShapeClass("bogus" as never)).toBe("object-contain");
+  });
+});
+
+describe("lockscreenOf", () => {
+  it("returns the saved layout, and classic for none or anything unknown", () => {
+    expect(lockscreenOf({ lockscreen: "split" })).toBe("split");
+    expect(lockscreenOf({ lockscreen: "spotlight" })).toBe("spotlight");
+    expect(lockscreenOf({ lockscreen: null })).toBe("classic");
+    expect(lockscreenOf({ lockscreen: "neon" as never })).toBe("classic");
   });
 });

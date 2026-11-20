@@ -119,7 +119,7 @@ describe('doctors are managed from Users', () => {
 });
 
 describe('data scope on leaves', () => {
-  it('hides a leave outside the role's scope (404) and never updates it', async () => {
+  it("hides a leave outside the role's scope (404) and never updates it", async () => {
     vi.mocked(entityScope).mockResolvedValueOnce({ column: 'user_id', values: ['me'] });
     mocks.results = [{ data: { user_id: 'someone-else' }, error: null }];
     const res = await DELETE(new Request('http://x', { method: 'DELETE' }), params('leaves'));

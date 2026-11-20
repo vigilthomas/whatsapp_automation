@@ -18,7 +18,9 @@ import {
 } from "@/lib/flows/meta-send";
 import { continueBooking, startBooking, type BookingDeps, type BookingState, type Reply } from "./engine";
 import { matchesKeyword, parseBookingConfig } from "./settings";
-import { isFree, type Busy } from "./slots";
+import { addDays, isFree, localDay, type Busy } from "./slots";
+import { withClinic } from "./clinic";
+import { parseClinicSettings } from "@/lib/clinic/settings";
 
 /** A conversation left this long is forgotten; the next message starts fresh. */
 export const SESSION_TIMEOUT_MS = 30 * 60_000;
@@ -42,6 +44,24 @@ export async function dispatchInboundToBooking(input: BookingInbound): Promise<{
   }
 }
 
+/**
+ * The assistant's config narrowed to when the clinic is open (Settings →
+ * Clinic, migration 060). Without that table or row it runs on its own
+ * hours, as before. Scoped by account_id: this is the service-role client.
+ */
+async function clinicAware(
+  db: ReturnType<typeof supabaseAdmin>,
+  accountId: string,
+  config: ReturnType<typeof parseBookingConfig>,
+): Promise<ReturnType<typeof parseBookingConfig>> {
+  const { data, error } = await db.from("clinic_settings").select("config").eq("account_id", accountId).maybeSingle();
+  if (error || !data) return config;
+  const today = localDay(new Date(), config.timezone);
+  // One extra day so a booking started just before midnight still sees tomorrow's closures.
+  const days = Array.from({ length: config.daysAhead + 1 }, (_, i) => addDays(today, i));
+  return withClinic(config, parseClinicSettings(data.config), days);
+}
+
 async function run(input: BookingInbound): Promise<{ consumed: boolean }> {
   const db = supabaseAdmin();
   const { accountId, contactId } = input;
@@ -52,7 +72,7 @@ async function run(input: BookingInbound): Promise<{ consumed: boolean }> {
     .eq("account_id", accountId)
     .maybeSingle();
   if (settingsError || !settings?.enabled) return { consumed: false };
-  const config = parseBookingConfig(settings.config);
+  const config = await clinicAware(db, accountId, parseBookingConfig(settings.config));
 
   const { data: session } = await db
     .from("booking_sessions")

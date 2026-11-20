@@ -374,6 +374,20 @@
       "noTags": "No tags",
       "noDeals": "No deals",
       "addNotePlaceholder": "Add a note..."
+    },
+    "aiMode": {
+      "label": "Who replies to this chat",
+      "human": "Human",
+      "bot": "Bot",
+      "hint": "Bot: the AI assistant replies and hands over when it doesn't know. Human: staff reply.",
+      "readOnly": "You can see who replies but not change it.",
+      "nowBot": "The AI assistant now replies in this chat",
+      "nowHuman": "Staff now reply in this chat",
+      "failed": "Couldn't change who replies",
+      "why": "Why",
+      "notReady": "The AI assistant isn't switched on yet, so Bot mode won't reply.",
+      "handedOff": "The assistant handed this chat over: {reason}",
+      "openSettings": "Open AI assistant settings"
     }
   },
   "Contacts": {
@@ -1936,7 +1950,9 @@
       "access": "Access control",
       "api": "API keys",
       "branding": "Branding",
-      "menu": "Sidebar menu"
+      "menu": "Sidebar menu",
+      "clinic": "Clinic",
+      "ai": "AI assistant"
     },
     "groups": {
       "account": "Account",
@@ -2008,6 +2024,22 @@
       "logo": "Logo",
       "logoNotImage": "That file isn't a real PNG, JPG, SVG or WebP image.",
       "logoShape": "Logo shape",
+      "lockscreen": "Lockscreen",
+      "lockscreenHint": "How the sign-in, sign-up and password reset pages look. They use your logo, name, subtitle and page colours.",
+      "lockscreens": {
+        "classic": {
+          "name": "Classic",
+          "desc": "A clean card in the middle of the page."
+        },
+        "split": {
+          "name": "Split",
+          "desc": "Your logo, name and subtitle on a coloured panel beside the form."
+        },
+        "spotlight": {
+          "name": "Spotlight",
+          "desc": "The form on a full-screen gradient in your colour."
+        }
+      },
       "shapes": {
         "original": "As uploaded",
         "circle": "Circle",
@@ -2224,8 +2256,10 @@
         "settings-profile": "Your profile",
         "settings-security": "Login & security",
         "settings-appearance": "Appearance",
+        "settings-clinic": "Clinic",
         "doctor-services": "Doctor services",
-        "leaves": "Leaves"
+        "leaves": "Leaves",
+        "ai-assistant": "AI assistant"
       },
       "settingsModules": "Settings",
       "notApplicable": "Not used here",
@@ -2248,7 +2282,82 @@
       "saveFailed": "Failed to save default currency",
       "saveSuccess": "Default currency updated"
     },
-    "readOnly": "You can see this section but not change it. Ask an admin for the Write tick in Access control."
+    "readOnly": "You can see this section but not change it. Ask an admin for the Write tick in Access control.",
+    "clinic": {
+      "title": "Clinic",
+      "description": "Opening hours, holidays and days the clinic is closed. Appointments and the WhatsApp booking assistant only offer times when the clinic is open.",
+      "hours": "Opening hours",
+      "hoursHint": "Switch a day off to close the clinic every week on that day.",
+      "copyMonday": "Copy Monday to all open days",
+      "openOn": "Open on {day}",
+      "opensAt": "{day} opens at",
+      "closesAt": "{day} closes at",
+      "closed": "Closed",
+      "endBeforeStart": "Closing time must be after opening time",
+      "holidays": "Holidays",
+      "holidaysHint": "Days off. Turn on Every year for holidays on the same date each year.",
+      "addHoliday": "Add holiday",
+      "noHolidays": "No holidays yet.",
+      "holidayDate": "Holiday date",
+      "holidayName": "Name, e.g. Christmas",
+      "yearly": "Every year",
+      "closures": "Closed dates",
+      "closuresHint": "One-off closed periods, such as renovation or staff training. Both dates are included.",
+      "addClosure": "Add closed dates",
+      "noClosures": "No closed dates.",
+      "closedFrom": "Closed from",
+      "closedTo": "Closed until",
+      "to": "to",
+      "reason": "Reason (optional)",
+      "remove": "Remove",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "discard": "Discard changes",
+      "saved": "Clinic settings saved",
+      "saveFailed": "Couldn't save the clinic settings",
+      "loadFailed": "Couldn't load the clinic settings",
+      "loading": "Loading…",
+      "saveTitle": "Save the clinic settings?",
+      "saveDesc": "New appointments and the booking assistant use these hours and closed days straight away. Existing appointments aren't moved.",
+      "notReady": "Clinic settings need migration 060_clinic_settings.sql. Until it's run, the default hours (Monday–Saturday 9:00–18:00) are used and changes can't be saved.",
+      "closedNotice": "The clinic is closed on this day ({why}). You can still enter a custom time."
+    },
+    "ai": {
+      "title": "AI assistant",
+      "description": "Let an AI answer WhatsApp chats that are switched to Bot. It answers only from your clinic's details and hands the chat to staff when it doesn't know.",
+      "active": "AI assistant on",
+      "activeHint": "When off, no chat gets AI replies, whatever its switch says.",
+      "newChatsBot": "New chats start in Bot mode",
+      "newChatsBotHint": "Otherwise every chat starts as Human and staff switch it to Bot in the inbox.",
+      "provider": "Provider",
+      "providers": {
+        "anthropic": "Anthropic (Claude)",
+        "openai": "OpenAI"
+      },
+      "model": "Model",
+      "apiKey": "API key",
+      "keySaved": "Saved — leave blank to keep it",
+      "keyPlaceholder": "Paste your provider API key",
+      "keyHint": "Your own key, stored encrypted. Usage is billed by the provider to you.",
+      "keyNeeded": "Add the API key before switching the assistant on.",
+      "knowledge": "What the assistant should know",
+      "knowledgeHint": "It already knows your clinic name, opening hours, holidays, services and doctors. Add anything else patients ask about: fees, payment, parking, preparation, tone.",
+      "instructionsPlaceholder": "e.g. Consultation fee is ₹500. We accept UPI and cards. Free parking behind the building. Be friendly and brief.",
+      "handoff": "When the assistant doesn't know",
+      "handoffHint": "The chat switches to Human, is assigned to this person and they get a notification. The patient is told a team member will reply.",
+      "handoffTo": "Hand chats to",
+      "handoffAssigned": "Whoever the chat is assigned to",
+      "maxReplies": "AI replies per chat before handing over",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "discard": "Discard changes",
+      "saved": "AI assistant saved",
+      "saveFailed": "Couldn't save the AI assistant",
+      "loadFailed": "Couldn't load the AI assistant",
+      "loading": "Loading…",
+      "saveTitle": "Save the AI assistant settings?",
+      "saveDesc": "Chats in Bot mode use the new settings from the next message."
+    }
   },
   "Booking": {
     "title": "Booking assistant",

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ForbiddenError, getCurrentAccount, type AccountContext } from "./account";
+import { ForbiddenError, getCurrentAccount, requireRole, type AccountContext } from "./account";
+import type { AccountRole } from "./roles";
 import { parseModuleAccess } from "./module-access";
 import type { ModuleId } from "./module-access";
 import {
@@ -72,6 +73,30 @@ async function loadInputs(supabase: SupabaseClient, userId: string, accountId: s
  */
 export async function requirePermission(module: ModuleId, action: Action): Promise<PermissionContext> {
   const ctx = await getCurrentAccount();
+  const { permissions, branchId } = await loadPermissionState(ctx);
+  if (!can(permissions, module, action)) {
+    throw new ForbiddenError(`You don't have '${action}' permission on ${module}`);
+  }
+  return { ...ctx, permissions, branchId };
+}
+
+/**
+ * `requireRole(min)` AND `requirePermission(module, action)` in one call.
+ *
+ * Security audit F-03/F-04: the routes inherited from the upstream
+ * template (send, react, broadcasts, automations, flows, quick replies,
+ * contact tags, templates) only checked the coarse account role, so a
+ * designation with the module switched off in Access control could still
+ * use it through the API. Those routes now call this instead. The role
+ * floor is kept so no route gets looser than it was; the matrix is what
+ * makes it tighter.
+ */
+export async function requireRoleAndPermission(
+  min: AccountRole,
+  module: ModuleId,
+  action: Action,
+): Promise<PermissionContext> {
+  const ctx = await requireRole(min);
   const { permissions, branchId } = await loadPermissionState(ctx);
   if (!can(permissions, module, action)) {
     throw new ForbiddenError(`You don't have '${action}' permission on ${module}`);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { toErrorResponse } from '@/lib/auth/account'
+import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import {
   deleteMessageTemplate,
@@ -56,29 +57,18 @@ export async function PATCH(
         { status: 400 },
       )
     }
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Security audit F-03: this used to check only that someone was
+    // signed in, so a viewer could delete or edit an approved template
+    // ON META (RLS only stopped the local write, after the Meta call).
+    // Admin floor + the Templates 'edit' permission, before anything
+    // touches Meta.
+    let access
+    try {
+      access = await requireRoleAndPermission('admin', 'templates', 'edit')
+    } catch (err) {
+      return toErrorResponse(err)
     }
-
-    // Resolve the caller's account_id so template + whatsapp_config
-    // lookups work for teammates who didn't author the row.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    const accountId = profile?.account_id as string | undefined
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
-      )
-    }
+    const { supabase, accountId } = access
 
     let payload: TemplatePayload
     try {
@@ -242,30 +232,18 @@ export async function DELETE(
         { status: 400 },
       )
     }
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Security audit F-03: this used to check only that someone was
+    // signed in, so a viewer could delete or edit an approved template
+    // ON META (RLS only stopped the local write, after the Meta call).
+    // Admin floor + the Templates 'delete' permission, before anything
+    // touches Meta.
+    let access
+    try {
+      access = await requireRoleAndPermission('admin', 'templates', 'delete')
+    } catch (err) {
+      return toErrorResponse(err)
     }
-
-    // Same account-scoping rationale as the PATCH handler above —
-    // teammates need to be able to operate on shared templates +
-    // the shared whatsapp_config.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    const accountId = profile?.account_id as string | undefined
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
-      )
-    }
+    const { supabase, accountId } = access
 
     const { data: existing, error: lookupErr } = await supabase
       .from('message_templates')

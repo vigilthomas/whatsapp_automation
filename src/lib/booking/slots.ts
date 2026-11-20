@@ -86,7 +86,7 @@ export function candidateDays(config: BookingConfig, now: Date): string[] {
   const out: string[] = [];
   for (let i = 0; i < config.daysAhead; i++) {
     const day = addDays(today, i);
-    if (config.hours[weekdayOf(day)].open) out.push(day);
+    if (config.hours[weekdayOf(day)].open && !config.closedDays?.includes(day)) out.push(day);
   }
   return out;
 }
@@ -130,7 +130,7 @@ export function freeSlots({
   now: Date;
 }): Slot[] {
   const hours = config.hours[weekdayOf(day)];
-  if (!hours.open) return [];
+  if (!hours.open || config.closedDays?.includes(day)) return [];
   const tz = config.timezone;
   const dayStart = zonedInstant(day, 0, tz).getTime();
   const toMin = (iso: string) => (Date.parse(iso) - dayStart) / 60_000;

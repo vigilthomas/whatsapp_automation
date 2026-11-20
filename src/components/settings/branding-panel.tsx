@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useBranding } from "@/hooks/use-branding";
-import { checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, DEFAULT_COLORS, isHexColor, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
+import { checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, DEFAULT_COLORS, isHexColor, LOCKSCREENS, lockscreenOf, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
+import { LockscreenThumb } from "@/components/auth/auth-shell";
 import { cn } from "@/lib/utils";
 import { BrandingPreview } from "./branding-preview";
 import { LogoCropDialog } from "./logo-crop-dialog";
@@ -50,7 +51,7 @@ const PAGE_PRESETS: Preset[] = [
   { name: "Graphite", values: { theme_primary: "#334155", theme_text: "#0B0F14", theme_muted: "#64748B", theme_bg: "#F3F4F6", theme_surface: "#FFFFFF", theme_danger: "#DC2626" } },
 ];
 
-const EDITABLE = ["title", "subtitle", "logo", "logo_shape", ...COLOR_KEYS] as const;
+const EDITABLE = ["title", "subtitle", "logo", "logo_shape", "lockscreen", ...COLOR_KEYS] as const;
 type Editable = (typeof EDITABLE)[number];
 
 const cleanText = (v: string | null) => (v && v.trim() ? v.trim().slice(0, TITLE_MAX) : null);
@@ -116,7 +117,7 @@ export function BrandingPanel() {
   };
 
   const onSave = async () => {
-    const names = changed.map((k) => (k === "title" ? t("name") : k === "subtitle" ? t("subtitle") : k === "logo" ? t("logo") : k === "logo_shape" ? t("logoShape") : t(`fields.${k}`)));
+    const names = changed.map((k) => (k === "title" ? t("name") : k === "subtitle" ? t("subtitle") : k === "logo" ? t("logo") : k === "logo_shape" ? t("logoShape") : k === "lockscreen" ? t("lockscreen") : t(`fields.${k}`)));
     if (!(await confirm({ title: t("saveTitle"), description: `${t("saveDesc")} (${names.join(", ")})`, confirmLabel: t("save") }))) return;
     setSaving(true);
     const patch = Object.fromEntries(
@@ -250,6 +251,35 @@ export function BrandingPanel() {
               <div>
                 <LogoShapePicker value={draft.logo_shape} disabled={readOnly} onChange={(v) => set("logo_shape", v)} />
               </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title={t("lockscreen")}>
+            <p className="text-xs text-muted-foreground">{t("lockscreenHint")}</p>
+            <div role="radiogroup" aria-label={t("lockscreen")} className="grid gap-3 sm:grid-cols-3">
+              {LOCKSCREENS.map((l) => {
+                const on = lockscreenOf(draft) === l;
+                return (
+                  <button
+                    key={l}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    disabled={readOnly}
+                    onClick={() => set("lockscreen", l)}
+                    className={cn(
+                      "flex flex-col gap-2 rounded-xl border p-2.5 text-left transition-colors disabled:opacity-60",
+                      on ? "border-primary bg-primary-soft ring-2 ring-primary/30" : "border-border hover:bg-muted",
+                    )}
+                  >
+                    <LockscreenThumb layout={l} />
+                    <span>
+                      <span className="block text-sm font-semibold text-foreground">{t(`lockscreens.${l}.name`)}</span>
+                      <span className="block text-xs text-muted-foreground">{t(`lockscreens.${l}.desc`)}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </SectionCard>
 

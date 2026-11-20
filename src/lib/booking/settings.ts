@@ -153,6 +153,12 @@ export interface BookingConfig {
   /** The clinic's own questions; answers go into the appointment notes. */
   questions: BookingQuestion[];
   texts: BookingTexts;
+  /**
+   * Calendar days (yyyy-mm-dd) the clinic is shut — holidays and closed
+   * dates from Settings → Clinic, filled in at run time by `withClinic`
+   * (booking/clinic.ts). Never stored.
+   */
+  closedDays?: readonly string[];
 }
 
 export interface BookingSettings extends BookingConfig {

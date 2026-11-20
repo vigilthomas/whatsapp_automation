@@ -46,6 +46,8 @@ export type Branding = {
   logo: string | null;
   /** How the logo is framed; null = as uploaded. */
   logo_shape: LogoShape | null;
+  /** Sign-in screen layout (059); null = classic. */
+  lockscreen: Lockscreen | null;
   menu: BrandMenu;
 } & Record<ColorKey, string | null>;
 
@@ -54,11 +56,21 @@ export const BLANK_BRANDING: Branding = {
   subtitle: null,
   logo: null,
   logo_shape: null,
+  lockscreen: null,
   menu: {},
   ...(Object.fromEntries(COLOR_KEYS.map((k) => [k, null])) as Record<ColorKey, null>),
 };
 
 export const LOGO_SHAPES = ["original", "circle", "rounded"] as const;
+
+/** Sign-in screen layouts (Settings → Branding → Lockscreen). */
+export const LOCKSCREENS = ["classic", "split", "spotlight"] as const;
+export type Lockscreen = (typeof LOCKSCREENS)[number];
+
+/** The layout to draw: anything unknown (a newer build's value, a typo in SQL) falls back to classic. */
+export function lockscreenOf(b: Pick<Branding, "lockscreen">): Lockscreen {
+  return (LOCKSCREENS as readonly string[]).includes(b.lockscreen ?? "") ? (b.lockscreen as Lockscreen) : "classic";
+}
 export type LogoShape = (typeof LOGO_SHAPES)[number];
 
 /** Classes for the logo <img>: the whole image as uploaded, or filled and clipped to a circle or rounded square. */

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { UsersRound } from "lucide-react";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless it sits under a Suspense boundary. We split the form into
@@ -76,7 +77,7 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <AuthShell>
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -152,6 +153,6 @@ function LoginPageInner() {
 
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

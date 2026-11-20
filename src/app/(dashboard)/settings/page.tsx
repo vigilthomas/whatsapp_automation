@@ -13,6 +13,8 @@ import { ProfileForm } from '@/components/settings/profile-form';
 import { SecurityPanel } from '@/components/settings/security-panel';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { BrandingPanel } from '@/components/settings/branding-panel';
+import { ClinicPanel } from '@/components/settings/clinic-panel';
+import { AiPanel } from '@/components/settings/ai-panel';
 import { MenuPanel } from '@/components/settings/menu-panel';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { TemplateManager } from '@/components/settings/template-manager';
@@ -103,6 +105,8 @@ function SettingsPageInner() {
     security: <SecurityPanel />,
     appearance: <AppearancePanel />,
     branding: <BrandingPanel />,
+    clinic: <ClinicPanel />,
+    ai: <AiPanel />,
     menu: <MenuPanel />,
     whatsapp: <WhatsAppConfig />,
     templates: <TemplateManager />,

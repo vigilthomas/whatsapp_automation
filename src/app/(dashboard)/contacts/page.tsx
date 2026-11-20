@@ -52,6 +52,7 @@ import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
 import { useTranslations } from 'next-intl';
+import { sanitizeSearch } from '@/lib/search/sanitize';
 
 const PAGE_SIZE = 25;
 
@@ -168,7 +169,8 @@ function ContactsPageInner() {
         .range(from, to);
 
       if (term) {
-        const like = `%${term}%`;
+        // Security audit F-12: strip PostgREST filter grammar first.
+        const like = `%${sanitizeSearch(term)}%`;
         query = query.or(`name.ilike.${like},phone.ilike.${like},email.ilike.${like}`);
       }
 

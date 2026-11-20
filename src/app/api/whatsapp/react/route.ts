@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireRole, toErrorResponse } from '@/lib/auth/account';
+import { toErrorResponse } from '@/lib/auth/account';
+import { requireRoleAndPermission } from '@/lib/auth/permission-guard';
 import { sendReactionMessage } from '@/lib/whatsapp/meta-api';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import { sanitizePhoneForMeta } from '@/lib/whatsapp/phone-utils';
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     // reaction to Meta before mirroring it locally — so, as on /send, a
     // missing role check let a read-only viewer put a visible reaction on
     // the customer's message even though RLS blocked the local mirror.
-    const { supabase, accountId, userId } = await requireRole('agent');
+    const { supabase, accountId, userId } = await requireRoleAndPermission('agent', 'inbox', 'write');
 
     const limit = checkRateLimit(`react:${userId}`, RATE_LIMITS.react);
     if (!limit.success) {

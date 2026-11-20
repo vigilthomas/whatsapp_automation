@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { toErrorResponse } from '@/lib/auth/account'
+import { requirePermission } from '@/lib/auth/permission-guard'
 
 /**
  * GET /api/flows/[id]/runs
@@ -22,12 +23,13 @@ export async function GET(
 ) {
   const { id } = await context.params
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Security audit F-04: runs carry contact names and phone numbers,
+  // so the Flows 'read' permission is required, not just a session.
+  let supabase
+  try {
+    ;({ supabase } = await requirePermission('flows', 'read'))
+  } catch (err) {
+    return toErrorResponse(err)
   }
 
   // Confirm flow exists + caller owns it (RLS does this) before doing

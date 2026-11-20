@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { CheckCircle, UsersRound } from "lucide-react";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { useBranding } from "@/hooks/use-branding";
 
 // `useSearchParams` opts the component out of static prerendering
@@ -94,7 +95,7 @@ function SignupPageInner() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <AuthShell>
         <Card className="w-full max-w-md border-border bg-card">
           <CardHeader className="items-center text-center">
             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -126,12 +127,12 @@ function SignupPageInner() {
             </Link>
           </CardContent>
         </Card>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <AuthShell>
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -242,6 +243,6 @@ function SignupPageInner() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

@@ -374,6 +374,20 @@
       "noTags": "태그 없음",
       "noDeals": "딜 없음",
       "addNotePlaceholder": "메모 추가..."
+    },
+    "aiMode": {
+      "label": "이 채팅에 답하는 사람",
+      "human": "사람",
+      "bot": "봇",
+      "hint": "봇: AI 도우미가 답하고 모르면 넘깁니다. 사람: 직원이 답합니다.",
+      "readOnly": "볼 수는 있지만 변경할 수 없습니다.",
+      "nowBot": "이제 AI 도우미가 이 채팅에 답합니다",
+      "nowHuman": "이제 직원이 이 채팅에 답합니다",
+      "failed": "변경하지 못했습니다",
+      "why": "이유",
+      "notReady": "AI 도우미가 아직 켜져 있지 않아 봇 모드가 답하지 않습니다.",
+      "handedOff": "도우미가 이 채팅을 넘겼습니다: {reason}",
+      "openSettings": "AI 도우미 설정 열기"
     }
   },
   "Contacts": {
@@ -1936,7 +1950,9 @@
       "access": "접근 제어",
       "api": "API 키",
       "branding": "Branding",
-      "menu": "Sidebar menu"
+      "menu": "Sidebar menu",
+      "clinic": "클리닉",
+      "ai": "AI 도우미"
     },
     "groups": {
       "account": "계정",
@@ -2008,6 +2024,22 @@
       "logo": "Logo",
       "logoNotImage": "That file isn't a real PNG, JPG, SVG or WebP image.",
       "logoShape": "Logo shape",
+      "lockscreen": "잠금 화면",
+      "lockscreenHint": "로그인, 가입, 비밀번호 재설정 페이지의 모양입니다. 로고, 이름, 부제목과 페이지 색상을 사용합니다.",
+      "lockscreens": {
+        "classic": {
+          "name": "클래식",
+          "desc": "페이지 가운데의 깔끔한 카드."
+        },
+        "split": {
+          "name": "분할",
+          "desc": "양식 옆 색상 패널에 로고, 이름, 부제목 표시."
+        },
+        "spotlight": {
+          "name": "스포트라이트",
+          "desc": "브랜드 색상의 전체 화면 그라데이션 위의 양식."
+        }
+      },
       "shapes": {
         "original": "As uploaded",
         "circle": "Circle",
@@ -2224,8 +2256,10 @@
         "settings-profile": "내 프로필",
         "settings-security": "로그인 및 보안",
         "settings-appearance": "화면 설정",
+        "settings-clinic": "클리닉",
         "doctor-services": "의사별 서비스",
-        "leaves": "휴가"
+        "leaves": "휴가",
+        "ai-assistant": "AI 도우미"
       },
       "settingsModules": "설정",
       "notApplicable": "해당 없음",
@@ -2248,7 +2282,82 @@
       "saveFailed": "기본 통화를 저장하지 못했습니다",
       "saveSuccess": "기본 통화가 업데이트되었습니다"
     },
-    "readOnly": "이 섹션을 볼 수는 있지만 변경할 수는 없습니다. 접근 제어에서 쓰기 권한을 관리자에게 요청하세요."
+    "readOnly": "이 섹션을 볼 수는 있지만 변경할 수는 없습니다. 접근 제어에서 쓰기 권한을 관리자에게 요청하세요.",
+    "clinic": {
+      "title": "클리닉",
+      "description": "영업시간, 휴일, 휴무일을 설정합니다. 예약과 WhatsApp 예약 도우미는 영업 중인 시간만 제안합니다.",
+      "hours": "영업시간",
+      "hoursHint": "요일을 끄면 매주 그 요일은 휴무입니다.",
+      "copyMonday": "월요일 시간을 모든 영업일에 복사",
+      "openOn": "{day} 영업",
+      "opensAt": "{day} 시작 시간",
+      "closesAt": "{day} 종료 시간",
+      "closed": "휴무",
+      "endBeforeStart": "종료 시간은 시작 시간 이후여야 합니다",
+      "holidays": "휴일",
+      "holidaysHint": "쉬는 날입니다. 매년 같은 날짜의 휴일은 매년을 켜세요.",
+      "addHoliday": "휴일 추가",
+      "noHolidays": "휴일이 없습니다.",
+      "holidayDate": "휴일 날짜",
+      "holidayName": "이름 (예: 크리스마스)",
+      "yearly": "매년",
+      "closures": "휴무일",
+      "closuresHint": "리모델링, 직원 교육 등 일회성 휴무 기간입니다. 두 날짜 모두 포함됩니다.",
+      "addClosure": "휴무일 추가",
+      "noClosures": "휴무일이 없습니다.",
+      "closedFrom": "휴무 시작",
+      "closedTo": "휴무 종료",
+      "to": "~",
+      "reason": "사유 (선택)",
+      "remove": "삭제",
+      "save": "변경 사항 저장",
+      "saving": "저장 중…",
+      "discard": "변경 취소",
+      "saved": "클리닉 설정이 저장되었습니다",
+      "saveFailed": "클리닉 설정을 저장하지 못했습니다",
+      "loadFailed": "클리닉 설정을 불러오지 못했습니다",
+      "loading": "불러오는 중…",
+      "saveTitle": "클리닉 설정을 저장할까요?",
+      "saveDesc": "새 예약과 예약 도우미에 바로 적용됩니다. 기존 예약은 옮겨지지 않습니다.",
+      "notReady": "클리닉 설정에는 마이그레이션 060_clinic_settings.sql이 필요합니다. 실행 전까지는 기본 시간(월–토 9:00–18:00)이 사용되며 저장할 수 없습니다.",
+      "closedNotice": "이 날은 클리닉 휴무입니다 ({why}). 직접 시간을 입력할 수는 있습니다."
+    },
+    "ai": {
+      "title": "AI 도우미",
+      "description": "봇으로 전환된 WhatsApp 채팅에 AI가 답합니다. 클리닉 정보로만 답하고, 모르면 직원에게 넘깁니다.",
+      "active": "AI 도우미 켜기",
+      "activeHint": "꺼져 있으면 채팅 스위치와 관계없이 AI가 답하지 않습니다.",
+      "newChatsBot": "새 채팅은 봇 모드로 시작",
+      "newChatsBotHint": "끄면 모든 채팅이 사람 모드로 시작하고, 직원이 받은편지함에서 봇으로 전환합니다.",
+      "provider": "제공업체",
+      "providers": {
+        "anthropic": "Anthropic (Claude)",
+        "openai": "OpenAI"
+      },
+      "model": "모델",
+      "apiKey": "API 키",
+      "keySaved": "저장됨 — 유지하려면 비워 두세요",
+      "keyPlaceholder": "제공업체 API 키 붙여넣기",
+      "keyHint": "자체 키이며 암호화되어 저장됩니다. 사용료는 제공업체가 청구합니다.",
+      "keyNeeded": "도우미를 켜기 전에 API 키를 추가하세요.",
+      "knowledge": "도우미가 알아야 할 내용",
+      "knowledgeHint": "클리닉 이름, 영업시간, 휴일, 서비스, 의사 정보는 이미 알고 있습니다. 요금, 결제, 주차, 준비 사항, 말투 등을 추가하세요.",
+      "instructionsPlaceholder": "예: 진료비 500루피. UPI와 카드 결제 가능. 건물 뒤 무료 주차. 친절하고 간단하게.",
+      "handoff": "도우미가 모를 때",
+      "handoffHint": "채팅이 사람 모드로 바뀌고 이 사람에게 배정되며 알림이 갑니다. 환자에게는 직원이 답할 것이라고 안내합니다.",
+      "handoffTo": "넘길 사람",
+      "handoffAssigned": "채팅 담당자",
+      "maxReplies": "넘기기 전 채팅당 AI 답변 수",
+      "save": "변경 사항 저장",
+      "saving": "저장 중…",
+      "discard": "변경 취소",
+      "saved": "AI 도우미가 저장되었습니다",
+      "saveFailed": "AI 도우미를 저장하지 못했습니다",
+      "loadFailed": "AI 도우미를 불러오지 못했습니다",
+      "loading": "불러오는 중…",
+      "saveTitle": "AI 도우미 설정을 저장할까요?",
+      "saveDesc": "봇 모드 채팅은 다음 메시지부터 새 설정을 사용합니다."
+    }
   },
   "Booking": {
     "title": "예약 도우미",

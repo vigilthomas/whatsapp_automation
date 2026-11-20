@@ -10,6 +10,7 @@ import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToBooking } from '@/lib/booking/runner'
+import { dispatchInboundToAi } from '@/lib/ai-chat/runner'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import {
   handleTemplateWebhookChange,
@@ -824,6 +825,18 @@ async function processMessage(
   })
   const flowConsumed = flowResult.consumed
 
+  // The AI assistant answers what neither booking nor a Flow took — but only
+  // in chats switched to Bot mode (migration 061), and it hands the chat to
+  // staff when it doesn't know. Never throws; a no-op when AI is off.
+  if (!flowConsumed) {
+    await dispatchInboundToAi({
+      accountId,
+      conversationId: conversation.id,
+      contactId: contactRecord.id,
+      text: contentText ?? message.text?.body ?? '',
+    })
+  }
+
   // Fire any automations that react to this webhook event. All dispatches
   // run here (not earlier) so the contact, conversation, and inbound
   // message all exist before any step — including send_message — runs.
@@ -921,11 +934,12 @@ async function parseMessageContent(
   // why images showed up as empty bubbles in the inbox.
   //
   // Beyond verifying, this is where inbound media gets COPIED into the
-  // `chat-media` bucket (issue #466). Meta deletes media ~30 days after
+  // private `patient-media` bucket (issue #466; moved out of the public
+  // `chat-media` bucket by migration 062, security audit F-01). Meta deletes media ~30 days after
   // receipt, so the `/api/whatsapp/media/<id>` proxy URL we used to
   // store is a pointer with an expiry date on it — every inbound
   // attachment silently became "Photo unavailable" a month later.
-  // Mirroring stores a durable public URL instead.
+  // Mirroring stores a durable, signed-in-only route URL instead.
   //
   // The mirror is strictly best-effort. `mirrorInboundMedia` swallows
   // its own failures and returns null, and we fall back to the proxy

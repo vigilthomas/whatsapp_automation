@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { requireRole, toErrorResponse } from '@/lib/auth/account';
+import { toErrorResponse } from '@/lib/auth/account';
+import { requireRoleAndPermission } from '@/lib/auth/permission-guard';
 import { addContactTagAndDispatch } from '@/lib/contacts/tag-events';
 import {
   ContactTagWriteError,
@@ -25,7 +26,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ctx = await requireRole('agent');
+    const ctx = await requireRoleAndPermission('agent', 'contacts', 'edit');
     const { id: contactId } = await params;
     const tagId = await readTagId(request);
     if (!tagId) {
@@ -53,7 +54,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ctx = await requireRole('agent');
+    const ctx = await requireRoleAndPermission('agent', 'contacts', 'edit');
     const { id: contactId } = await params;
     const tagId = await readTagId(request);
     if (!tagId) {

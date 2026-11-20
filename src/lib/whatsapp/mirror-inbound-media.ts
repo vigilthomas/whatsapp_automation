@@ -3,7 +3,8 @@ import { extensionForMime } from "@/lib/media/filename";
 import { buildMediaPath, MEDIA_MAX_BYTES } from "@/lib/storage/upload-media";
 
 /**
- * Copies inbound WhatsApp media into the `chat-media` bucket so it
+ * Copies inbound WhatsApp media into the private `patient-media` bucket
+ * (migration 062; it was `chat-media` until security audit F-01) so it
  * outlives Meta's retention window (issue #466).
  *
  * Meta deletes media roughly 30 days after receipt. Before this, the
@@ -31,12 +32,31 @@ export interface MirrorStorage {
       body: Uint8Array | Buffer,
       options: { contentType: string; cacheControl: string; upsert: boolean },
     ): Promise<{ error: { message: string } | null }>;
-    getPublicUrl(path: string): { data: { publicUrl: string } };
   };
 }
 
-/** Bucket the composer already writes to; inbound joins it. */
-export const MIRROR_BUCKET = "chat-media";
+/**
+ * PRIVATE bucket for inbound media (migration 062, security audit F-01).
+ *
+ * Inbound attachments used to land in the public `chat-media` bucket,
+ * whose SELECT policy let anyone with the anon key list every account's
+ * folder. Patient photos, prescriptions and voice notes now go to a
+ * bucket with no public URLs; members read them through
+ * `/api/whatsapp/media/stored/<path>` (see `storedMediaUrl`).
+ */
+export const MIRROR_BUCKET = "patient-media";
+
+/** Route prefix that serves `patient-media` objects to signed-in members. */
+export const STORED_MEDIA_PREFIX = "/api/whatsapp/media/stored/";
+
+/**
+ * The `messages.media_url` for a mirrored object. It sits under
+ * `/api/whatsapp/media/`, so the inbox's blob cache already treats it as
+ * an auth-gated URL and fetches it with the session cookie.
+ */
+export function storedMediaUrl(path: string): string {
+  return STORED_MEDIA_PREFIX + path.split("/").map(encodeURIComponent).join("/");
+}
 
 /**
  * Second path segment for mirrored inbound objects, so a bucket listing
@@ -140,9 +160,9 @@ export function mirrorFileName(args: {
 }
 
 /**
- * Download the bytes from Meta and put them in `chat-media`.
+ * Download the bytes from Meta and put them in `patient-media`.
  *
- * @returns the durable public URL, or `null` if the mirror was skipped
+ * @returns the durable signed-in route URL, or `null` if the mirror was skipped
  *          or failed — in which case the caller must fall back to the
  *          proxy URL.
  */
@@ -226,10 +246,7 @@ export async function mirrorInboundMedia(
       return null;
     }
 
-    const {
-      data: { publicUrl },
-    } = storage.from(MIRROR_BUCKET).getPublicUrl(path);
-    return publicUrl || null;
+    return storedMediaUrl(path);
   } catch (error) {
     console.warn(
       `[mirror-media] could not mirror ${mediaId}:`,

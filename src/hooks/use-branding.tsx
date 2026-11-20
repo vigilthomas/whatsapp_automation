@@ -18,7 +18,12 @@ import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, COLOR_KEYS, brandin
 
 
 
-const COLUMNS = ["title", "subtitle", "logo", "logo_shape", "menu", ...COLOR_KEYS].join(",");
+const COLUMNS = ["title", "subtitle", "logo", "logo_shape", "lockscreen", "menu", ...COLOR_KEYS].join(",");
+// Before 059 there's no `lockscreen` column; reading it would fail the whole
+// row and drop every other branding setting, so fall back to the older list.
+const COLUMNS_BEFORE_059 = ["title", "subtitle", "logo", "logo_shape", "menu", ...COLOR_KEYS].join(",");
+/** Postgres "undefined_column". */
+const UNDEFINED_COLUMN = "42703";
 const DEFAULT_TITLE = "Clinicoro";
 
 type BrandingContextValue = {
@@ -112,10 +117,17 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const [canEdit, setCanEdit] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const branding = previewing ?? saved;
+  // Which column list the database has (see COLUMNS_BEFORE_059); learnt on the first read.
+  const columns = useRef(COLUMNS);
 
   /** Read the row; `null` when it can't be read (most likely migration 046 hasn't been run). */
   const fetchRow = useCallback(async (): Promise<Branding | null> => {
-    const { data, error } = await supabase.from("app_branding").select(COLUMNS).eq("id", 1).maybeSingle();
+    let { data, error } = await supabase.from("app_branding").select(COLUMNS).eq("id", 1).maybeSingle();
+    columns.current = COLUMNS;
+    if (error?.code === UNDEFINED_COLUMN) {
+      columns.current = COLUMNS_BEFORE_059;
+      ({ data, error } = await supabase.from("app_branding").select(COLUMNS_BEFORE_059).eq("id", 1).maybeSingle());
+    }
     if (error) {
       console.warn("[branding] not loaded:", error.message); // keep the defaults, don't nag
       return null;
@@ -198,7 +210,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
         .from("app_branding")
         .update(patch)
         .eq("id", 1)
-        .select(COLUMNS)
+        .select(columns.current)
         .maybeSingle();
       if (error) return error.message;
       if (!data) return "You don't have permission to change the branding.";

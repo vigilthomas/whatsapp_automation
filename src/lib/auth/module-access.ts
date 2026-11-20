@@ -46,10 +46,12 @@ export const MODULES = [
   "broadcasts",
   "automations",
   "flows",
+  "ai-assistant",
   "settings-overview",
   "settings-profile",
   "settings-security",
   "settings-appearance",
+  "settings-clinic",
 ] as const;
 
 export type ModuleId = (typeof MODULES)[number];
@@ -64,6 +66,7 @@ export const SETTINGS_MODULES = [
   "settings-profile",
   "settings-security",
   "settings-appearance",
+  "settings-clinic",
 ] as const satisfies readonly ModuleId[];
 
 export type SettingsModuleId = (typeof SETTINGS_MODULES)[number];

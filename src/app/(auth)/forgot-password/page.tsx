@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { CheckCircle, ArrowLeft } from "lucide-react";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -44,7 +45,7 @@ export default function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <AuthShell>
         <Card className="w-full max-w-md border-border bg-card">
           <CardHeader className="items-center text-center">
             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -70,12 +71,12 @@ export default function ForgotPasswordPage() {
             </Link>
           </CardContent>
         </Card>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <AuthShell>
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -127,6 +128,6 @@ export default function ForgotPasswordPage() {
           </Link>
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

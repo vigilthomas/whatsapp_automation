@@ -38,11 +38,6 @@ function fakeStorage(uploadError: { message: string } | null = null) {
           uploads.push({ bucket, path, body, options });
           return { error: uploadError };
         },
-        getPublicUrl(path: string) {
-          return {
-            data: { publicUrl: `https://cdn.test/storage/${bucket}/${path}` },
-          };
-        },
       };
     },
   };
@@ -158,7 +153,7 @@ describe("mirrorInboundMedia", () => {
     );
     expect(uploads[0].options.contentType).toBe("image/jpeg");
     expect(url).toBe(
-      `https://cdn.test/storage/chat-media/account-${ACCOUNT}/inbound/${MEDIA_ID}-image-1754899200.jpg`,
+      `/api/whatsapp/media/stored/account-${ACCOUNT}/inbound/${MEDIA_ID}-image-1754899200.jpg`,
     );
   });
 

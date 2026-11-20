@@ -20,7 +20,7 @@ const h = vi.hoisted(() => ({
     automationCompleted: 0,
     /** whatsapp_config.mirror_inbound_media for the matched row (#466). */
     mirrorInboundMedia: true as boolean | undefined,
-    /** Objects the inbound-media mirror pushed into chat-media. */
+    /** Objects the inbound-media mirror pushed into patient-media. */
     storageUploads: [] as {
       bucket: string
       path: string
@@ -390,17 +390,18 @@ describe('inbound webhook: inbound media is mirrored (#466)', () => {
     image: { id: '1234567890123456', mime_type: 'image/jpeg', caption: 'hi' },
   }
 
-  it('stores a durable bucket URL instead of the expiring proxy path', async () => {
+  it('stores a durable signed-in route URL instead of the expiring proxy path', async () => {
     await runWebhook(IMAGE_MESSAGE)
 
     expect(h.state.storageUploads).toHaveLength(1)
-    expect(h.state.storageUploads[0].bucket).toBe('chat-media')
+    // Private bucket (migration 062, security audit F-01) — never a public URL.
+    expect(h.state.storageUploads[0].bucket).toBe('patient-media')
     expect(h.state.storageUploads[0].path).toBe(
       'account-acc-1/inbound/1234567890123456-image-1700000000.jpg',
     )
     expect(h.state.upsertCalls[0].row).toMatchObject({
       media_url:
-        'https://cdn.test/chat-media/account-acc-1/inbound/1234567890123456-image-1700000000.jpg',
+        '/api/whatsapp/media/stored/account-acc-1/inbound/1234567890123456-image-1700000000.jpg',
       // Meta's MIME type used to be discarded outright (`void mediaType`).
       media_type: 'image/jpeg',
     })

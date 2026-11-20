@@ -29,8 +29,9 @@ import {
 } from "@/components/ui/dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { avatarColor, initialsOf } from "@/components/dashboard/clinic-widgets";
-import { WORK_END_HOUR, WORK_START_HOUR } from "@/components/appointments/appointment-calendar";
+import { DEFAULT_CLINIC_SETTINGS, closureOn, hoursOn, parseClinicSettings, type ClinicSettings } from "@/lib/clinic/settings";
 import { dynamicStarts, hhmm } from "@/lib/booking/schedule";
+import { sanitizeSearch } from "@/lib/search/sanitize";
 
 type PatientPick = { id: string; name: string | null; phone: string };
 
@@ -136,6 +137,7 @@ interface Props {
 export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, mode = "edit" }: Props) {
   const t = useTranslations("Appointments.dialog");
   const tStatus = useTranslations("Appointments.status");
+  const tClinic = useTranslations("Settings.clinic");
   const confirm = useConfirm();
   const durationLabel = useDurationLabel();
   const [form, setForm] = useState<AppointmentDraft | null>(draft);
@@ -151,17 +153,30 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
   const [customService, setCustomService] = useState(false);
   const [busy, setBusy] = useState<{ start: number; end: number; id?: string; service?: string }[]>([]);
   const [showAllDates, setShowAllDates] = useState(false);
+  // A new booking opens at "now + half an hour", which is usually outside
+  // clinic hours. Until the user picks a time themselves (a slot or the
+  // custom field), the time follows the first free slot as the service,
+  // doctor and date change — otherwise "Book" kept the opening time.
+  const [timeTouched, setTimeTouched] = useState(false);
+  // Settings → Clinic: opening hours and closed days (defaults until loaded).
+  const [clinic, setClinic] = useState<ClinicSettings>(DEFAULT_CLINIC_SETTINGS);
 
   useEffect(() => {
     setForm(draft);
     setQuery("");
     setResults([]);
     setShowAllDates(false);
+    // Editing keeps the saved time; only a new booking snaps to a slot.
+    setTimeTouched(!!draft?.id);
   }, [draft]);
 
   // Services master — once per open.
   useEffect(() => {
     if (!draft) return;
+    fetch("/api/clinic-settings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setClinic(d ? parseClinicSettings(d.settings) : DEFAULT_CLINIC_SETTINGS))
+      .catch(() => setClinic(DEFAULT_CLINIC_SETTINGS));
     fetch("/api/master/services", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -205,7 +220,8 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
     }
     const handle = setTimeout(async () => {
       setSearching(true);
-      const like = `%${query.trim()}%`;
+      // Security audit F-12: strip PostgREST filter grammar first.
+      const like = `%${sanitizeSearch(query)}%`;
       const { data } = await createClient()
         .from("contacts")
         .select("id, name, phone")
@@ -305,9 +321,13 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
           .filter((b) => b.id !== form.id)
           .map((b) => ({ start: (b.start - dayStart) / 60000, end: (b.end - dayStart) / 60000, bufferMin: bufferOf(b.service) }))
       : [];
+    // A closed day (weekly day off, holiday, closed dates) offers no slots;
+    // staff can still type a custom time on purpose.
+    const window = hoursOn(clinic, form.date);
+    if (!window) return [];
     const starts = dynamicStarts({
-      open: WORK_START_HOUR * 60,
-      close: WORK_END_HOUR * 60,
+      open: window.open,
+      close: window.close,
       durationMin: form.durationMin,
       bufferMin: bufferOf(form.service),
       gapMin: SLOT_GAP_MIN,
@@ -318,7 +338,27 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
       const s = dayStart + m * 60000;
       return { time: hhmm(m), label: fmt.format(new Date(s)), taken: false, past: s + form.durationMin * 60000 < now };
     });
-  }, [form, busy, services]);
+  }, [form, busy, services, clinic]);
+
+  // Why the chosen day is closed, for the notice above the (empty) slot grid.
+  const closure = form ? closureOn(clinic, form.date) : null;
+  const closedWhy = !closure
+    ? null
+    : closure.kind === "holiday"
+      ? closure.name || tClinic("holidays")
+      : closure.kind === "closed"
+        ? closure.reason || tClinic("closures")
+        : tClinic("closed");
+
+  const firstFree = slots.find((s) => !s.taken && !s.past)?.time ?? null;
+  useEffect(() => {
+    if (timeTouched || !firstFree) return;
+    setForm((f) => (f && !f.id && f.time !== firstFree ? { ...f, time: firstFree } : f));
+  }, [firstFree, timeTouched]);
+  const pickTime = (time: string) => {
+    setTimeTouched(true);
+    set("time", time);
+  };
 
   async function save() {
     if (!form) return;
@@ -630,16 +670,20 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
                   <div className="flex gap-1.5">
                     {strip.map((d) => {
                       const on = form.date === d.key;
+                      const shut = !!closureOn(clinic, d.key);
                       return (
                         <button
                           key={d.key}
                           type="button"
                           onClick={() => set("date", d.key)}
+                          title={shut ? tClinic("closed") : undefined}
                           className={cn(
                             "flex flex-1 flex-col items-center rounded-[10px] border py-2 transition-colors",
                             on
                               ? "border-navy bg-navy text-white dark:border-teal dark:bg-teal dark:text-[#06201f]"
-                              : "border-input bg-card text-foreground hover:bg-sunken",
+                              : shut
+                                ? "border-border bg-sunken text-muted-foreground/70 line-through hover:bg-sunken"
+                                : "border-input bg-card text-foreground hover:bg-sunken",
                           )}
                         >
                           <span className="text-[11px]">{d.day}</span>
@@ -659,6 +703,11 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
                     · {selectedDoctor ? t("slotsFrom", { doctor: String(selectedDoctor.name) }) : t("slotsAll")}
                   </span>
                 </Label>
+                {closedWhy && (
+                  <p className="rounded-[10px] border border-warn-fg/30 bg-warn-bg px-3 py-2 text-xs text-warn-fg">
+                    {tClinic("closedNotice", { why: closedWhy })}
+                  </p>
+                )}
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {slots.map((s) => {
                     const on = form.time === s.time;
@@ -668,7 +717,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
                         key={s.time}
                         type="button"
                         disabled={off && !on}
-                        onClick={() => set("time", s.time)}
+                        onClick={() => pickTime(s.time)}
                         className={cn(
                           "flex h-11 items-center justify-center rounded-[10px] border text-[13px] font-semibold transition-colors",
                           on
@@ -688,7 +737,7 @@ export function AppointmentDialog({ draft, onClose, onSaved, doctors, branches, 
                   <TimeInput
                     minuteStep={5}
                     value={form.time}
-                    onChange={(e) => set("time", e.target.value)}
+                    onChange={(e) => pickTime(e.target.value)}
                     className="h-8 w-28 rounded-lg border-input"
                     required
                   />

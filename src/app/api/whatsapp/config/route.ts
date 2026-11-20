@@ -7,6 +7,7 @@ import {
   verifyPhoneNumber,
 } from '@/lib/whatsapp/meta-api'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
+import { requireRole, toErrorResponse } from '@/lib/auth/account'
 
 /**
  * Resolve the caller's account_id from their profile. Inlined here
@@ -165,24 +166,19 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Security audit F-05/F-15: writes are admin-only under RLS (017),
+    // but this used to check only for a session, so a non-admin's save
+    // still ran Meta /register and /subscribed_apps with the submitted
+    // credentials, and a non-admin's reset returned success while RLS
+    // silently deleted nothing. Check the role before anything else.
+    let ctx
+    try {
+      ctx = await requireRole('admin')
+    } catch (err) {
+      return toErrorResponse(err)
     }
-
-    const accountId = await resolveAccountId(supabase, user.id)
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
-      )
-    }
+    const { supabase, accountId } = ctx
+    const user = { id: ctx.userId }
 
     const body = await request.json()
     const { phone_number_id, waba_id, access_token, verify_token, pin } = body
@@ -440,24 +436,18 @@ export async function POST(request: Request) {
  */
 export async function DELETE() {
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Security audit F-05/F-15: writes are admin-only under RLS (017),
+    // but this used to check only for a session, so a non-admin's save
+    // still ran Meta /register and /subscribed_apps with the submitted
+    // credentials, and a non-admin's reset returned success while RLS
+    // silently deleted nothing. Check the role before anything else.
+    let ctx
+    try {
+      ctx = await requireRole('admin')
+    } catch (err) {
+      return toErrorResponse(err)
     }
-
-    const accountId = await resolveAccountId(supabase, user.id)
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
-      )
-    }
+    const { supabase, accountId } = ctx
 
     const { error: deleteError } = await supabase
       .from('whatsapp_config')

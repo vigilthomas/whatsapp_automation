@@ -175,9 +175,20 @@ const ROLE_DEFAULT: Record<AccountRole, readonly Action[]> = {
   viewer: ["view", "read"],
 };
 
+/**
+ * Modules only an owner gets without a designation (the super admin gets
+ * everything anyway). Anyone else needs Access control to grant them.
+ * Settings → Clinic: opening hours and closures change what every patient
+ * can book, so it isn't handed to every admin and agent by default.
+ */
+const OWNER_DEFAULT_ONLY: readonly ModuleId[] = ["settings-clinic"];
+
 /** Full list for a role with no designation, in default order. */
 export function roleDefaultPermissions(role: AccountRole): Permissions {
-  return MODULES.map((module) => ({ module, actions: [...ROLE_DEFAULT[role]] }));
+  return MODULES.filter((module) => role === "owner" || !OWNER_DEFAULT_ONLY.includes(module)).map((module) => ({
+    module,
+    actions: [...ROLE_DEFAULT[role]].filter((a) => actionsFor(module).includes(a)),
+  }));
 }
 
 export interface EffectiveInput {
@@ -226,6 +237,9 @@ export function effectivePermissions({ role, designation, moduleAccess, superAdm
  */
 export function actionsFor(module: ModuleId): readonly Action[] {
   if (module === "settings-overview") return ["view", "read"];
+  // AI assistant: View/Read show the inbox's Human/Bot switch and the
+  // settings; Edit flips the switch and changes the settings.
+  if (module === "ai-assistant") return ["view", "read", "edit"];
   if (isSettingsModule(module)) return ["view", "read", "edit"];
   return ACTIONS;
 }

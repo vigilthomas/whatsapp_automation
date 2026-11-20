@@ -1,5 +1,6 @@
 "use client";
 
+import { ReplyModeToggle } from "@/components/inbox/reply-mode-toggle";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -991,6 +992,9 @@ export function MessageThread({
               />
             </button>
           )}
+
+          {/* Human / Bot: who answers this chat (AI assistant, migration 061). */}
+          <ReplyModeToggle key={conversation.id} conversationId={conversation.id} />
 
           {/* Status dropdown */}
           <DropdownMenu>

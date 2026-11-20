@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requireRole,
-  toErrorResponse,
-} from '@/lib/auth/account'
+import { ForbiddenError, UnauthorizedError, toErrorResponse } from '@/lib/auth/account'
+import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { submitMessageTemplate } from '@/lib/whatsapp/meta-api'
 import {
@@ -99,7 +95,7 @@ export async function POST(request: Request) {
     // membership, so a viewer or agent could push a template to Meta for
     // approval — an external side effect RLS can't roll back — before the
     // local upsert was refused.
-    const { supabase, accountId, userId } = await requireRole('admin')
+    const { supabase, accountId, userId } = await requireRoleAndPermission('admin', 'templates', 'write')
 
     let payload: TemplatePayload
     try {

@@ -6,8 +6,11 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 
+vi.mock('@/lib/auth/permission-guard', () => ({
+  requireRoleAndPermission: mocks.requireRole,
+}));
+
 vi.mock('@/lib/auth/account', () => ({
-  requireRole: mocks.requireRole,
   toErrorResponse: vi.fn(() =>
     Response.json({ error: 'auth failed' }, { status: 403 })
   ),
@@ -56,13 +59,20 @@ beforeEach(() => {
 });
 
 describe('/api/contacts/[id]/tags', () => {
+  it('refuses a member whose designation has no Contacts edit (audit F-04)', async () => {
+    mocks.requireRole.mockRejectedValueOnce(new Error('forbidden'));
+    const response = await POST(request('POST', { tag_id: 'tag-1' }), params);
+    expect(response.status).toBe(403);
+    expect(mocks.add).not.toHaveBeenCalled();
+  });
+
   it('requires an agent and dispatches a newly-added tag', async () => {
     mocks.add.mockResolvedValue({ added: true, dispatched: true });
 
     const response = await POST(request('POST', { tag_id: 'tag-1' }), params);
 
     expect(response.status).toBe(200);
-    expect(mocks.requireRole).toHaveBeenCalledWith('agent');
+    expect(mocks.requireRole).toHaveBeenCalledWith('agent', 'contacts', 'edit');
     expect(mocks.add).toHaveBeenCalledWith({
       db: context.supabase,
       accountId: 'account-1',
