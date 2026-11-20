@@ -15,7 +15,7 @@ Fixes applied after the audit, at the owner's request. Nothing is committed or d
 | **F-12** PostgREST filter strings from search boxes | **Fixed** | Shared `sanitizeSearch` (`src/lib/search/sanitize.ts`) used by the contacts page, the appointment patient picker and `/api/v1/contacts`. This also fixed a bug: the old sanitiser stripped Indic vowel signs, which broke Malayalam/Hindi name searches. |
 | **F-10** Rate limits | **Register corrected** | `whatsapp/send` (60/min) and `whatsapp/broadcast` and resume (60/min) were already limited; the audit overstated this. Still per-process only. |
 | Node 20 EOL | **Fixed** | Docker base and CI → Node 22. |
-| F-06 data scope | Open | Being finished or removed in its own session. |
+| F-06 data scope | **Fixed in code; needs migration 063** | Access control has a Data access dropdown per module (all, assigned branch, assigned to them, custom branches). The API routes for Appointments and Leaves enforce it, and migration 063 adds restrictive RLS so browser reads follow it too. Not yet tested by saving a role against live data. |
 | F-07 CSP enforcement | Open | Needs a week of report-only data first. |
 | F-08 MFA | Open | Feature work (Supabase TOTP + AAL2 checks). |
 | F-11 booking race / audit log | **Partly fixed** | Appointment create/edit now refuse an overlap with the same doctor's booking in any branch (409), and the booking dialog reads busy times from `/api/appointments/busy`, which ignores Data access and returns times only. Without that, a role limited to one branch saw another branch's bookings as free slots. **Open:** two requests at the same instant can still both pass (needs a DB exclusion constraint once existing overlaps are cleaned up); no audit log yet. |
