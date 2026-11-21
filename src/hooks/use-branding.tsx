@@ -208,7 +208,19 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const shown = useRef(DEFAULT_TITLE);
   useEffect(() => {
     const name = saved.title || DEFAULT_TITLE;
+    // Next re-asserts its own <title> after a same-page URL change
+    // (e.g. the dashboard filter's ?range=…), and each of our rewrites
+    // made it write again — an endless loop that froze the tab. Allow a
+    // few corrections per second; past that, back off until the next tick.
+    let burst = 0;
+    let resetAt = 0;
     const fix = () => {
+      const now = Date.now();
+      if (now > resetAt) {
+        burst = 0;
+        resetAt = now + 1000;
+      }
+      if (++burst > 5) return;
       let next = retitle(document.title, shown.current, name);
       if (shown.current !== DEFAULT_TITLE) next = retitle(next, DEFAULT_TITLE, name); // a fresh "— Clinicoro" from Next
       shown.current = name;
