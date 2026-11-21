@@ -81,3 +81,18 @@ describe("sanitizeMasterInput — partial update", () => {
     expect(sanitizeMasterInput(branches, { bogus: 1 }, { partial: true }).ok).toBe(false);
   });
 });
+
+describe("designations — dashboard_cards (069)", () => {
+  const designations = MASTER_ENTITIES.designations;
+  it("keeps known card ids only", () => {
+    expect(
+      sanitizeMasterInput(designations, { dashboard_cards: { disabled: ["pipeline", "x"] } }, { partial: true }),
+    ).toEqual({ ok: true, values: { dashboard_cards: { disabled: ["pipeline"] } } });
+  });
+  it("refuses a non-object", () => {
+    expect(sanitizeMasterInput(designations, { dashboard_cards: ["pipeline"] }, { partial: true })).toEqual({
+      ok: false,
+      error: "dashboard_cards must be an object",
+    });
+  });
+});

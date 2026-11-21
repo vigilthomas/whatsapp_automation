@@ -5,14 +5,13 @@ import { useTranslations } from 'next-intl'
 import { CalendarDays, Plus } from 'lucide-react'
 
 import { useAuth } from '@/hooks/use-auth'
-import { cardDef, templateLayout } from '@/lib/dashboard/cards'
+import { cardDef } from '@/lib/dashboard/cards'
+import { packLayout, SECTOR_CARDS } from '@/lib/dashboard/sectors'
 
 import { Button } from '@/components/ui/button'
 import { DashboardGrid } from '@/components/dashboard/dashboard-grid'
 import { useDashboardData } from '@/components/dashboard/dashboard-cards'
 
-/** The one dashboard everyone sees: the Bookings ("classic") template. */
-const LAYOUT = templateLayout('classic')
 
 /**
  * Dashboard — a fixed grid of cards (the Bookings template). Customisation
@@ -26,10 +25,11 @@ export default function DashboardPage() {
   const t = useTranslations('Dashboard')
   const { profile, can } = useAuth()
 
-  const visible = LAYOUT.cards.filter((id) => {
+  const visible = SECTOR_CARDS.clinic.filter((id) => {
     const m = cardDef(id)?.module
     return !m || can(m, 'read')
   })
+  const LAYOUT = packLayout(visible)
   const data = useDashboardData(visible)
 
   const hour = new Date().getHours()

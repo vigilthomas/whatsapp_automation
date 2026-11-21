@@ -12,6 +12,7 @@
 // ============================================================
 
 import { parsePermissions } from "@/lib/auth/permissions";
+import { parseDashboardCards } from "@/lib/dashboard/card-switches";
 import type { ModuleId } from "@/lib/auth/module-access";
 
 export const MASTER_ENTITY_SLUGS = [
@@ -43,7 +44,8 @@ export type MasterFieldType =
   | "select"
   | "duration"
   | RefType
-  | "permissions";
+  | "permissions"
+  | "dashboard-cards";
 
 export function isRefType(t: MasterFieldType): t is RefType {
   return (REF_TYPES as readonly string[]).includes(t);
@@ -273,6 +275,8 @@ export const MASTER_ENTITIES: Record<MasterEntitySlug, MasterEntity> = {
       name,
       { key: "description", labelKey: "description", type: "text", list: true, maxLength: 500 },
       { key: "permissions", labelKey: "permissions", type: "permissions", form: false },
+      // Access Control → Dashboard tab (069): cards switched off for this role.
+      { key: "dashboard_cards", labelKey: "dashboardCards", type: "dashboard-cards", form: false },
       isActive,
     ],
   },
@@ -434,6 +438,13 @@ export function sanitizeMasterInput(
           return { ok: false, error: `${field.key} must be an array` };
         }
         values[field.key] = parsePermissions(raw);
+        break;
+      }
+      case "dashboard-cards": {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+          return { ok: false, error: `${field.key} must be an object` };
+        }
+        values[field.key] = parseDashboardCards(raw);
         break;
       }
     }

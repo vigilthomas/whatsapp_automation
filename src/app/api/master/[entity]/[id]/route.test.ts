@@ -67,6 +67,20 @@ describe('PATCH /api/master/[entity]/[id]', () => {
     expect(q).toContainEqual(['is', 'deleted_at', null]);
   });
 
+  it("saves a role's dashboard card switches, cleaned", async () => {
+    mocks.results = [{ data: { id: 'rec-1' }, error: null }];
+    const res = await PATCH(
+      new Request('http://x', {
+        method: 'PATCH',
+        body: JSON.stringify({ dashboard_cards: { disabled: ['pipeline', 'pipeline', 'bogus'] } }),
+      }),
+      params('designations'),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.requirePermission).toHaveBeenCalledWith('designations', 'edit');
+    expect(mocks.calls[0]).toContainEqual(['update', { dashboard_cards: { disabled: ['pipeline'] } }]);
+  });
+
   it('is refused without Edit', async () => {
     mocks.requirePermission.mockRejectedValue(new Error('no'));
     const res = await PATCH(new Request('http://x', { method: 'PATCH', body: '{}' }), params('services'));
