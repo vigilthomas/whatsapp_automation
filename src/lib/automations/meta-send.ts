@@ -16,6 +16,7 @@ import {
   templateContentText,
 } from '@/lib/whatsapp/template-body'
 import { supabaseAdmin } from './admin-client'
+import { loadAutofillContext, resolveEngineTemplateParams } from '@/lib/whatsapp/template-autofill-server'
 
 // ------------------------------------------------------------
 // Automation-side Meta sender.
@@ -50,6 +51,8 @@ interface SendTemplateArgs {
   templateName: string
   language?: string
   params?: string[]
+  /** The step's values by placeholder key ('1' or a name like 'token_num'). */
+  variables?: Record<string, string>
 }
 
 export async function engineSendText(args: SendTextArgs): Promise<{ whatsapp_message_id: string }> {
@@ -146,10 +149,10 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
 
   const accessToken = decrypt(config.access_token)
 
-  // Local template row — read for the body we persist below, not for
-  // the Meta payload (the wire shape is deliberately unchanged here).
-  // A missing row is fine: the send still goes out, we just can't
-  // reconstruct the text the customer saw.
+  // Local template row — for the body we persist below and, when found,
+  // for the Meta payload's components (named parameters, static media
+  // header). A missing row is fine: the send still goes out the old way,
+  // we just can't reconstruct the text the customer saw.
   const templateRow =
     input.kind === 'template'
       ? (
@@ -162,6 +165,18 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
         ).row
       : null
 
+  // Body values in the template's own placeholder order. Named
+  // templates ({{name}}, {{time}}…) are filled from the step, then the
+  // contact and their next booking; the row rides along so the send
+  // carries each value's parameter_name (Meta rejects named templates
+  // without it) and any static media header.
+  const templateParams =
+    input.kind === 'template'
+      ? await resolveEngineTemplateParams(templateRow, input.variables, input.params, () =>
+          loadAutofillContext(db, input.accountId, input.contactId),
+        )
+      : []
+
   const attempt = async (phone: string): Promise<string> => {
     if (input.kind === 'template') {
       const r = await sendTemplateMessage({
@@ -170,7 +185,8 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
         to: phone,
         templateName: input.templateName,
         language: input.language,
-        params: input.params,
+        params: templateParams,
+        template: templateRow ?? undefined,
       })
       return r.messageId
     }
@@ -218,7 +234,7 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
   const content_text =
     input.kind === 'text'
       ? input.text
-      : templateContentText(templateRow, input.params ?? [])
+      : templateContentText(templateRow, templateParams)
   const template_name = input.kind === 'template' ? input.templateName : null
 
   const { error: msgErr } = await db.from('messages').insert({

@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, ArrowRight, Eye, ImageIcon, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { templateVariables } from '@/lib/whatsapp/template-validators';
+import { defaultFieldFor } from '@/lib/whatsapp/template-autofill';
 
 type VariableType = 'static' | 'field' | 'custom_field';
 
@@ -128,10 +130,25 @@ export function Step3Personalize({
     };
   }, []);
 
-  const placeholders = useMemo(() => {
-    const matches = template.body_text.match(/\{\{(\d+)\}\}/g);
-    if (!matches) return [];
-    return [...new Set(matches)].sort();
+  // Numbered ({{1}}) or named ({{name}}) — in send order either way.
+  const placeholders = useMemo(
+    () => templateVariables(template.body_text).keys.map((k) => `{{${k}}}`),
+    [template.body_text],
+  );
+
+  // Named placeholders that obviously mean a contact field ({{name}},
+  // {{phone}}…) start mapped to it; still changeable below. Only fills
+  // keys with no mapping yet, so nothing the user picked is replaced.
+  useEffect(() => {
+    const { keys, named } = templateVariables(template.body_text);
+    if (!named) return;
+    const seeded: Record<string, VariableMapping> = {};
+    for (const k of keys) {
+      const field = defaultFieldFor(k);
+      if (field && !variables[k]?.value) seeded[k] = { type: 'field', value: field };
+    }
+    if (Object.keys(seeded).length) onUpdate({ ...variables, ...seeded });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once per template
   }, [template.body_text]);
 
   // Templates with an IMAGE/VIDEO/DOCUMENT header need a media URL at

@@ -55,3 +55,35 @@ describe('suggestTemplateValues', () => {
     ])
   })
 })
+
+describe('fillTemplateParams', () => {
+  it('uses a configured value first, then the suggestion, in the template order', async () => {
+    const { fillTemplateParams } = await import('./template-autofill')
+    expect(fillTemplateParams(['name', 'time', 'token_num'], { token_num: 'A7', name: ' ' }, ['Asha', '10:00', ''])).toEqual({
+      params: ['Asha', '10:00', 'A7'],
+      missing: [],
+    })
+  })
+  it('reports placeholders nothing could fill', async () => {
+    const { fillTemplateParams } = await import('./template-autofill')
+    expect(fillTemplateParams(['name', 'token_num'], undefined, ['Asha', ''])).toEqual({
+      params: ['Asha', ''],
+      missing: ['token_num'],
+    })
+  })
+})
+
+describe('defaultFieldFor', () => {
+  it('maps contact-ish names to the broadcast contact fields', async () => {
+    const { defaultFieldFor } = await import('./template-autofill')
+    expect(['name', 'customer_name', 'phone', 'email', 'company', 'time', '1'].map(defaultFieldFor)).toEqual([
+      'name',
+      'name',
+      'phone',
+      'email',
+      'company',
+      null,
+      null,
+    ])
+  })
+})

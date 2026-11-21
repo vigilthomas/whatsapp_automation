@@ -95,3 +95,45 @@ export function suggestTemplateValues(keys: readonly string[], named: boolean, c
     return (pick?.(ctx) ?? '').trim()
   })
 }
+
+/**
+ * The values to send, in the template's placeholder order: a value
+ * configured for that placeholder wins (automation step, broadcast
+ * mapping), else the suggestion. `missing` lists placeholders left
+ * empty — Meta rejects a send with an empty parameter, so callers say
+ * which one instead of letting Meta answer with a bare 400.
+ */
+export function fillTemplateParams(
+  keys: readonly string[],
+  given: Record<string, string> | undefined,
+  suggested: readonly string[],
+): { params: string[]; missing: string[] } {
+  const params = keys.map((k, i) => {
+    const v = given?.[k]
+    return v != null && String(v).trim() ? String(v) : (suggested[i] ?? '')
+  })
+  return { params, missing: keys.filter((_, i) => !params[i].trim()) }
+}
+
+const FIELD_OF: Record<string, 'name' | 'phone' | 'email' | 'company'> = {
+  name: 'name',
+  full_name: 'name',
+  customer_name: 'name',
+  customer: 'name',
+  client_name: 'name',
+  client: 'name',
+  patient_name: 'name',
+  patient: 'name',
+  contact_name: 'name',
+  phone: 'phone',
+  phone_number: 'phone',
+  mobile: 'phone',
+  email: 'email',
+  company: 'company',
+  company_name: 'company',
+}
+
+/** The broadcast contact field a named placeholder most likely means. */
+export function defaultFieldFor(key: string): 'name' | 'phone' | 'email' | 'company' | null {
+  return FIELD_OF[key.trim().toLowerCase().replace(/[\s-]+/g, '_')] ?? null
+}

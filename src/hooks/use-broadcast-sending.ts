@@ -1,5 +1,6 @@
 'use client';
 
+import { templateVariables } from '@/lib/whatsapp/template-validators';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -98,18 +99,27 @@ export function resolveVariables(
   variables: Record<string, VariableMapping>,
   contact: Contact,
   customValues?: Map<string, string>,
+  /**
+   * The template's placeholders in send order (templateVariables). Named
+   * templates ({{name}}) need it: their values go in the order the names
+   * first appear, which no sort of the keys reproduces.
+   */
+  order?: readonly string[],
 ): string[] {
-  // Keys are typically "1","2",... — numeric-aware sort keeps
-  // {{1}} before {{10}}.
-  const keys = Object.keys(variables).sort((a, b) => {
-    const an = Number(a);
-    const bn = Number(b);
-    if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
-    return a.localeCompare(b);
-  });
+  // Without an order, keys are typically "1","2",... — numeric-aware
+  // sort keeps {{1}} before {{10}}.
+  const keys = order
+    ? [...order]
+    : Object.keys(variables).sort((a, b) => {
+        const an = Number(a);
+        const bn = Number(b);
+        if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+        return a.localeCompare(b);
+      });
 
   return keys.map((key) => {
     const v = variables[key];
+    if (!v) return '';
     if (v.type === 'static') return v.value;
 
     if (v.type === 'field') {
@@ -429,6 +439,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             payload.variables,
             contact,
             customValueIndex.get(contact.id),
+            templateVariables(payload.template.body_text).keys,
           ),
         ]),
       );
