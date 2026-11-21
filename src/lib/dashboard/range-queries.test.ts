@@ -7,6 +7,8 @@ import {
   loadBookingHours,
   loadCompletedCountByContact,
   loadDealsSummary,
+  loadAppointmentList,
+  loadUpcoming,
   loadMessagesIn,
   loadPointInTimeCounts,
   loadServicePrices,
@@ -143,5 +145,29 @@ describe('loadMessagesIn', () => {
     const { db, calls } = fakeDb([{ data: [], error: null }])
     await loadMessagesIn(db, range)
     expect(calls[0]).toContainEqual(['order', 'created_at', { ascending: false }])
+  })
+})
+
+describe('loadAppointmentList', () => {
+  it('reads the range newest first with patient and doctor names, narrowed to the branch', async () => {
+    const row = { id: 'a1', starts_at: 'x', service: 'Cut', status: 'completed', contact_id: 'c1', contact: { name: 'Asha' }, doctor: { name: 'Neha' } }
+    const { db, calls } = fakeDb([{ data: [row], error: null }])
+    expect(await loadAppointmentList(db, range, 'b1')).toEqual([row])
+    expect(calls[0]).toContainEqual(['gte', 'starts_at', range.from.toISOString()])
+    expect(calls[0]).toContainEqual(['lt', 'starts_at', range.to.toISOString()])
+    expect(calls[0]).toContainEqual(['eq', 'branch_id', 'b1'])
+    expect(calls[0]).toContainEqual(['order', 'starts_at', { ascending: false }])
+  })
+})
+
+describe('loadUpcoming', () => {
+  it('reads 7 business days from the given day, booked ones only, soonest first', async () => {
+    const { db, calls } = fakeDb([{ data: [], error: null }])
+    await loadUpcoming(db, '2026-11-23', 'Asia/Kolkata', null)
+    // 2026-11-23 00:00 in Kolkata is 2026-11-22T18:30Z; 7 days later 2026-11-29T18:30Z
+    expect(calls[0]).toContainEqual(['gte', 'starts_at', '2026-11-22T18:30:00.000Z'])
+    expect(calls[0]).toContainEqual(['lt', 'starts_at', '2026-11-29T18:30:00.000Z'])
+    expect(calls[0]).toContainEqual(['in', 'status', ['scheduled', 'confirmed']])
+    expect(calls[0]).toContainEqual(['order', 'starts_at', { ascending: true }])
   })
 })

@@ -124,7 +124,7 @@ export function StatTile({
   sub?: string;
   subTone?: "muted" | "primary" | "amber";
   /** Icon box tint (reference `.icon-box.mint` / `.info` / `.warn`). */
-  tone?: "mint" | "info" | "warn";
+  tone?: "mint" | "info" | "warn" | "success";
   /**
    * Optional trend pill vs the previous period, e.g. { pct: 20, up: true }.
    * `good` sets the colour when up isn't the good direction (no-shows).
@@ -133,56 +133,80 @@ export function StatTile({
 }) {
   const meta = useCardMeta();
   const Icon = meta?.Icon ?? GivenIcon;
+  const toneText = {
+    mint: "text-teal-700",
+    info: "text-info-fg",
+    warn: "text-warn-fg",
+    success: "text-success-fg",
+  }[tone];
+  const toneBox = {
+    mint: "bg-mint text-teal-700",
+    info: "bg-info-bg text-info-fg",
+    warn: "bg-warn-bg text-warn-fg",
+    success: "bg-success-bg text-success-fg",
+  }[tone];
   return (
-    <div className={cn("flex items-start gap-3.5 rounded-2xl border border-border bg-card p-5 shadow-card", meta && "h-full overflow-hidden")}>
-      <span
-        className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-[11px]",
-          tone === "mint" && "bg-mint text-teal-700",
-          tone === "info" && "bg-info-bg text-info-fg",
-          tone === "warn" && "bg-warn-bg text-warn-fg",
-        )}
-      >
-        <Icon className="size-5" strokeWidth={1.75} />
-      </span>
+    <div
+      className={cn(
+        // @container: narrow tiles (four across beside the upcoming column)
+        // shrink the number and icon instead of colliding.
+        "@container flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-card @min-[260px]:p-5",
+        meta && "h-full overflow-hidden",
+      )}
+    >
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground">
-            <span className="truncate">{meta?.title ?? label}</span>
-            <CardTag />
-          </p>
-          {trend ? (
-            <span
-              className={cn(
-                "inline-flex h-[22px] shrink-0 items-center gap-0.5 rounded-full px-2 text-[11.5px] font-bold",
-                (trend.good ?? trend.up) ? "bg-success-bg text-success-fg" : "bg-warn-bg text-warn-fg",
-              )}
-            >
-              {trend.up ? (
-                <ArrowUpRight className="size-3" strokeWidth={2.2} />
-              ) : (
-                <ArrowDownRight className="size-3" strokeWidth={2.2} />
-              )}
-              {trend.pct}%
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1.5 mb-1 font-heading text-[30px] leading-[1.05] font-semibold tabular-nums text-foreground">
+        <p
+          className={cn(
+            "truncate font-heading text-[21px] leading-[1.15] font-semibold tabular-nums @min-[240px]:text-[28px]",
+            toneText,
+          )}
+        >
           {value}
         </p>
-        {sub ? (
-          <p
-            className={cn(
-              "text-xs",
-              subTone === "primary" && "text-teal-700",
-              subTone === "amber" && "text-warn-fg",
-              subTone === "muted" && "text-muted-foreground",
-            )}
-          >
-            {sub}
-          </p>
+        <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] leading-tight text-foreground/80">
+          <span className="line-clamp-2">{meta?.title ?? label}</span>
+          <CardTag />
+        </p>
+        {trend || sub ? (
+          <div className="mt-1 flex min-w-0 items-center gap-1.5">
+            {trend ? (
+              <span
+                className={cn(
+                  "inline-flex h-[20px] shrink-0 items-center gap-0.5 rounded-full px-1.5 text-[11px] font-bold",
+                  (trend.good ?? trend.up) ? "bg-success-bg text-success-fg" : "bg-warn-bg text-warn-fg",
+                )}
+              >
+                {trend.up ? (
+                  <ArrowUpRight className="size-3" strokeWidth={2.2} />
+                ) : (
+                  <ArrowDownRight className="size-3" strokeWidth={2.2} />
+                )}
+                {trend.pct}%
+              </span>
+            ) : null}
+            {sub ? (
+              <p
+                className={cn(
+                  "hidden truncate text-[11.5px] @min-[250px]:block",
+                  subTone === "primary" && "text-teal-700",
+                  subTone === "amber" && "text-warn-fg",
+                  subTone === "muted" && "text-muted-foreground",
+                )}
+              >
+                {sub}
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </div>
+      <span
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-xl @min-[240px]:size-12",
+          toneBox,
+        )}
+      >
+        <Icon className="size-5 @min-[240px]:size-6" strokeWidth={1.75} />
+      </span>
     </div>
   );
 }

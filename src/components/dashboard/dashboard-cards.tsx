@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  BadgeCheck,
   Briefcase,
   CalendarCheck,
   CircleAlert,
@@ -57,6 +58,7 @@ import { percentChange, previousRange, type DateRange } from "@/lib/dashboard/ra
 import {
   countCreatedIn,
   loadAppointmentsIn,
+  loadAppointmentList,
   loadBookingHours,
   loadBroadcastResults,
   loadCompletedCountByContact,
@@ -69,6 +71,7 @@ import {
   type BookingHours,
   type BroadcastResults,
   type DealsSummary,
+  type ListAppointment,
   type PointInTimeCounts,
   type StaffRow,
 } from "@/lib/dashboard/range-queries";
@@ -88,6 +91,7 @@ import {
   WhatsAppConversations,
 } from "@/components/dashboard/clinic-widgets";
 import { BroadcastResultsCard, RankList } from "@/components/dashboard/range-widgets";
+import { BookingsLineCard, PatientsTable, UpcomingRail } from "@/components/dashboard/overview-widgets";
 
 type Group =
   | "appts"
@@ -104,7 +108,8 @@ type Group =
   | "pipeline"
   | "response"
   | "deals"
-  | "broadcasts";
+  | "broadcasts"
+  | "list";
 
 const GROUPS_OF: Record<string, Group[]> = {
   "stat-bookings-today": ["appts"],
@@ -116,6 +121,11 @@ const GROUPS_OF: Record<string, Group[]> = {
   "bookings-trend": ["appts"],
   "staff-bookings": ["appts", "staff"],
   "top-services": ["appts"],
+  "stat-completed": ["appts"],
+  "bookings-line": ["appts"],
+  "patients-table": ["list", "appts", "returning"],
+  // Loads itself (always "what's coming", not the range).
+  "upcoming-appointments": [],
   "today-bookings": ["day"],
   "staff-availability": ["day", "staff"],
   "stat-open-chats": ["counts"],
@@ -136,6 +146,8 @@ const GROUPS_OF: Record<string, Group[]> = {
 
 export interface DashboardData {
   range: DateRange | null;
+  /** The filter's branch (null = all the viewer may see). */
+  branch: string | null;
   appts: ApptRow[] | null;
   prevAppts: ApptRow[] | null;
   completedByContact: Map<string, number> | null;
@@ -153,13 +165,14 @@ export interface DashboardData {
   response: ResponseTimeSummary | null;
   deals: { cur: DealsSummary; prev: DealsSummary } | null;
   broadcasts: BroadcastResults | null;
+  list: ListAppointment[] | null;
   hours: BookingHours | null;
   loading: Record<Group, boolean>;
   /** Groups whose query failed this request (their cards say so). */
   failed: ReadonlySet<string>;
 }
 
-type Loaded = Omit<DashboardData, "range" | "hours" | "loading" | "failed">;
+type Loaded = Omit<DashboardData, "range" | "branch" | "hours" | "loading" | "failed">;
 const NONE_FAILED: ReadonlySet<string> = new Set();
 
 const EMPTY: Loaded = {
@@ -180,6 +193,7 @@ const EMPTY: Loaded = {
   response: null,
   deals: null,
   broadcasts: null,
+  list: null,
 };
 
 const ALL_GROUPS = [...new Set(Object.values(GROUPS_OF).flat())];
@@ -309,11 +323,12 @@ export function useDashboardData(
       set(id, "deals", { cur, prev: before });
     });
     run("broadcasts", async () => set(id, "broadcasts", await loadBroadcastResults(db, range)));
+    run("list", async () => set(id, "list", await loadAppointmentList(db, range, branch)));
     // `range` is represented by rangeKey; `tick` re-runs the same request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupKey, rangeKey, branch, tick, db, set]);
 
-  return { ...state, range, hours, loading, failed };
+  return { ...state, range, branch, hours, loading, failed };
 }
 
 // ------------------------------------------------------------ rendering
@@ -345,7 +360,7 @@ export function DashboardCard({ id, data }: { id: string; data: DashboardData })
   const tp = useTranslations("Dashboard.page");
   const tc = useTranslations("Dashboard.cards");
   const tr = useTranslations("Dashboard.range");
-  const { defaultCurrency } = useAuth();
+  const { defaultCurrency, can } = useAuth();
   const L = data.loading;
   const vs = useVsLabel(data.range);
   const range = data.range;
@@ -462,6 +477,42 @@ export function DashboardCard({ id, data }: { id: string; data: DashboardData })
         />
       );
     }
+    case "stat-completed": {
+      const n = (rows: ApptRow[] | null) => (rows ?? []).filter((a) => a.status === "completed").length;
+      return (
+        <StatTile
+          icon={BadgeCheck}
+          tone="info"
+          label={tc(id, { range: "" })}
+          value={wait(apptsReady, () => n(appts))}
+          trend={apptsReady && prev ? trendOf(n(appts), n(prev)) : null}
+          sub={apptsReady ? vs : undefined}
+        />
+      );
+    }
+    case "bookings-line":
+      return (
+        <BookingsLineCard
+          loading={L.appts}
+          points={
+            apptsReady && range
+              ? trendPoints(appts!, range).map((p) => ({ label: p.label, total: p.inClinic + p.viaWhatsApp }))
+              : null
+          }
+        />
+      );
+    case "patients-table":
+      return (
+        <PatientsTable
+          rows={data.list}
+          completed={data.completedByContact}
+          loading={L.list}
+          tz={data.hours?.tz ?? null}
+          canAdd={can("appointments", "write")}
+        />
+      );
+    case "upcoming-appointments":
+      return <UpcomingRail tz={data.hours?.tz ?? null} branch={data.branch} />;
     case "today-bookings":
       return <TodayAppointments items={data.day} loading={L.day} tz={data.hours?.tz ?? null} />;
     case "staff-availability":
@@ -509,6 +560,7 @@ export function DashboardCard({ id, data }: { id: string; data: DashboardData })
       return (
         <StatTile
           icon={Users}
+          tone="warn"
           label={tc(id)}
           value={wait(!L.counts && !!data.counts, () => data.counts!.customersTotal.toLocaleString())}
           sub={data.counts ? t("patientsHint") : undefined}
@@ -519,6 +571,7 @@ export function DashboardCard({ id, data }: { id: string; data: DashboardData })
       return (
         <StatTile
           icon={UserPlus}
+          tone="success"
           label={tc(id, { range: "" })}
           value={wait(!L.newContacts && !!n, () => n!.cur.toLocaleString())}
           trend={n ? trendOf(n.cur, n.prev) : null}

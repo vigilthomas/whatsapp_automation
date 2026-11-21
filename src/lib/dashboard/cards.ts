@@ -31,6 +31,12 @@ export interface CardDef {
   minH: number;
   /** Where clicking the card goes, with the dashboard's range and branch. */
   href?: (q: CardLinkQuery) => string;
+  /**
+   * A tall column on the right of the wide layout (Upcoming appointments).
+   * The other cards pack into the 8 columns beside it; on smaller screens
+   * it goes after them (sectors.ts packLayout).
+   */
+  rail?: boolean;
 }
 
 export interface CardLinkQuery {
@@ -56,6 +62,10 @@ export const CARDS: readonly CardDef[] = [
   { id: "stat-takings", icon: "wallet", module: "appointments", w: 3, h: 4, minW: 2, minH: 3, href: appts("completed") },
   { id: "stat-utilisation", icon: "pie-chart", module: "appointments", w: 3, h: 4, minW: 2, minH: 3, href: appts() },
   { id: "stat-returning", icon: "users-round", module: "appointments", w: 3, h: 4, minW: 2, minH: 3, href: appts("completed") },
+  { id: "stat-completed", icon: "badge-check", module: "appointments", w: 3, h: 4, minW: 2, minH: 3, href: appts("completed") },
+  { id: "bookings-line", icon: "trending-up", module: "appointments", w: 12, h: 10, minW: 4, minH: 7, href: appts() },
+  { id: "patients-table", icon: "users", module: "appointments", w: 12, h: 11, minW: 4, minH: 8, href: appts() },
+  { id: "upcoming-appointments", icon: "calendar-days", module: "appointments", w: 4, h: 20, minW: 3, minH: 12, href: appts(), rail: true },
   { id: "today-bookings", icon: "calendar-check", module: "appointments", w: 6, h: 12, minW: 3, minH: 6, href: appts() },
   { id: "staff-availability", icon: "user-round", module: "appointments", w: 6, h: 6, minW: 3, minH: 4, href: appts() },
   { id: "bookings-trend", icon: "bar-chart-3", module: "appointments", w: 6, h: 10, minW: 3, minH: 6, href: appts() },

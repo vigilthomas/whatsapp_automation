@@ -29,12 +29,12 @@ const switchFor = (html: string, label: string) => {
 describe('DashboardCardsTab', () => {
   it('lets an admin switch a card even before the role can read its module', () => {
     const html = render([])
-    const sw = switchFor(html, 'Pending confirmations')
+    const sw = switchFor(html, 'Treatments done')
     expect(sw).toContain('aria-checked="true"')
     expect(sw).not.toMatch(/data-disabled|aria-disabled="true"/)
     expect(html).toContain('Needs appointments → Read')
   })
   it('shows a switched-off card as off', () => {
-    expect(switchFor(render(['stat-pending']), 'Pending confirmations')).toContain('aria-checked="false"')
+    expect(switchFor(render(['stat-completed']), 'Treatments done')).toContain('aria-checked="false"')
   })
 })

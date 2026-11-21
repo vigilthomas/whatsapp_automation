@@ -250,3 +250,48 @@ export async function loadMessagesIn(db: DB, range: DateRange): Promise<{ at: st
   )
   return rows.map((r) => ({ at: r.created_at, incoming: r.sender_type === 'customer' }))
 }
+
+/** One booking as the patients table and the upcoming column show it. */
+export interface ListAppointment {
+  id: string
+  starts_at: string
+  service: string | null
+  status: string
+  contact_id: string | null
+  contact: { name: string | null; phone?: string | null } | null
+  doctor: { name: string } | null
+}
+
+const LIST_SELECT = 'id, starts_at, service, status, contact_id, contact:contacts(name, phone), doctor:doctors(name)'
+/** The table pages through at most this many of the range's bookings. */
+export const LIST_CAP = 1000
+
+/** The range's bookings, newest first, with patient and doctor names (patients table). */
+export async function loadAppointmentList(db: DB, range: DateRange, branch: string | null): Promise<ListAppointment[]> {
+  let q = db
+    .from('appointments')
+    .select(LIST_SELECT)
+    .gte('starts_at', range.from.toISOString())
+    .lt('starts_at', range.to.toISOString())
+  if (branch) q = q.eq('branch_id', branch)
+  const { data, error } = await q.order('starts_at', { ascending: false }).range(0, LIST_CAP - 1)
+  if (error) throw error
+  return (data as unknown as ListAppointment[]) ?? []
+}
+
+/**
+ * Booked (scheduled / confirmed) appointments for 7 days from `fromDay`
+ * in the business timezone, soonest first (upcoming column).
+ */
+export async function loadUpcoming(db: DB, fromDay: string, tz: string, branch: string | null): Promise<ListAppointment[]> {
+  let q = db
+    .from('appointments')
+    .select(LIST_SELECT)
+    .gte('starts_at', zonedInstant(fromDay, 0, tz).toISOString())
+    .lt('starts_at', zonedInstant(addDays(fromDay, 7), 0, tz).toISOString())
+    .in('status', ['scheduled', 'confirmed'])
+  if (branch) q = q.eq('branch_id', branch)
+  const { data, error } = await q.order('starts_at', { ascending: true }).range(0, 499)
+  if (error) throw error
+  return (data as unknown as ListAppointment[]) ?? []
+}

@@ -200,7 +200,7 @@
     "cards": {
       "stat-bookings-today": "[[Bookings]] {range}",
       "stat-open-chats": "WhatsApp chats",
-      "stat-customers": "[[Customers]]",
+      "stat-customers": "Total [[customers]]",
       "stat-pending": "Pending confirmations",
       "today-bookings": "[[Bookings]] {day}",
       "staff-availability": "[[Staff]] availability {day}",
@@ -216,14 +216,18 @@
       "quick-actions": "Quick actions",
       "activity": "Recent activity",
       "stat-no-show-rate": "No-show rate",
-      "stat-takings": "Estimated takings",
+      "stat-takings": "Total earnings",
       "stat-utilisation": "Chair utilisation",
       "stat-returning": "Returning [[customers]]",
       "staff-bookings": "[[Bookings]] by [[staff]]",
       "top-services": "Top services",
       "stat-pipeline-value": "Open pipeline value",
       "stat-deals-won-lost": "Deals won",
-      "broadcast-results": "Broadcast results"
+      "broadcast-results": "Broadcast results",
+      "stat-completed": "Treatments done",
+      "bookings-line": "[[Bookings]] status",
+      "patients-table": "Current [[customers]]",
+      "upcoming-appointments": "Upcoming [[bookings]]"
     },
     "grid": {
       "customise": "Customise",
@@ -299,6 +303,31 @@
       "maxRange": "Up to 12 months",
       "branch": "Branch",
       "allBranches": "All my branches"
+    },
+    "overview": {
+      "bookingsCount": "{count, plural, one {# [[booking]]} other {# [[bookings]]}}",
+      "search": "Search…",
+      "add": "Add [[booking]]",
+      "noMatches": "No matches.",
+      "noPatients": "No [[bookings]] in this period.",
+      "colPatient": "[[Customer]]",
+      "colService": "Service",
+      "colDate": "Date",
+      "colTime": "Time",
+      "colStaff": "[[Staff]]",
+      "open": "Open",
+      "visit": "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} visit",
+      "today": "Today",
+      "pages": "Pages",
+      "previous": "Previous page",
+      "next": "Next page",
+      "previousWeek": "Previous week",
+      "nextWeek": "Next week",
+      "todayOn": "Today, {date}",
+      "tomorrowOn": "Tomorrow, {date}",
+      "nothingUpcoming": "Nothing booked for these days.",
+      "loadFailed": "Couldn't load upcoming [[bookings]].",
+      "newPatient": "New"
     }
   },
   "Inbox": {

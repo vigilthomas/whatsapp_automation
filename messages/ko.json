@@ -200,7 +200,7 @@
     "cards": {
       "stat-bookings-today": "{range} [[booking]]",
       "stat-open-chats": "WhatsApp 채팅",
-      "stat-customers": "[[customer]]",
+      "stat-customers": "전체 [[customers]]",
       "stat-pending": "확정 대기",
       "today-bookings": "{day} [[booking]]",
       "staff-availability": "{day} [[staff]] 가용성",
@@ -216,14 +216,18 @@
       "quick-actions": "빠른 작업",
       "activity": "최근 활동",
       "stat-no-show-rate": "노쇼 비율",
-      "stat-takings": "예상 매출",
+      "stat-takings": "총 수익",
       "stat-utilisation": "좌석 가동률",
       "stat-returning": "재방문 [[customer]]",
       "staff-bookings": "[[staff]]별 [[booking]]",
       "top-services": "인기 서비스",
       "stat-pipeline-value": "진행 중 파이프라인 금액",
       "stat-deals-won-lost": "성사된 거래",
-      "broadcast-results": "브로드캐스트 결과"
+      "broadcast-results": "브로드캐스트 결과",
+      "stat-completed": "완료된 진료",
+      "bookings-line": "[[Bookings]] 현황",
+      "patients-table": "현재 [[customers]]",
+      "upcoming-appointments": "다가오는 [[bookings]]"
     },
     "grid": {
       "customise": "사용자 지정",
@@ -299,6 +303,31 @@
       "maxRange": "최대 12개월",
       "branch": "지점",
       "allBranches": "내 모든 지점"
+    },
+    "overview": {
+      "bookingsCount": "[[bookings]] {count}건",
+      "search": "검색…",
+      "add": "[[booking]] 추가",
+      "noMatches": "일치하는 항목이 없습니다.",
+      "noPatients": "이 기간에 [[bookings]]이 없습니다.",
+      "colPatient": "[[Customer]]",
+      "colService": "서비스",
+      "colDate": "날짜",
+      "colTime": "시간",
+      "colStaff": "[[Staff]]",
+      "open": "열기",
+      "visit": "{n}번째 방문",
+      "today": "오늘",
+      "pages": "페이지",
+      "previous": "이전 페이지",
+      "next": "다음 페이지",
+      "previousWeek": "이전 주",
+      "nextWeek": "다음 주",
+      "todayOn": "오늘, {date}",
+      "tomorrowOn": "내일, {date}",
+      "nothingUpcoming": "이 기간에 예약이 없습니다.",
+      "loadFailed": "다가오는 [[bookings]]을 불러오지 못했습니다.",
+      "newPatient": "신규"
     }
   },
   "Inbox": {
