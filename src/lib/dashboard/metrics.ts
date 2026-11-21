@@ -135,16 +135,39 @@ function bucketKeys(range: DateRange): { key: string; label: string; size: 'day'
   return out
 }
 
-/** Bookings per bucket for the trend chart: in-clinic, via WhatsApp, cancelled + no-show. */
+/** "YYYY-MM-DDTHH" — the hour an instant falls in, in the business timezone. */
+function localHourKey(iso: string, tz: string): string {
+  const d = new Date(iso)
+  const hour = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(d)
+  return `${localDay(d, tz)}T${hour.padStart(2, '0')}`
+}
+
+/** The 24 hour keys of a single day, labelled like "9 AM" / "14:00" by locale. */
+function hourKeys(day: string): { key: string; label: string }[] {
+  const fmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', timeZone: 'UTC' })
+  return Array.from({ length: 24 }, (_, h) => {
+    const hh = String(h).padStart(2, '0')
+    return { key: `${day}T${hh}`, label: fmt.format(new Date(`${day}T${hh}:00:00Z`)) }
+  })
+}
+
+/**
+ * Bookings per bucket for the trend charts: in-clinic, via WhatsApp,
+ * cancelled + no-show. A single-day range (Today, Yesterday) is split
+ * by hour so the chart shows the day's shape instead of one dot.
+ */
 export function trendPoints(
   rows: ApptRow[],
   range: DateRange,
 ): { day: string; label: string; inClinic: number; viaWhatsApp: number; cancelled: number }[] {
-  const keys = bucketKeys(range)
+  const hourly = range.days === 1
+  const keys = hourly ? hourKeys(range.fromDay) : bucketKeys(range)
   const pts = new Map(keys.map(({ key, label }) => [key, { day: key, label, inClinic: 0, viaWhatsApp: 0, cancelled: 0 }]))
-  const size = keys[0]?.size ?? 'day'
+  const size = bucketFor(range)
   for (const r of rows) {
-    const p = pts.get(bucketStart(localDay(new Date(r.starts_at), range.tz), size))
+    const p = pts.get(
+      hourly ? localHourKey(r.starts_at, range.tz) : bucketStart(localDay(new Date(r.starts_at), range.tz), size),
+    )
     if (!p) continue
     if (r.status === 'cancelled' || r.status === 'no_show') p.cancelled++
     else if (r.source === 'whatsapp') p.viaWhatsApp++

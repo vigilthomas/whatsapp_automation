@@ -121,6 +121,22 @@ describe('trendPoints', () => {
       ['2026-11-17', 0, 0, 2],
     ])
   })
+  it('uses hourly buckets in the business timezone for a single day', () => {
+    const r = resolveRange('today', new Date('2026-11-21T10:00:00Z'), 'Asia/Kolkata')
+    const pts = trendPoints(
+      [
+        row({ starts_at: '2026-11-21T04:00:00Z', status: 'confirmed' }), // 09:30 IST
+        row({ starts_at: '2026-11-21T04:20:00Z', status: 'confirmed', source: 'whatsapp' }), // 09:50 IST
+        row({ starts_at: '2026-11-21T08:30:00Z', status: 'cancelled' }), // 14:00 IST
+      ],
+      r,
+    )
+    expect(pts).toHaveLength(24)
+    expect(pts[0].day).toBe('2026-11-21T00')
+    expect(pts[9]).toMatchObject({ day: '2026-11-21T09', inClinic: 1, viaWhatsApp: 1, cancelled: 0 })
+    expect(pts[14]).toMatchObject({ cancelled: 1 })
+    expect(pts[9].label).not.toBe(pts[10].label)
+  })
 })
 
 describe('messageSeries', () => {
