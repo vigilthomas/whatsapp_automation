@@ -14,6 +14,7 @@ import {
   type MasterSection,
 } from '@/components/settings/settings-sections';
 import { MasterRecordsPanel } from '@/components/master/master-records-panel';
+import { StaffPanel } from '@/components/master/staff-panel';
 import { MASTER_ENTITIES, isMasterEntitySlug } from '@/lib/master/entities';
 
 /** Lists that were merged into another page (one clinic, many branches). */
@@ -56,6 +57,9 @@ export default function MasterSectionPage() {
     // Users = everyone who signs in (team members included): add with a
     // password or an invite link, set branch / role / access inline.
     panel = <UsersPanel />;
+  } else if (params.section === 'staff') {
+    // Doctors: the records list plus a Login column.
+    panel = <StaffPanel />;
   } else if (isMasterEntitySlug(params.section) && !MASTER_ENTITIES[params.section].readOnly) {
     panel = <MasterRecordsPanel slug={params.section} />;
   } else if (isMasterSection(params.section)) {

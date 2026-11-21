@@ -28,6 +28,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { SettingsPanelHead } from "@/components/settings/settings-panel-head";
 import { InviteMemberDialog } from "@/components/settings/invite-member-dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { LoginSwitch } from "@/components/master/login-switch";
 
 interface NewUser {
   full_name: string;
@@ -82,6 +83,7 @@ const selectCls = "h-9 w-full";
 export function UsersPanel() {
   const t = useTranslations("Master.users");
   const tRoles = useTranslations("Settings.roles");
+  const tLogin = useTranslations("Master.login");
   const confirm = useConfirm();
   const { user, can, canManageMembers } = useAuth();
   const { branding } = useBranding();
@@ -350,6 +352,21 @@ export function UsersPanel() {
         ) : (
           <span className="text-sm text-muted-foreground">{roleName(m.designation_id)}</span>
         ),
+    },
+    {
+      id: "login",
+      header: tLogin("col"),
+      width: 170,
+      exportValue: (m) => (m.login_disabled ? tLogin("off") : tLogin("on")),
+      cell: (m) => (
+        <LoginSwitch
+          name={m.full_name || m.email || ""}
+          userId={m.user_id}
+          loginOff={!!m.login_disabled}
+          editable={rowInfo(m).editable}
+          onChanged={() => void load()}
+        />
+      ),
     },
   ];
   const table = useTableLayout("master.users", columns);

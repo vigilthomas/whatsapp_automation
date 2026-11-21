@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NextIntlClientProvider } from 'next-intl'
 
@@ -8,18 +7,16 @@ import { DashboardCardsTab } from './dashboard-cards-tab'
 
 const render = (disabled: string[]) =>
   renderToStaticMarkup(
-    React.createElement(
-      NextIntlClientProvider,
-      { locale: 'en', messages, timeZone: 'UTC' },
-      React.createElement(DashboardCardsTab, {
-        sector: 'clinic',
-        disabled,
-        canRead: () => false,
-        moduleName: (m: string) => m,
-        editable: true,
-        onToggle: () => {},
-      }),
-    ),
+    <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+      <DashboardCardsTab
+        sector="clinic"
+        disabled={disabled}
+        canRead={() => false}
+        moduleName={(m: string) => m}
+        editable
+        onToggle={() => {}}
+      />
+    </NextIntlClientProvider>,
   )
 
 /** The switch markup for one card, found by its aria-label. */

@@ -69,6 +69,16 @@ export async function GET() {
 
     // Super admins (049). super_admins isn't readable by members, so the
     // service role looks up just the ids on this account's roster.
+    // Login switched off (070). Its own query so a database without the
+    // column yet still lists everyone (all shown as login on).
+    const disabledIds = new Set<string>();
+    const lRes = await ctx.supabase
+      .from("profiles")
+      .select("user_id, login_disabled")
+      .eq("account_id", ctx.accountId)
+      .eq("login_disabled", true);
+    if (!lRes.error) for (const r of lRes.data as { user_id: string }[]) disabledIds.add(r.user_id);
+
     const superIds = new Set<string>();
     const ids = (data as ProfileRow[]).map((r) => r.user_id);
     if (ids.length) {
@@ -93,6 +103,7 @@ export async function GET() {
           branch_id: extras.get(row.user_id)?.branch_id ?? null,
           staff_type: extras.get(row.user_id)?.staff_type ?? null,
           is_super_admin: superIds.has(row.user_id),
+          login_disabled: disabledIds.has(row.user_id),
         },
       ];
     });

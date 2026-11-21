@@ -83,6 +83,8 @@ export interface AccountMember {
   staff_type: string | null;
   /** In super_admins (049): full access everywhere, whatever the role says. */
   is_super_admin?: boolean;
+  /** Login switched off (070): they can't sign in. */
+  login_disabled?: boolean;
 }
 
 /**

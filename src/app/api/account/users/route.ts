@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/permission-guard";
 import { isAccountRole, type AccountRole } from "@/lib/auth/roles";
 import { supabaseAdmin } from "@/lib/automations/admin-client";
 import { accessLevelFromRole, loadStaffWords, staffTypeFromRole, syncDoctorForUser, type StaffType } from "@/lib/master/staff";
+import { doctorForLogin, linkDoctorLogin, type DoctorForLogin } from "@/lib/master/login-access";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/rate-limit";
 
 // ============================================================
@@ -36,6 +37,11 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/rate-limit
 //     'agent'. What they can actually do comes from the designation's
 //     permission matrix either way; the role only sets the RLS tier.
 //
+// `doctor_id` gives an EXISTING doctor (Master → Doctors → Login) the
+// login instead: the doctor must be this account's and have none yet;
+// they become staff type 'doctor' in the doctor's branch, and the row is
+// linked by user_id rather than a second doctors row being made.
+//
 // Gated on `users:write` — the designation matrix, not just the role.
 // Owner can't be granted here (ownership goes through transfer).
 // ============================================================
@@ -52,6 +58,7 @@ interface Body {
   staff_type?: unknown;
   speciality?: unknown;
   phone?: unknown;
+  doctor_id?: unknown;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,7 +86,8 @@ export async function POST(request: Request) {
       ? (body.staff_type as StaffType)
       : null;
   const designationId = typeof body.designation_id === "string" && body.designation_id ? body.designation_id : null;
-  const branchId = typeof body.branch_id === "string" && body.branch_id ? body.branch_id : null;
+  let branchId = typeof body.branch_id === "string" && body.branch_id ? body.branch_id : null;
+  const doctorId = typeof body.doctor_id === "string" && body.doctor_id ? body.doctor_id : null;
   const speciality = typeof body.speciality === "string" ? body.speciality.trim() || null : null;
   const phone = typeof body.phone === "string" ? body.phone.trim() || null : null;
 
@@ -93,6 +101,16 @@ export async function POST(request: Request) {
   }
 
   const admin = supabaseAdmin();
+
+  // An existing doctor getting a login: they are a doctor, in their branch.
+  let doctor: DoctorForLogin | null = null;
+  if (doctorId) {
+    const found = await doctorForLogin(admin, ctx.accountId, doctorId);
+    if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
+    doctor = found.doctor;
+    staffType = "doctor";
+    if (!branchId) branchId = doctor.branch_id;
+  }
 
   // Referenced role / branch must be this account's.
   if (designationId) {
@@ -168,8 +186,20 @@ export async function POST(request: Request) {
     await admin.from("accounts").delete().eq("id", personalAccountId).eq("owner_user_id", newUserId);
   }
 
-  // 4. Doctors get a bookable record (there is no separate Doctors list).
-  if (staffType === "doctor") {
+  // 4a. An existing doctor: link their row to the new login.
+  if (doctor) {
+    const linked = await linkDoctorLogin(admin, ctx.accountId, doctor.id, newUserId).catch((err) => {
+      console.error("[users] doctor link failed:", err);
+      return false;
+    });
+    if (!linked) {
+      await admin.auth.admin.deleteUser(newUserId);
+      return NextResponse.json({ error: "This doctor already has a login" }, { status: 409 });
+    }
+    if (!doctor.email) await admin.from("doctors").update({ email }).eq("id", doctor.id).eq("account_id", ctx.accountId);
+  }
+  // 4b. Otherwise doctors get a bookable record.
+  else if (staffType === "doctor") {
     await syncDoctorForUser(admin, {
       accountId: ctx.accountId,
       userId: newUserId,

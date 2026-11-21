@@ -64,7 +64,17 @@ type Pick = { id: string; minutes: number };
  * route enforces admin-only writes, so non-admins get a read-only
  * table with the action buttons hidden.
  */
-export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
+export function MasterRecordsPanel({
+  slug,
+  extraColumns,
+  reloadKey = 0,
+}: {
+  slug: MasterEntitySlug;
+  /** Columns a page adds after the entity's own (e.g. Doctors → Login). */
+  extraColumns?: DataColumn<MasterRecord>[];
+  /** Bump to reload the list after a change made outside this panel. */
+  reloadKey?: number;
+}) {
   const entity = MASTER_ENTITIES[slug];
   const t = useTranslations("Master");
   const confirm = useConfirm();
@@ -116,7 +126,7 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, reloadKey]);
 
   const refName = useMemo(() => {
     const maps = Object.fromEntries(
@@ -355,6 +365,7 @@ export function MasterRecordsPanel({ slug }: { slug: MasterEntitySlug }) {
         return v == null ? "" : String(v);
       },
     }));
+  if (extraColumns) columns.push(...extraColumns);
   const table = useTableLayout(`master.${slug}`, columns);
 
   // Only the columns on screen, in their on-screen order.
