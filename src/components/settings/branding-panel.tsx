@@ -7,7 +7,8 @@
  * A colour left at "Default" keeps Clinicoro's own value.
  */
 import { SectionCard } from "@/components/ui/section-card";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Crop, ImageUp, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useBranding } from "@/hooks/use-branding";
-import { checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, DEFAULT_COLORS, isHexColor, LOCKSCREENS, lockscreenOf, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
+import { buttonText, checkLogoFile, checkLogoUrl, sniffImage, COLOR_KEYS, DEFAULT_COLORS, isHexColor, LOCKSCREENS, lockscreenOf, TITLE_MAX, type Branding, type ColorKey } from "@/lib/branding";
 import { LockscreenThumb } from "@/components/auth/auth-shell";
 import { cn } from "@/lib/utils";
 import { BrandingPreview } from "./branding-preview";
@@ -26,7 +27,7 @@ import { SettingsPanelHead } from "./settings-panel-head";
 import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 const SIDEBAR_KEYS: ColorKey[] = ["sidebar_bg", "sidebar_text", "sidebar_accent", "title_color", "subtitle_color"];
-const PAGE_KEYS: ColorKey[] = ["theme_primary", "theme_text", "theme_muted", "theme_bg", "theme_surface", "theme_danger"];
+const PAGE_KEYS: ColorKey[] = ["theme_primary", "theme_button_text", "theme_text", "theme_muted", "theme_bg", "theme_surface", "theme_danger"];
 
 type Preset = { name: string; values: Partial<Record<ColorKey, string | null>> };
 const nulls = (keys: ColorKey[]) => Object.fromEntries(keys.map((k) => [k, null]));
@@ -41,6 +42,8 @@ const SIDEBAR_PRESETS: Preset[] = [
   { name: "Charcoal", values: { sidebar_bg: "#1F2937", sidebar_text: "#F9FAFB", sidebar_accent: "#F59E0B", title_color: "#FFFFFF", subtitle_color: "#F59E0B" } },
   { name: "Light", values: { sidebar_bg: "#FFFFFF", sidebar_text: "#0F172A", sidebar_accent: "#4F46E5", title_color: "#0F172A", subtitle_color: "#B8976D" } },
 ];
+// A preset resets the button text to automatic (null) so it never keeps a
+// colour picked for a different main colour.
 const PAGE_PRESETS: Preset[] = [
   { name: DEFAULT_APP_NAME, values: nulls(PAGE_KEYS) },
   { name: "Indigo", values: { theme_primary: "#6366F1", theme_text: "#0F172A", theme_muted: "#64748B", theme_bg: "#F1F5F9", theme_surface: "#FFFFFF", theme_danger: "#EF4444" } },
@@ -50,7 +53,7 @@ const PAGE_PRESETS: Preset[] = [
   { name: "Rose", values: { theme_primary: "#E11D48", theme_text: "#1F1416", theme_muted: "#7A5F66", theme_bg: "#FBF2F4", theme_surface: "#FFFFFF", theme_danger: "#B91C1C" } },
   { name: "Amber", values: { theme_primary: "#B45309", theme_text: "#1C1917", theme_muted: "#78716C", theme_bg: "#FAF7F2", theme_surface: "#FFFFFF", theme_danger: "#DC2626" } },
   { name: "Graphite", values: { theme_primary: "#334155", theme_text: "#0B0F14", theme_muted: "#64748B", theme_bg: "#F3F4F6", theme_surface: "#FFFFFF", theme_danger: "#DC2626" } },
-];
+].map((p) => ({ ...p, values: { theme_button_text: null, ...p.values } }));
 
 const EDITABLE = ["title", "subtitle", "logo", "logo_shape", "lockscreen", ...COLOR_KEYS] as const;
 type Editable = (typeof EDITABLE)[number];
@@ -136,7 +139,8 @@ export function BrandingPanel() {
       {keys.map((k) => {
         const value = draft[k];
         // Empty = Clinicoro's own colour; show it rather than a blank swatch.
-        const shown = isHexColor(value) ? value : DEFAULT_COLORS[k];
+        const fallback = k === "theme_button_text" ? buttonText({ ...draft, theme_button_text: null }) : DEFAULT_COLORS[k];
+        const shown = isHexColor(value) ? value : fallback;
         return (
           <div key={k} className="flex items-center gap-3 px-3.5 py-2.5">
             <Label htmlFor={`brand-${k}`} className="flex flex-1 flex-col items-start gap-0.5">
@@ -146,7 +150,7 @@ export function BrandingPanel() {
             <span
               className="relative size-8 shrink-0 overflow-hidden rounded-md border border-border"
               style={{ background: shown }}
-              title={isHexColor(value) ? value : t("defaultColour", { hex: DEFAULT_COLORS[k] })}
+              title={isHexColor(value) ? value : t("defaultColour", { hex: fallback })}
             >
               <input
                 type="color"
@@ -160,7 +164,7 @@ export function BrandingPanel() {
             <Input
               id={`brand-${k}`}
               className="w-[104px] font-mono text-xs uppercase"
-              placeholder={DEFAULT_COLORS[k]}
+              placeholder={fallback}
               maxLength={7}
               disabled={readOnly}
               value={value ?? ""}
@@ -195,6 +199,13 @@ export function BrandingPanel() {
     </div>
   );
 
+  const section = (value: string, title: string, content: ReactNode) => (
+    <AccordionItem value={value} className="rounded-xl border border-border bg-card px-5 text-card-foreground shadow-xs not-last:border-b">
+      <AccordionTrigger className="py-4 text-sm font-semibold text-foreground hover:no-underline">{title}</AccordionTrigger>
+      <AccordionContent className="space-y-3 pb-5">{content}</AccordionContent>
+    </AccordionItem>
+  );
+
   const invalid = COLOR_KEYS.some((k) => draft[k] !== null && !isHexColor(draft[k]));
 
   return (
@@ -207,9 +218,31 @@ export function BrandingPanel() {
         <p className="mb-4 rounded-lg border border-border bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">{t("readOnly")}</p>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-5">
-          <SectionCard title={t("identity")}>
+      {/* Preview first, full width, so every change below is visible
+          without scrolling back up. Save / Discard / Defaults sit with it. */}
+      <SectionCard title={t("preview")} className="mb-5">
+        <div className="grid items-start gap-5 md:grid-cols-[minmax(0,420px)_1fr]">
+          <BrandingPreview draft={draft} />
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={readOnly || !dirty || invalid || saving} onClick={onSave}>
+                {saving ? t("saving") : t("save")}
+              </Button>
+              <Button type="button" variant="outline" disabled={!dirty || saving} onClick={() => setDraft(branding)}>
+                {t("discard")}
+              </Button>
+              <Button type="button" variant="ghost" disabled={readOnly} onClick={useDefaults}>
+                <RotateCcw className="size-4" /> {t("defaults")}
+              </Button>
+            </div>
+            {dirty && <p className="text-xs text-warn-fg">{t("unsaved")}</p>}
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Every section collapses; several can be open at once. */}
+      <Accordion multiple defaultValue={["identity"]} className="gap-3">
+        {section("identity", t("identity"), <>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="brand-title">{t("name")}</Label>
@@ -254,9 +287,8 @@ export function BrandingPanel() {
                 <LogoShapePicker value={draft.logo_shape} disabled={readOnly} onChange={(v) => set("logo_shape", v)} />
               </div>
             </div>
-          </SectionCard>
-
-          <SectionCard title={t("lockscreen")}>
+          </>)}
+        {section("lockscreen", t("lockscreen"), <>
             <p className="text-xs text-muted-foreground">{t("lockscreenHint")}</p>
             <div role="radiogroup" aria-label={t("lockscreen")} className="grid gap-3 sm:grid-cols-3">
               {LOCKSCREENS.map((l) => {
@@ -283,37 +315,16 @@ export function BrandingPanel() {
                 );
               })}
             </div>
-          </SectionCard>
-
-          <SectionCard title={t("sidebar")}>
+          </>)}
+        {section("sidebar", t("sidebar"), <>
             {presetRow(SIDEBAR_PRESETS)}
             {colourRows(SIDEBAR_KEYS)}
-          </SectionCard>
-
-          <SectionCard title={t("page")}>
+          </>)}
+        {section("page", t("page"), <>
             {presetRow(PAGE_PRESETS)}
             {colourRows(PAGE_KEYS)}
-          </SectionCard>
-        </div>
-
-        <aside className="lg:sticky lg:top-4 lg:self-start">
-          <SectionCard title={t("preview")}>
-          <BrandingPreview draft={draft} />
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={readOnly || !dirty || invalid || saving} onClick={onSave}>
-              {saving ? t("saving") : t("save")}
-            </Button>
-            <Button type="button" variant="outline" disabled={!dirty || saving} onClick={() => setDraft(branding)}>
-              {t("discard")}
-            </Button>
-            <Button type="button" variant="ghost" disabled={readOnly} onClick={useDefaults}>
-              <RotateCcw className="size-4" /> {t("defaults")}
-            </Button>
-          </div>
-          {dirty && <p className="text-xs text-warn-fg">{t("unsaved")}</p>}
-          </SectionCard>
-        </aside>
-      </div>
+          </>)}
+      </Accordion>
       <LogoCropDialog
         src={cropSrc}
         shape={draft.logo_shape}

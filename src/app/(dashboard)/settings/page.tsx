@@ -14,7 +14,6 @@ import { SecurityPanel } from '@/components/settings/security-panel';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { BrandingPanel } from '@/components/settings/branding-panel';
 import { BusinessTypePanel } from '@/components/settings/business-type-panel';
-import { DashboardCardsPanel } from '@/components/settings/dashboard-cards-panel';
 import { ClinicPanel } from '@/components/settings/clinic-panel';
 import { AiPanel } from '@/components/settings/ai-panel';
 import { MenuPanel } from '@/components/settings/menu-panel';
@@ -108,7 +107,6 @@ function SettingsPageInner() {
     appearance: <AppearancePanel />,
     branding: <BrandingPanel />,
     business: <BusinessTypePanel />,
-    dashboard: <DashboardCardsPanel />,
     clinic: <ClinicPanel />,
     ai: <AiPanel />,
     menu: <MenuPanel />,

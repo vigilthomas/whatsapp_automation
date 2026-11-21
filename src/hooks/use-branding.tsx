@@ -19,11 +19,14 @@ import { DEFAULT_APP_NAME } from "@/lib/vocabulary";
 
 
 
-const BASE_COLUMNS = ["title", "subtitle", "logo", "logo_shape", "menu", ...COLOR_KEYS];
+// theme_button_text arrived in 068, later than the other colours, so it is
+// only in the newest set.
+const BASE_COLUMNS = ["title", "subtitle", "logo", "logo_shape", "menu", ...COLOR_KEYS.filter((k) => k !== "theme_button_text")];
 // Newest schema first. Reading a column the database doesn't have yet fails
 // the whole row and would drop every other branding setting, so an older
 // database (064 or 059 not run) falls back to the column list it has.
 const COLUMN_SETS = [
+  [...BASE_COLUMNS, "lockscreen", "vocabulary", "dashboard", "theme_button_text"].join(","), // 068
   [...BASE_COLUMNS, "lockscreen", "vocabulary", "dashboard"].join(","), // 064
   [...BASE_COLUMNS, "lockscreen"].join(","), // 059
   BASE_COLUMNS.join(","),
@@ -142,7 +145,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       ({ data, error } = await supabase.from("app_branding").select(set).eq("id", 1).maybeSingle());
       if (error?.code !== UNDEFINED_COLUMN) break;
     }
-    setHasVocabulary(!error && columns.current === COLUMN_SETS[0]);
+    setHasVocabulary(!error && (columns.current === COLUMN_SETS[0] || columns.current === COLUMN_SETS[1]));
     if (error) {
       console.warn("[branding] not loaded:", error.message); // keep the defaults, don't nag
       return null;

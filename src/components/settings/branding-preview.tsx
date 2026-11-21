@@ -8,6 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   DEFAULT_COLORS,
   darkAccent,
+  buttonText,
   inkOn,
   isHexColor,
   logoShapeClass,
@@ -28,6 +29,9 @@ const DARK = {
   theme_bg: '#0B1622',
   theme_surface: '#112233',
   theme_danger: '#F3A097',
+  // Not used for the Book button (dark mode picks by contrast, see bookInk);
+  // present only so every ColorKey has a dark value.
+  theme_button_text: '#06201F',
 };
 
 /**
@@ -57,7 +61,13 @@ export function BrandingPreview({ draft }: { draft: Branding }) {
     if (k === 'theme_primary' || k === 'sidebar_accent') return accent;
     return DARK[k];
   };
-  const ink = (bg: string) => (mode === 'dark' ? inkOn(bg) : '#FFFFFF');
+  // Same rules the app applies via brandingCss. Light mode: the chosen
+  // button text colour, else white/dark by contrast (buttonText). Dark
+  // mode always picks by contrast against the lightened accent. This used
+  // to hard-code white in light mode, so a teal main colour previewed
+  // white text while the real buttons were dark.
+  const ink = (bg: string) => inkOn(bg);
+  const bookInk = mode === 'light' ? buttonText(draft) : inkOn(c('theme_primary'));
   const rows = [
     { icon: LayoutDashboard, label: 'Dashboard', active: true },
     { icon: MessageSquare, label: 'Inbox' },
@@ -152,7 +162,7 @@ export function BrandingPreview({ draft }: { draft: Branding }) {
                 className="rounded px-2 py-0.5"
                 style={{
                   background: c('theme_primary'),
-                  color: ink(c('theme_primary')),
+                  color: bookInk,
                 }}
               >
                 Book

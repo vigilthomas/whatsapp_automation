@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLANK_BRANDING, BRANDING_CACHE_KEY, BRAND_STYLE_ID, DARK_BG, brandBootJs, brandingCss, checkLogoFile, checkLogoUrl, contrast, inkOn, isHexColor, retitle, sniffImage, logoShapeClass, lockscreenOf } from "./branding";
+import { BLANK_BRANDING, DEFAULT_COLORS, buttonText, BRANDING_CACHE_KEY, BRAND_STYLE_ID, DARK_BG, brandBootJs, brandingCss, checkLogoFile, checkLogoUrl, contrast, inkOn, isHexColor, retitle, sniffImage, logoShapeClass, lockscreenOf } from "./branding";
 
 describe("brandingCss", () => {
   it("is empty when nothing is set (untouched install looks like Clinicoro)", () => {
@@ -132,5 +132,25 @@ describe("lockscreenOf", () => {
     expect(lockscreenOf({ lockscreen: "spotlight" })).toBe("spotlight");
     expect(lockscreenOf({ lockscreen: null })).toBe("classic");
     expect(lockscreenOf({ lockscreen: "neon" as never })).toBe("classic");
+  });
+});
+
+describe("button text colour (068)", () => {
+  it("an explicit button text colour wins over the automatic pick in light mode", () => {
+    const css = brandingCss({ ...BLANK_BRANDING, theme_primary: "#0D9488", theme_button_text: "#FFFFFF" });
+    const light = css.split('html[data-mode="dark"]')[0];
+    expect(light).toContain("--primary-foreground:#FFFFFF");
+    expect(light.match(/--primary-foreground:/g)).toHaveLength(1);
+  });
+
+  it("empty button text keeps the automatic pick", () => {
+    expect(buttonText({ theme_primary: "#0D9488", theme_button_text: null })).toBe(inkOn("#0D9488"));
+    expect(buttonText({ theme_primary: null, theme_button_text: null })).toBe(inkOn(DEFAULT_COLORS.theme_primary));
+    expect(buttonText({ theme_primary: "#0D9488", theme_button_text: "#112233" })).toBe("#112233");
+  });
+
+  it("works with only the button text set (default main colour)", () => {
+    const css = brandingCss({ ...BLANK_BRANDING, theme_button_text: "#FFEE00" });
+    expect(css).toContain("--primary-foreground:#FFEE00");
   });
 });

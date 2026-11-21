@@ -18,6 +18,7 @@ export const COLOR_KEYS = [
   "title_color",
   "subtitle_color",
   "theme_primary",
+  "theme_button_text",
   "theme_text",
   "theme_muted",
   "theme_bg",
@@ -34,6 +35,8 @@ export const DEFAULT_COLORS: Record<ColorKey, string> = {
   title_color: "#0B2740",
   subtitle_color: "#627485",
   theme_primary: "#0B2740",
+  /** Shown only as the swatch fallback; when empty the app picks `inkOn(primary)` (see buttonText). */
+  theme_button_text: "#FFFFFF",
   theme_text: "#172B3A",
   theme_muted: "#627485",
   theme_bg: "#F4F8FA",
@@ -106,6 +109,7 @@ export function isHexColor(v: unknown): v is string {
 /** Light mode: every set colour. Token names are the ones in globals.css. */
 const LIGHT_TOKENS: Record<ColorKey, string[]> = {
   theme_primary: ["--primary", "--ring", "--chart-1"],
+  theme_button_text: ["--primary-foreground"],
   theme_text: ["--foreground", "--card-foreground"],
   theme_muted: ["--muted-foreground"],
   theme_bg: ["--background"],
@@ -137,6 +141,16 @@ export function contrast(a: string, b: string): number {
 export function inkOn(bg: string): string {
   return contrast(bg, LIGHT_INK) >= contrast(bg, DARK_BG) ? LIGHT_INK : DARK_BG;
 }
+/**
+ * Text colour on main-colour buttons in light mode: the admin's explicit
+ * choice (migration 068) or, when empty, white/dark by contrast with the
+ * main colour. Shared by brandingCss and the Settings preview so the two
+ * can't drift apart again.
+ */
+export function buttonText(b: Pick<Branding, "theme_primary" | "theme_button_text">): string {
+  if (isHexColor(b.theme_button_text)) return b.theme_button_text;
+  return inkOn(isHexColor(b.theme_primary) ? b.theme_primary : DEFAULT_COLORS.theme_primary);
+}
 /** The accent for dark mode: lightened towards white until it stands out on the navy page (3:1). */
 export function darkAccent(hex: string): string {
   let out = hex;
@@ -164,7 +178,12 @@ export function brandingCss(b: Branding): string {
     const value = b[key];
     if (isHexColor(value)) light.push(...LIGHT_TOKENS[key].map((t) => `${t}:${value}`));
   }
-  if (isHexColor(b.theme_primary)) light.push(...derived(b.theme_primary), `--primary-foreground:${inkOn(b.theme_primary)}`);
+  // An explicit button text colour was already pushed by the loop above
+  // (LIGHT_TOKENS); only fall back to the automatic pick when it is empty.
+  if (isHexColor(b.theme_primary)) {
+    light.push(...derived(b.theme_primary));
+    if (!isHexColor(b.theme_button_text)) light.push(`--primary-foreground:${inkOn(b.theme_primary)}`);
+  }
   if (isHexColor(b.sidebar_accent)) light.push(`--sidebar-primary-foreground:${inkOn(b.sidebar_accent)}`);
   if (!light.length) return "";
 
