@@ -2408,7 +2408,14 @@
       "customCount": "{count, plural, =0 {No branches picked} one {# branch} other {# branches}}",
       "customNone": "Pick at least one branch, or members with this role will see nothing here.",
       "noBranches": "No branches yet. Add them under Master → Branches.",
-      "branchesLoading": "Loading branches…"
+      "branchesLoading": "Loading branches…",
+      "tabsLabel": "Role settings",
+      "tabPermissions": "Permissions",
+      "tabDashboard": "Dashboard",
+      "dashboardNote": "Choose what this role sees on the dashboard. This doesn't hide data — use Permissions and Data access for that.",
+      "needsRead": "Needs {module} → Read",
+      "wholeBusinessNumbers": "shows whole-business numbers",
+      "cardEveryone": "Everyone"
     },
     "deals": {
       "title": "Currency",

@@ -52,6 +52,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { DataScopePicker, type BranchOption } from "./data-scope-picker";
+import { DashboardCardsTab } from "./dashboard-cards-tab";
+import { parseDashboardCards } from "@/lib/dashboard/card-switches";
+import { defaultSector, isSector, parseVocabulary } from "@/lib/vocabulary";
 
 /**
  * Circular tick toggle for one matrix cell. Colours come straight from
@@ -283,7 +286,10 @@ export function AccessControlPanel() {
   const [saving, setSaving] = useState(false);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   // Earlier drafts, newest last, for Undo. Cleared on save or a new pick.
-  const [history, setHistory] = useState<Permissions[]>([]);
+  const [history, setHistory] = useState<{ p: Permissions; c: string[] }[]>([]);
+  // Dashboard tab: cards switched off for this role (designations.dashboard_cards, 069).
+  const [tab, setTab] = useState<"permissions" | "dashboard">("permissions");
+  const [cardsDraft, setCardsDraft] = useState<string[]>([]);
   // For Data access → Custom. Loaded once; a caller without Branches
   // read just gets an empty list (the picker says there are none).
   const [branches, setBranches] = useState<BranchOption[]>([]);
@@ -340,15 +346,22 @@ export function AccessControlPanel() {
     [designations, selectedId],
   );
   const saved = useMemo(() => parsePermissions(selected?.permissions), [selected]);
+  const savedCards = useMemo(() => parseDashboardCards(selected?.dashboard_cards).disabled, [selected]);
 
   // Re-seed the draft when the selection (or a save) changes.
   useEffect(() => {
     setDraft(saved);
+    setCardsDraft(savedCards);
     setHistory([]);
   }, [saved]);
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const cardsDirty = JSON.stringify(cardsDraft) !== JSON.stringify(savedCards);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved) || cardsDirty;
   const editable = !profileLoading && callerCan("designations", "edit");
+  const sector = useMemo(() => {
+    const s = parseVocabulary(branding.vocabulary).sector;
+    return isSector(s) ? s : defaultSector();
+  }, [branding.vocabulary]);
 
   // The sidebar's sections (with Sidebar menu's moves, names and group order) → their modules.
   const placed = useMemo(() => resolveMenu<NavItem>(menuSections(), branding.menu), [branding.menu]);
@@ -388,14 +401,15 @@ export function AccessControlPanel() {
   /** Every change goes through here so Undo can step back. */
   const change = (next: Permissions) => {
     if (JSON.stringify(next) === JSON.stringify(draft)) return;
-    setHistory((h) => [...h, draft]);
+    setHistory((h) => [...h, { p: draft, c: cardsDraft }]);
     setDraft(next);
   };
   const undo = () => {
     const prev = history[history.length - 1];
     if (!prev) return;
     setHistory((h) => h.slice(0, -1));
-    setDraft(prev);
+    setDraft(prev.p);
+    setCardsDraft(prev.c);
   };
 
   const setCell = (module: ModuleId, action: Action, allowed: boolean) =>
@@ -415,6 +429,13 @@ export function AccessControlPanel() {
     );
 
   const setModuleScope = (module: ModuleId, scope: DataScope) => change(setScope(draft, module, scope));
+
+  /** Switch one dashboard card on/off for this role (undoable like the grid). */
+  const setCard = (id: string, on: boolean) => {
+    const next = on ? cardsDraft.filter((c) => c !== id) : [...cardsDraft, id];
+    setHistory((h) => [...h, { p: draft, c: cardsDraft }]);
+    setCardsDraft(next);
+  };
 
   /** Group toggle state: every applicable tick, some, or none. */
   const stateOf = (modules: readonly ModuleId[]) => {
@@ -443,7 +464,9 @@ export function AccessControlPanel() {
       const res = await fetch(`/api/master/designations/${selected.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ permissions: draft }),
+        // dashboard_cards only when it changed, so roles still save
+        // before migration 069 adds the column.
+        body: JSON.stringify(cardsDirty ? { permissions: draft, dashboard_cards: { disabled: cardsDraft } } : { permissions: draft }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -508,7 +531,26 @@ export function AccessControlPanel() {
             </CardTitle>
             <CardDescription className="mt-1 text-muted-foreground">{t("matrixDesc")}</CardDescription>
           </div>
-          {editable && selected ? (
+          {selected ? (
+            <div role="tablist" aria-label={t("tabsLabel")} className="inline-flex w-fit rounded-lg border border-border p-0.5 text-sm">
+              {(["permissions", "dashboard"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === k}
+                  onClick={() => setTab(k)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 transition-colors",
+                    tab === k ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {k === "permissions" ? t("tabPermissions") : t("tabDashboard")}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {editable && selected && tab === "permissions" ? (
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => setAll(MODULES, true)}>
                 {t("selectAll")}
@@ -527,6 +569,15 @@ export function AccessControlPanel() {
             <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
               {loading ? t("loading") : t("pickDesignation")}
             </p>
+          ) : tab === "dashboard" ? (
+            <DashboardCardsTab
+              sector={sector}
+              disabled={cardsDraft}
+              canRead={(m) => can(draft, m, "read")}
+              moduleName={nameOf}
+              editable={editable}
+              onToggle={setCard}
+            />
           ) : (
             sections.map((section) => {
               const { granted, rows } = rowsOf(section.modules);
