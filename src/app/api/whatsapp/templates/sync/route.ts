@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { ForbiddenError, UnauthorizedError, toErrorResponse } from '@/lib/auth/account'
 import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { decrypt } from '@/lib/whatsapp/encryption'
+import { WRONG_WABA_ID_MESSAGE } from '@/lib/whatsapp/meta-api'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
 
@@ -177,6 +178,9 @@ export async function POST() {
         try {
           const body = await metaRes.json()
           if (body?.error?.message) metaErr = body.error.message
+          // Code 100 on the message_templates edge = the stored waba_id
+          // is some other Meta object (usually the Phone Number ID).
+          if (body?.error?.code === 100) metaErr = WRONG_WABA_ID_MESSAGE
         } catch {
           // response wasn't JSON — keep the fallback
         }

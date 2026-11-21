@@ -3,6 +3,8 @@ import {
   getSubscribedApps,
   registerPhoneNumber,
   subscribeWabaToApp,
+  verifyWabaOwnsPhoneNumber,
+  WRONG_WABA_ID_MESSAGE,
 } from './meta-api';
 
 function okResponse(body: unknown): Response {
@@ -178,5 +180,43 @@ describe('getSubscribedApps', () => {
     await expect(
       getSubscribedApps({ wabaId: 'WABA_1', accessToken: 'tok' }),
     ).rejects.toThrow(/Invalid OAuth token/);
+  });
+});
+
+describe('verifyWabaOwnsPhoneNumber', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('passes when the phone number is listed under the WABA', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse({ data: [{ id: 'PN1' }, { id: 'PN2' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      verifyWabaOwnsPhoneNumber({ wabaId: 'W1', phoneNumberId: 'PN2', accessToken: 't' }),
+    ).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls[0][0]).toContain('/W1/phone_numbers');
+  });
+
+  it('maps Meta code 100 (wrong kind of ID) to a clear message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        errorResponse(400, {
+          error: { message: '(#100) Tried accessing nonexisting field (phone_numbers)', code: 100 },
+        }),
+      ),
+    );
+    await expect(
+      verifyWabaOwnsPhoneNumber({ wabaId: 'PN1', phoneNumberId: 'PN1', accessToken: 't' }),
+    ).rejects.toThrow(WRONG_WABA_ID_MESSAGE);
+  });
+
+  it('rejects when the phone number is not under that WABA', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ data: [{ id: 'OTHER' }] })));
+    await expect(
+      verifyWabaOwnsPhoneNumber({ wabaId: 'W1', phoneNumberId: 'PN1', accessToken: 't' }),
+    ).rejects.toThrow(/does not belong/);
   });
 });

@@ -5,6 +5,7 @@ import {
   registerPhoneNumber,
   subscribeWabaToApp,
   verifyPhoneNumber,
+  verifyWabaOwnsPhoneNumber,
 } from '@/lib/whatsapp/meta-api'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
@@ -245,6 +246,22 @@ export async function POST(request: Request) {
         { error: `Meta API error: ${message}` },
         { status: 400 }
       )
+    }
+
+    // Verify the WABA ID is really a WABA that owns this number. A wrong
+    // ID used to save silently and only blow up later on template sync
+    // with "(#100) Tried accessing nonexisting field (message_templates)".
+    if (waba_id) {
+      try {
+        await verifyWabaOwnsPhoneNumber({
+          wabaId: waba_id,
+          phoneNumberId: phone_number_id,
+          accessToken: access_token,
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown Meta API error'
+        return NextResponse.json({ error: message }, { status: 400 })
+      }
     }
 
     // Encrypt sensitive tokens before storing

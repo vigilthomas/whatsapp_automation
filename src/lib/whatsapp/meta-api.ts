@@ -178,6 +178,61 @@ export async function subscribeWabaToApp(
   }
 }
 
+export interface VerifyWabaOwnsPhoneNumberArgs {
+  wabaId: string
+  phoneNumberId: string
+  accessToken: string
+}
+
+/**
+ * Confirm `wabaId` really is a WhatsApp Business Account ID and that
+ * `phoneNumberId` lives under it, by listing GET /{waba_id}/phone_numbers.
+ *
+ * Why this exists: the Settings form takes the WABA ID as free text, and
+ * it's easy to paste the Phone Number ID, the Meta Business (portfolio)
+ * ID or the App ID instead — they're all bare numeric IDs on the same
+ * Meta screens. Nothing rejected that at save time (the subscribed_apps
+ * call below is non-fatal), so the mistake only surfaced later as Meta's
+ * cryptic "(#100) Tried accessing nonexisting field (message_templates)"
+ * when syncing templates. Meta returns code 100 for "this object type has
+ * no such edge", which is exactly the wrong-kind-of-ID case.
+ */
+export async function verifyWabaOwnsPhoneNumber(
+  args: VerifyWabaOwnsPhoneNumberArgs
+): Promise<void> {
+  const { wabaId, phoneNumberId, accessToken } = args
+  const url = `${META_API_BASE}/${wabaId}/phone_numbers?fields=id&limit=100`
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) {
+    let data: MetaErrorResponse = {}
+    try {
+      data = (await response.json()) as MetaErrorResponse
+    } catch {
+      /* keep empty */
+    }
+    if (data.error?.code === 100) {
+      throw new Error(WRONG_WABA_ID_MESSAGE)
+    }
+    throw new Error(data.error?.message ?? `Meta API error: ${response.status}`)
+  }
+  const body = (await response.json()) as { data?: { id: string }[] }
+  const ids = (body.data ?? []).map((p) => p.id)
+  if (!ids.includes(phoneNumberId)) {
+    throw new Error(
+      `Phone Number ID ${phoneNumberId} does not belong to WhatsApp Business Account ${wabaId}. Check both IDs in Meta → WhatsApp → API Setup.`
+    )
+  }
+}
+
+/**
+ * Shown when Meta answers code 100 on a WABA edge (message_templates,
+ * phone_numbers, …): the stored ID is some other kind of Meta object.
+ */
+export const WRONG_WABA_ID_MESSAGE =
+  'The saved WhatsApp Business Account ID is not a WABA ID (it may be the Phone Number ID or Business ID). Copy the "WhatsApp Business Account ID" from Meta → WhatsApp → API Setup and save it in Settings.'
+
 export interface GetSubscribedAppsArgs {
   wabaId: string
   accessToken: string
