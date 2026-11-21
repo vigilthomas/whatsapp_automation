@@ -7,8 +7,10 @@
  * dashboard.
  *
  * This decides what the dashboard SHOWS, not what the role can read:
- * a card whose module the role can't read is greyed out ("Needs … →
- * Read") because it would never show anyway, and cards built on modules
+ * a card whose module the role can't read is marked "Needs … → Read"
+ * (it won't show until that is granted) but its switch still works, so
+ * an admin can set up the dashboard before or after the permissions —
+ * the order the two tabs are visited in mustn't matter. Cards built on modules
  * without data scope are marked as whole-business numbers so an admin
  * can switch them off for, say, doctors with "Own" scope.
  */
@@ -72,8 +74,8 @@ export function DashboardCardsTab({
                 </p>
               </div>
               <Switch
-                checked={readable && on}
-                disabled={!editable || !readable}
+                checked={on}
+                disabled={!editable}
                 onCheckedChange={(v) => onToggle(id, v)}
                 aria-label={title}
               />
