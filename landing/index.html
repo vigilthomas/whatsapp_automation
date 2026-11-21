@@ -3,240 +3,348 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clinicoro — your clinic's front desk on WhatsApp</title>
-  <meta name="description" content="Clinicoro answers your patients on WhatsApp day and night: books, moves and cancels appointments in English, Malayalam and Hindi, with a shared inbox, dashboards and reminders for your team." />
-  <meta property="og:title" content="Clinicoro — your clinic's front desk on WhatsApp" />
-  <meta property="og:description" content="An AI receptionist that books appointments on WhatsApp in English, Malayalam and Hindi — plus the inbox, calendar and dashboards your team runs the day from." />
+  <title>Watoro — Your business, on autopilot on WhatsApp</title>
+  <meta name="description" content="Watoro answers your customers on WhatsApp around the clock: an AI receptionist that books, moves and cancels appointments in English, Malayalam and Hindi, with a shared inbox, calendar and dashboards for your team." />
+  <link rel="canonical" href="https://clinicoro.atovian.com/" />
+  <meta property="og:title" content="Watoro — Your business, on autopilot" />
+  <meta property="og:description" content="An AI receptionist on WhatsApp that books appointments in English, Malayalam and Hindi — plus the inbox, calendar and dashboards your team runs the day from." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://clinicoro.atovian.com/" />
-  <meta name="theme-color" content="#0b2e2c" />
+  <meta property="og:image" content="https://clinicoro.atovian.com/assets/og-watoro.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#111c3a" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,300..700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Malayalam:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Noto+Sans+Malayalam:wght@400;500&family=Noto+Sans+Devanagari:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Icon set -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fd38a" /><stop offset="1" stop-color="#0d8f86" /></linearGradient>
+      <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="11" rx="5" /><path d="M12 8V5" /><circle cx="12" cy="4" r="1.2" /><path d="M9 13.5a1.4 1.4 0 0 1 2 0M13 13.5a1.4 1.4 0 0 1 2 0" /></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 13l2.5-7h11L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /><path d="M9 14.5l2 2 4-4" /></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16" /><rect x="6" y="11" width="3" height="6" rx="1" /><rect x="11" y="7" width="3" height="10" rx="1" /><rect x="16" y="13" width="3" height="4" rx="1" /></symbol>
+      <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M4 10v4a1 1 0 0 0 1 1h2l8 4V5L7 9H5a1 1 0 0 0-1 1z" /><path d="M18.5 9.5a3.5 3.5 0 0 1 0 5" /><path d="M8 15l1 4" /></symbol>
+      <symbol id="i-flow" viewBox="0 0 24 24"><rect x="3.5" y="4" width="7" height="5" rx="1.5" /><rect x="13.5" y="15" width="7" height="5" rx="1.5" /><path d="M7 9v3.5a2.5 2.5 0 0 0 2.5 2.5H13.5" /><circle cx="17" cy="6.5" r="2.5" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2.5" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /><path d="M12 14.5v2" /></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5z" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.7-7 9-4.1-1.3-7-4.7-7-9V6.3z" /><path d="M9 12l2 2 4-4" /></symbol>
+      <symbol id="i-handoff" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3" /><path d="M3 19a5 5 0 0 1 10 0" /><path d="M15 9h6M18 6l3 3-3 3" /><path d="M21 16h-6M18 13l-3 3 3 3" /></symbol>
+      <symbol id="i-tooth" viewBox="0 0 24 24"><path d="M8 3.8c-2.3 0-4 1.9-4 4.4 0 2 .8 3.4 1.3 5.2.6 2.3.7 6.8 2.6 6.8 1.6 0 1.4-4.6 4.1-4.6s2.5 4.6 4.1 4.6c1.9 0 2-4.5 2.6-6.8.5-1.8 1.3-3.2 1.3-5.2 0-2.5-1.7-4.4-4-4.4-1.7 0-2.6 1-4 1s-2.3-1-4-1z" /></symbol>
+      <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6.5" cy="7" r="2.5" /><circle cx="6.5" cy="17" r="2.5" /><path d="M8.6 8.4L20 17M8.6 15.6L20 7" /></symbol>
+      <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3.5 12.5h17" /></symbol>
+      <symbol id="i-store" viewBox="0 0 24 24"><path d="M4 9.5L5.5 4.5h13L20 9.5" /><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0" /><path d="M5.5 11.5V20h13v-8.5M10 20v-5h4v5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5" /><path d="M4 7l8 6 8-6" /></symbol>
+      <symbol id="i-signal" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="5" y="5.5" width="3" height="6.5" rx="1" /><rect x="10" y="3" width="3" height="9" rx="1" /><rect x="15" y="0" width="3" height="12" rx="1" /></symbol>
+      <symbol id="i-wifi" viewBox="0 0 16 12"><path d="M8 11.5l2.2-2.6a3.3 3.3 0 0 0-4.4 0zM2.6 5.6a8 8 0 0 1 10.8 0l-1.6 1.9a5.6 5.6 0 0 0-7.6 0zM0 2.6a12 12 0 0 1 16 0l-1.6 1.9a9.6 9.6 0 0 0-12.8 0z" /></symbol>
+      <symbol id="i-battery" viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="currentColor" opacity=".4" /><rect x="2" y="2" width="18" height="8" rx="2" /><path d="M25 4v4a2 2 0 0 0 0-4z" opacity=".5" /></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></symbol>
+      <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="7" width="12" height="10" rx="2.5" /><path d="M15 11l5-3v8l-5-3" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.5 4h3l1.5 4-2 1.5a10 10 0 0 0 5.5 5.5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A15 15 0 0 1 4.5 6a2 2 0 0 1 2-2z" /></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z" /></symbol>
+      <symbol id="i-dash" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="4" rx="1.5" /><rect x="13" y="10" width="7" height="10" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.5" /><path d="M3 19.5a6 6 0 0 1 12 0" /><path d="M16 5.5a3.2 3.2 0 0 1 0 6.2M18 13.8a5.6 5.6 0 0 1 3 5.2" /></symbol>
+    </defs>
+  </svg>
+
   <a class="skip" href="#main">Skip to content</a>
 
   <header class="nav" data-nav>
-    <a class="brand" href="#top" aria-label="Clinicoro home">
-      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" /><path d="M21.5 11.2a7 7 0 1 0 0 9.6" /><circle cx="22" cy="16" r="2.2" /></svg>
-      <span>Clinicoro</span>
-    </a>
-    <nav class="nav-links" aria-label="Sections">
-      <a href="#how">How it works</a>
-      <a href="#features">Features</a>
-      <a href="#businesses">Who it's for</a>
-      <a href="#trust">Privacy</a>
-    </nav>
-    <div class="nav-cta">
-      <a class="btn btn-ghost" href="https://app.clinicoro.atovian.com/login">Sign in</a>
-      <a class="btn btn-primary" href="https://app.clinicoro.atovian.com/signup">Get started</a>
+    <div class="container nav-row">
+      <a class="logo" href="#top" aria-label="Watoro home">
+        <img src="assets/watoro-mark.svg" width="34" height="34" alt="" />
+        <span class="wordmark">Wat<b>oro</b></span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#industries">Industries</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a class="btn btn-primary nav-cta" href="#contact">Request a demo</a>
     </div>
   </header>
 
   <main id="main">
     <!-- HERO -->
     <section class="hero" id="top">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <div class="hero-grid">
+      <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow" data-hero>WhatsApp CRM · AI receptionist</p>
-          <h1 class="hero-title" data-hero-title>
-            <span class="line"><span>Your front desk,</span></span>
-            <span class="line"><span>open on <em>WhatsApp</em></span></span>
-            <span class="line"><span>all night.</span></span>
-          </h1>
-          <p class="hero-lede" data-hero>Clinicoro answers your patients the moment they message — finds a free time, books it, and reminds them. In English, Malayalam and Hindi. Your team takes over whenever it should.</p>
-          <div class="hero-actions" data-hero>
-            <a class="btn btn-primary btn-lg" href="https://app.clinicoro.atovian.com/signup">Start with Clinicoro <span aria-hidden="true">→</span></a>
-            <a class="btn btn-line btn-lg" href="#how">See it book</a>
+          <p class="badge" data-fade><span class="dot"></span> AI receptionist for WhatsApp</p>
+          <h1 data-fade>Your business, <span class="grad">on autopilot</span> — right inside WhatsApp.</h1>
+          <p class="lede" data-fade>Watoro replies to your customers the moment they message, day or night. It finds a real free time, books it, and confirms — in English, Malayalam or Hindi — and hands the chat to your team whenever it should.</p>
+          <div class="actions" data-fade>
+            <a class="btn btn-primary btn-lg" href="#contact">Request a demo <svg class="ic"><use href="#i-arrow" /></svg></a>
+            <a class="btn btn-secondary btn-lg" href="#how">See how it works</a>
           </div>
-          <ul class="hero-points" data-hero>
-            <li>Books, moves &amp; cancels</li>
-            <li>Only shares a patient's own bookings</li>
-            <li>Hands over to staff when unsure</li>
+          <ul class="checks" data-fade>
+            <li><svg class="ic"><use href="#i-check" /></svg>Books, reschedules and cancels</li>
+            <li><svg class="ic"><use href="#i-check" /></svg>Replies in three languages</li>
+            <li><svg class="ic"><use href="#i-check" /></svg>Hands over to staff when unsure</li>
           </ul>
         </div>
 
-        <div class="hero-phone-wrap" data-hero-phone>
-          <div class="phone" aria-label="Example WhatsApp chat: a patient books a cleaning in Malayalam" role="img">
-            <div class="phone-top"><span class="avatar">C</span><div><strong>Dr.32 Dental</strong><small>online</small></div></div>
-            <div class="chat" data-hero-chat>
-              <p class="msg in ml">നാളെ വൈകുന്നേരം ക്ലീനിംഗ് ബുക്ക് ചെയ്യാമോ?</p>
-              <p class="msg out ml">നാളെ 4:00 pm, 4:30 pm അല്ലെങ്കിൽ 5:00 pm — Dr. Anjali, Aluva. ഏത് സമയം വേണം?</p>
-              <p class="msg in">5 pm, Anil</p>
-              <div class="msg out card">
-                <span class="tick" aria-hidden="true">✓</span>
-                <div><strong>Booked</strong><small>Dental cleaning · Sun 5:00 pm<br />Dr. Anjali · Aluva</small></div>
+        <div class="hero-device" data-hero-device>
+          <div class="iphone" role="img" aria-label="WhatsApp chat on an iPhone: a customer books a dental cleaning in Malayalam and Watoro confirms it">
+            <span class="iphone-btn b1"></span><span class="iphone-btn b2"></span><span class="iphone-btn b3"></span>
+            <div class="iphone-screen">
+              <div class="island"></div>
+              <div class="status"><span>9:41</span><span class="status-ic"><svg viewBox="0 0 18 12"><use href="#i-signal" /></svg><svg viewBox="0 0 16 12"><use href="#i-wifi" /></svg><svg viewBox="0 0 27 12"><use href="#i-battery" /></svg></span></div>
+              <div class="wa-head">
+                <svg class="ic"><use href="#i-back" /></svg>
+                <img class="wa-avatar" src="assets/watoro-mark.svg" alt="" />
+                <div class="wa-title"><strong>Smile Dental</strong><small>online</small></div>
+                <svg class="ic"><use href="#i-video" /></svg><svg class="ic"><use href="#i-phone" /></svg>
               </div>
-            </div>
-            <div class="phone-input"><span>Message</span><i aria-hidden="true"></i></div>
-          </div>
-          <div class="float-chip chip-a" aria-hidden="true">⏱ replies in seconds</div>
-          <div class="float-chip chip-b" aria-hidden="true">● Bot · Human</div>
-        </div>
-      </div>
-      <a class="scroll-hint" href="#langs" aria-label="Scroll down"><span></span></a>
-    </section>
-
-    <!-- LANGUAGES MARQUEE -->
-    <section class="langs" id="langs" aria-label="Languages">
-      <div class="marquee" data-marquee>
-        <div class="marquee-track">
-          <span>Book an appointment</span><span class="ml">അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്യാം</span><span class="hi">अपॉइंटमेंट बुक करें</span><span>naale 5 manikku?</span><span>kal shaam 6 baje?</span>
-          <span aria-hidden="true">Book an appointment</span><span class="ml" aria-hidden="true">അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്യാം</span><span class="hi" aria-hidden="true">अपॉइंटमेंट बुक करें</span><span aria-hidden="true">naale 5 manikku?</span><span aria-hidden="true">kal shaam 6 baje?</span>
-        </div>
-      </div>
-      <p class="langs-note">Patients write the way they talk — English, Malayalam, Hindi, or either one typed in English letters. Clinicoro answers in kind.</p>
-    </section>
-
-    <!-- PINNED STORY -->
-    <section class="story" id="how">
-      <div class="story-inner">
-        <div class="story-copy">
-          <p class="eyebrow dark">How it works</p>
-          <h2 class="section-title">One message.<br /><em>One booking.</em></h2>
-          <ol class="steps" data-steps>
-            <li class="is-active"><span class="num">01</span><div><h3>A patient asks</h3><p>"Can I come tomorrow evening?" — at 11 pm, in whatever language they use.</p></div></li>
-            <li><span class="num">02</span><div><h3>Real free times</h3><p>Clinicoro checks opening hours, holidays, leaves and every doctor's calendar. It never invents a slot.</p></div></li>
-            <li><span class="num">03</span><div><h3>Confirmed, not assumed</h3><p>It repeats the service, doctor, date and time, and books only after the patient says yes.</p></div></li>
-            <li><span class="num">04</span><div><h3>On your calendar</h3><p>The booking lands in Appointments and the dashboard, ready for your team in the morning.</p></div></li>
-          </ol>
-        </div>
-        <div class="story-stage" aria-hidden="true">
-          <div class="phone phone-story">
-            <div class="phone-top"><span class="avatar">C</span><div><strong>Your clinic</strong><small>online</small></div></div>
-            <div class="screens">
-              <div class="screen is-on" data-screen="0">
-                <p class="msg in">Hi, can I come tomorrow evening for a cleaning?</p>
-                <p class="typing"><i></i><i></i><i></i></p>
-              </div>
-              <div class="screen" data-screen="1">
-                <p class="msg in">Hi, can I come tomorrow evening for a cleaning?</p>
-                <div class="msg out slots">
-                  <small>Tomorrow · Dental cleaning</small>
-                  <div class="slot-row"><b>4:00 pm</b><b>4:30 pm</b><b class="hot">5:00 pm</b></div>
-                  <small>with Dr. Anjali · Aluva</small>
+              <div class="wa-chat" data-hero-chat>
+                <p class="day-chip">Today</p>
+                <p class="bubble in ml">നാളെ വൈകുന്നേരം ക്ലീനിംഗ് ബുക്ക് ചെയ്യാമോ?<time>9:38 pm</time></p>
+                <p class="bubble out ml">നാളെ 4:00 pm, 4:30 pm അല്ലെങ്കിൽ 5:00 pm — Dr. Anjali, Aluva. ഏത് സമയം വേണം?<time>9:38 pm</time></p>
+                <p class="bubble in">5 pm please. Anil<time>9:39 pm</time></p>
+                <div class="bubble out confirm">
+                  <span class="confirm-ic"><svg class="ic"><use href="#i-calendar" /></svg></span>
+                  <div><strong>Appointment booked</strong><small>Dental cleaning · Sun, 5:00 pm<br />Dr. Anjali · Aluva</small></div>
+                  <time>9:39 pm</time>
                 </div>
               </div>
-              <div class="screen" data-screen="2">
-                <p class="msg in">5 pm please — Ravi</p>
-                <p class="msg out">Dental cleaning with Dr. Anjali, tomorrow at 5:00 pm. Shall I book it?</p>
-                <p class="msg in">Yes 👍</p>
-              </div>
-              <div class="screen" data-screen="3">
-                <div class="cal">
-                  <div class="cal-head"><strong>Tomorrow</strong><small>Appointments</small></div>
-                  <div class="cal-row"><span>4:00</span><div class="cal-ev muted">Root canal · Meera</div></div>
-                  <div class="cal-row"><span>5:00</span><div class="cal-ev new">Dental cleaning · Ravi <em>New · WhatsApp</em></div></div>
-                  <div class="cal-row"><span>6:00</span><div class="cal-ev muted">Consultation · Sunil</div></div>
-                </div>
-              </div>
+              <div class="wa-input"><span>Message</span><i><svg class="ic"><use href="#i-send" /></svg></i></div>
+              <div class="home-bar"></div>
             </div>
           </div>
-          <div class="story-progress"><span data-progress></span></div>
         </div>
       </div>
     </section>
 
-    <!-- FEATURES BENTO -->
-    <section class="features" id="features">
-      <div class="section-head">
-        <p class="eyebrow dark">Everything at the desk</p>
-        <h2 class="section-title">Run the whole front office <em>from one screen.</em></h2>
-      </div>
-      <div class="bento">
-        <article class="tile tile-ai" data-reveal>
-          <span class="tag">AI receptionist</span>
-          <h3>Books, moves and cancels — and knows when to stop.</h3>
-          <p>Answers from your own hours, services and doctors. If it can't answer, it says a team member will reply and hands the chat to staff.</p>
-          <div class="handoff"><span class="pill bot">Bot</span><span class="arrow">⇄</span><span class="pill human">Human</span></div>
-        </article>
-        <article class="tile tile-inbox" data-reveal>
-          <span class="tag">Shared inbox</span>
-          <h3>Every WhatsApp chat, one team.</h3>
-          <p>Assign chats, reply with templates and quick replies, see who's handling what.</p>
-          <ul class="mini-inbox"><li><b>AS</b>Can I move my review?<i>2</i></li><li><b>MJ</b>Thank you doctor!</li><li><b>RK</b>Booked ✓</li></ul>
-        </article>
-        <article class="tile tile-cal" data-reveal>
-          <span class="tag">Appointments</span>
-          <h3>Doctors, branches, leaves, buffers.</h3>
-          <p>Every doctor's own time for each service. No double bookings across branches.</p>
-        </article>
-        <article class="tile tile-dash" data-reveal>
-          <span class="tag">Dashboards</span>
-          <h3>Today at a glance.</h3>
-          <div class="bars" aria-hidden="true"><i style="--h:40%"></i><i style="--h:65%"></i><i style="--h:52%"></i><i style="--h:88%"></i><i style="--h:70%"></i><i style="--h:94%"></i><i style="--h:60%"></i></div>
-          <p>Bookings by hour, upcoming visits, patients and earnings — per business type.</p>
-        </article>
-        <article class="tile tile-broad" data-reveal>
-          <span class="tag">Broadcasts &amp; templates</span>
-          <h3>Reminders that fill themselves in.</h3>
-          <p>Template placeholders auto-fill with the patient's name, date and doctor before you send.</p>
-        </article>
-        <article class="tile tile-auto" data-reveal>
-          <span class="tag">Automations &amp; flows</span>
-          <h3>Follow-ups that never forget.</h3>
-          <p>Triggers, conditions, waits and menus — built visually, no code.</p>
-        </article>
-        <article class="tile tile-roles" data-reveal>
-          <span class="tag">Access control</span>
-          <h3>Everyone sees just their part.</h3>
-          <p>Roles per module and per dashboard card. Doctors get their own login, which you can switch off any time.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- BUSINESS TYPES (horizontal) -->
-    <section class="biz" id="businesses">
-      <div class="biz-pin">
-        <div class="biz-head">
-          <p class="eyebrow dark">Who it's for</p>
-          <h2 class="section-title">Speaks your <em>business's</em> language.</h2>
-          <p class="biz-sub">Pick a business type and Clinicoro renames itself to match — patients or clients, doctors or stylists — with a dashboard made for it.</p>
-        </div>
-        <div class="biz-track" data-biz-track>
-          <article class="biz-card c1"><span class="biz-ico" aria-hidden="true">🦷</span><h3>Clinics</h3><p>Patients, doctors, treatments, no-shows and earnings from service prices.</p></article>
-          <article class="biz-card c2"><span class="biz-ico" aria-hidden="true">✂️</span><h3>Salons &amp; spas</h3><p>Clients, stylists, each stylist's own time per service, and buffers between bookings.</p></article>
-          <article class="biz-card c3"><span class="biz-ico" aria-hidden="true">📈</span><h3>Agencies</h3><p>Leads in pipelines, broadcasts and follow-up automations on WhatsApp.</p></article>
-          <article class="biz-card c4"><span class="biz-ico" aria-hidden="true">🏪</span><h3>Any business</h3><p>A shared WhatsApp inbox with an assistant that answers from your own facts.</p></article>
-        </div>
-      </div>
-    </section>
-
-    <!-- TRUST -->
-    <section class="trust" id="trust">
-      <div class="trust-grid">
-        <div>
-          <p class="eyebrow">Privacy by design</p>
-          <h2 class="section-title light">It only ever talks about <em>their own</em> appointments.</h2>
-        </div>
-        <ul class="trust-list">
-          <li data-reveal><b>Tied to the number</b><span>A patient sees only bookings made from their own WhatsApp number — never anyone else's, whoever they claim to be.</span></li>
-          <li data-reveal><b>Real times only</b><span>Every time it offers comes from your live calendar, and it's checked again right before saving.</span></li>
-          <li data-reveal><b>Asks before acting</b><span>Bookings, changes and cancellations happen only after the patient clearly says yes.</span></li>
-          <li data-reveal><b>Your team in control</b><span>Flip any chat between Bot and Human, or start the conversation afresh, in one click.</span></li>
+    <!-- LANGUAGES -->
+    <section class="langs" aria-label="Languages">
+      <div class="container langs-row">
+        <p class="langs-label"><svg class="ic"><use href="#i-globe" /></svg>Understands how your customers actually write</p>
+        <ul class="langs-list">
+          <li>English</li>
+          <li class="ml">മലയാളം</li>
+          <li class="hi">हिन्दी</li>
+          <li>Manglish</li>
+          <li>Hinglish</li>
         </ul>
       </div>
     </section>
 
-    <!-- CTA -->
-    <section class="cta">
-      <h2 class="cta-title" data-cta>Open your <em>24/7</em> front desk.</h2>
-      <p>Connect your WhatsApp Business number, add your doctors and hours, and let Clinicoro take the first message.</p>
-      <div class="hero-actions center">
-        <a class="btn btn-primary btn-lg" href="https://app.clinicoro.atovian.com/signup">Get started <span aria-hidden="true">→</span></a>
-        <a class="btn btn-line dark btn-lg" href="https://app.clinicoro.atovian.com/login">Sign in</a>
+    <!-- DESKTOP -->
+    <section class="desk">
+      <div class="container">
+        <div class="section-head center" data-fade-scroll>
+          <p class="kicker">One workspace</p>
+          <h2>Your whole team, on every chat.</h2>
+          <p class="sub">The bot answers first; your staff see every conversation, every booking and every handover in one inbox.</p>
+        </div>
+        <div class="window-wrap" data-window>
+          <div class="window" role="img" aria-label="The Watoro inbox on desktop with a new-appointment notification">
+            <div class="window-bar"><span class="lights"><i></i><i></i><i></i></span><span class="window-title">Watoro — Inbox</span></div>
+            <div class="app">
+              <aside class="app-rail">
+                <img src="assets/watoro-mark.svg" alt="" />
+                <span class="on"><svg class="ic"><use href="#i-inbox" /></svg></span>
+                <span><svg class="ic"><use href="#i-calendar" /></svg></span>
+                <span><svg class="ic"><use href="#i-dash" /></svg></span>
+                <span><svg class="ic"><use href="#i-users" /></svg></span>
+                <span><svg class="ic"><use href="#i-megaphone" /></svg></span>
+              </aside>
+              <div class="app-list">
+                <div class="app-search">Search conversations</div>
+                <div class="conv on"><b>RK</b><div><strong>Ravi Kumar</strong><small>Yes, book it please</small></div><em>now</em></div>
+                <div class="conv"><b>MJ</b><div><strong>Meera Joseph</strong><small>Can I move my review?</small></div><em>2m</em><i>2</i></div>
+                <div class="conv"><b>AS</b><div><strong>Anil S</strong><small>നന്ദി, കാണാം</small></div><em>8m</em></div>
+                <div class="conv"><b>PN</b><div><strong>Priya Nair</strong><small>What are your hours?</small></div><em>21m</em></div>
+                <div class="conv"><b>SV</b><div><strong>Sunil V</strong><small>कल शाम 6 बजे?</small></div><em>1h</em></div>
+              </div>
+              <div class="app-chat">
+                <div class="app-chat-head"><div><strong>Ravi Kumar</strong><small>+91 ••••• •4821</small></div><span class="mode"><span>Human</span><span class="on"><svg class="ic"><use href="#i-bot" /></svg>Bot</span></span></div>
+                <div class="app-thread">
+                  <p class="bubble in">Hi, can I come tomorrow evening for a cleaning?</p>
+                  <p class="bubble out ai">Tomorrow we have 4:00 pm, 4:30 pm or 5:00 pm with Dr. Anjali at Aluva. Which suits you?<span class="ai-tag">AI</span></p>
+                  <p class="bubble in">5 pm. Yes, book it please</p>
+                  <p class="bubble out ai">Done — dental cleaning with Dr. Anjali, tomorrow at 5:00 pm. See you then!<span class="ai-tag">AI</span></p>
+                </div>
+              </div>
+              <aside class="app-side">
+                <p class="side-label">Upcoming</p>
+                <div class="appt"><span>Tomorrow · 5:00 pm</span><strong>Dental cleaning</strong><small>Dr. Anjali · Aluva</small></div>
+                <div class="appt muted"><span>Mon · 11:30 am</span><strong>Consultation</strong><small>Dr. Rohan · Kochi</small></div>
+              </aside>
+            </div>
+            <div class="toast" data-toast>
+              <span class="toast-ic"><svg class="ic"><use href="#i-calendar" /></svg></span>
+              <div><strong>New appointment booked</strong><small>Ravi Kumar · Dental cleaning · Tomorrow, 5:00 pm</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS (pinned) -->
+    <section class="story" id="how">
+      <div class="container story-grid" data-story>
+        <div class="story-copy">
+          <p class="kicker">How it works</p>
+          <h2>From first message to confirmed booking.</h2>
+          <ol class="steps" data-steps>
+            <li class="is-active"><span class="num">1</span><div><h3>A customer asks</h3><p>"Can I come tomorrow evening?" — at 11 pm, in whichever language they use.</p></div></li>
+            <li><span class="num">2</span><div><h3>Watoro checks real availability</h3><p>Opening hours, holidays, staff leave and every calendar. It never offers a time that isn't free.</p></div></li>
+            <li><span class="num">3</span><div><h3>It confirms before booking</h3><p>Service, person, date and time are repeated back. Nothing is booked until the customer says yes.</p></div></li>
+            <li><span class="num">4</span><div><h3>It's on your calendar</h3><p>The appointment appears in your calendar and dashboard, ready for your team.</p></div></li>
+          </ol>
+        </div>
+        <div class="story-device" aria-hidden="true">
+          <div class="iphone small">
+            <span class="iphone-btn b1"></span><span class="iphone-btn b2"></span><span class="iphone-btn b3"></span>
+            <div class="iphone-screen">
+              <div class="island"></div>
+              <div class="status"><span>9:41</span><span class="status-ic"><svg viewBox="0 0 18 12"><use href="#i-signal" /></svg><svg viewBox="0 0 16 12"><use href="#i-wifi" /></svg><svg viewBox="0 0 27 12"><use href="#i-battery" /></svg></span></div>
+              <div class="wa-head">
+                <svg class="ic"><use href="#i-back" /></svg>
+                <img class="wa-avatar" src="assets/watoro-mark.svg" alt="" />
+                <div class="wa-title"><strong>Smile Dental</strong><small>online</small></div>
+                <svg class="ic"><use href="#i-video" /></svg><svg class="ic"><use href="#i-phone" /></svg>
+              </div>
+              <div class="wa-chat screens">
+                <div class="screen is-on" data-screen="0">
+                  <p class="bubble in">Hi, can I come tomorrow evening for a cleaning?</p>
+                  <p class="typing"><i></i><i></i><i></i></p>
+                </div>
+                <div class="screen" data-screen="1">
+                  <p class="bubble in">Hi, can I come tomorrow evening for a cleaning?</p>
+                  <div class="bubble out slots">
+                    <small>Tomorrow · Dental cleaning</small>
+                    <div class="slot-row"><b>4:00 pm</b><b>4:30 pm</b><b class="pick">5:00 pm</b></div>
+                    <small>with Dr. Anjali · Aluva</small>
+                  </div>
+                </div>
+                <div class="screen" data-screen="2">
+                  <p class="bubble in">5 pm please. Ravi</p>
+                  <p class="bubble out">Dental cleaning with Dr. Anjali, tomorrow at 5:00 pm. Shall I book it?</p>
+                  <p class="bubble in">Yes, please</p>
+                </div>
+                <div class="screen" data-screen="3">
+                  <div class="bubble out confirm">
+                    <span class="confirm-ic"><svg class="ic"><use href="#i-calendar" /></svg></span>
+                    <div><strong>Appointment booked</strong><small>Dental cleaning · Tomorrow, 5:00 pm<br />Dr. Anjali · Aluva</small></div>
+                  </div>
+                  <p class="bubble out">You'll get a reminder before your visit.</p>
+                </div>
+              </div>
+              <div class="wa-input"><span>Message</span><i><svg class="ic"><use href="#i-send" /></svg></i></div>
+              <div class="home-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features" id="features">
+      <div class="container">
+        <div class="section-head" data-fade-scroll>
+          <p class="kicker">Features</p>
+          <h2>Everything your front desk does — and the parts it never gets to.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-bot" /></svg></span><h3>AI receptionist</h3><p>Answers from your own hours, services and staff. Books, reschedules and cancels — and hands over when it can't answer.</p></article>
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-inbox" /></svg></span><h3>Shared inbox</h3><p>Every WhatsApp conversation in one place. Assign chats, use templates and quick replies, switch any chat between Bot and Human.</p></article>
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-calendar" /></svg></span><h3>Appointments</h3><p>Multiple branches and staff, each person's own time per service, leave and buffers — with no double bookings.</p></article>
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-chart" /></svg></span><h3>Dashboards</h3><p>Bookings by hour, upcoming visits, customers and earnings — laid out for your type of business.</p></article>
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-megaphone" /></svg></span><h3>Broadcasts &amp; templates</h3><p>Approved WhatsApp templates with placeholders that fill in each customer's name, date and staff automatically.</p></article>
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-flow" /></svg></span><h3>Automations &amp; flows</h3><p>Follow-ups, menus and reminders built visually from triggers, conditions and waits — no code.</p></article>
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-lock" /></svg></span><h3>Roles &amp; access control</h3><p>Decide who sees which module and dashboard card. Give staff their own login and switch it off any time.</p></article>
+          <article class="feature" data-card><span class="f-ic"><svg class="ic"><use href="#i-handoff" /></svg></span><h3>Smooth handover</h3><p>When the assistant isn't sure, the customer is told a team member will reply and the chat is assigned to your staff.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- INDUSTRIES -->
+    <section class="industries" id="industries">
+      <div class="container">
+        <div class="section-head center" data-fade-scroll>
+          <p class="kicker">Industries</p>
+          <h2>Adapts to the way your business works.</h2>
+          <p class="sub">Choose your business type and Watoro uses your words — patients or clients, doctors or stylists — with a dashboard built for it.</p>
+        </div>
+        <div class="industry-grid">
+          <article class="industry" data-card><span class="in-ic"><svg class="ic"><use href="#i-tooth" /></svg></span><h3>Clinics</h3><p>Patients, doctors and treatments, missed-appointment tracking and earnings from service prices.</p></article>
+          <article class="industry" data-card><span class="in-ic"><svg class="ic"><use href="#i-scissors" /></svg></span><h3>Salons &amp; spas</h3><p>Clients and stylists, each stylist's own time per service, and buffers between bookings.</p></article>
+          <article class="industry" data-card><span class="in-ic"><svg class="ic"><use href="#i-briefcase" /></svg></span><h3>Agencies</h3><p>Leads in pipelines, broadcasts and automated follow-ups over WhatsApp.</p></article>
+          <article class="industry" data-card><span class="in-ic"><svg class="ic"><use href="#i-store" /></svg></span><h3>Any business</h3><p>A shared WhatsApp inbox with an assistant that answers from your own information.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRIVACY -->
+    <section class="trust">
+      <div class="container trust-grid">
+        <div data-fade-scroll>
+          <p class="kicker light">Privacy &amp; control</p>
+          <h2>Each customer only ever hears about their own bookings.</h2>
+          <p class="sub light">Built for businesses that handle personal information every day.</p>
+        </div>
+        <ul class="trust-list">
+          <li data-card><svg class="ic"><use href="#i-shield" /></svg><div><h3>Tied to the phone number</h3><p>Customers see only appointments made from their own WhatsApp number — never anyone else's, whoever they claim to be.</p></div></li>
+          <li data-card><svg class="ic"><use href="#i-calendar" /></svg><div><h3>Real availability only</h3><p>Every time offered comes from your live calendar and is checked again right before saving.</p></div></li>
+          <li data-card><svg class="ic"><use href="#i-check" /></svg><div><h3>Asks before it acts</h3><p>Bookings, changes and cancellations happen only after the customer clearly confirms.</p></div></li>
+          <li data-card><svg class="ic"><use href="#i-users" /></svg><div><h3>Your team stays in charge</h3><p>Switch any chat between Bot and Human, or start the conversation afresh, in one click.</p></div></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+      <div class="container faq-grid">
+        <div class="section-head" data-fade-scroll>
+          <p class="kicker">FAQ</p>
+          <h2>Questions, answered.</h2>
+          <p class="sub">Anything else? <a href="#contact">Get in touch</a>.</p>
+        </div>
+        <div class="faq-list">
+          <details data-card><summary>Do I need the WhatsApp Business API?<svg class="ic"><use href="#i-plus" /></svg></summary><p>Yes. Watoro works with the official WhatsApp Business Platform from Meta. We help you connect your business number during setup.</p></details>
+          <details data-card><summary>Which languages does the assistant understand?<svg class="ic"><use href="#i-plus" /></svg></summary><p>English, Malayalam and Hindi — including Malayalam and Hindi typed in English letters. It replies in the same language and script the customer used.</p></details>
+          <details data-card><summary>What happens when the assistant doesn't know the answer?<svg class="ic"><use href="#i-plus" /></svg></summary><p>It never guesses. The customer is told a team member will reply shortly, and the conversation is handed to your staff with a short note on what's needed.</p></details>
+          <details data-card><summary>Can it book a time that's already taken?<svg class="ic"><use href="#i-plus" /></svg></summary><p>No. It only offers times from your live calendar — taking opening hours, holidays, leave and buffers into account — and checks again right before saving.</p></details>
+          <details data-card><summary>Can customers see other people's appointments?<svg class="ic"><use href="#i-plus" /></svg></summary><p>No. The assistant only looks up bookings made from the customer's own WhatsApp number and refuses requests about anyone else.</p></details>
+          <details data-card><summary>Can my staff take over a conversation?<svg class="ic"><use href="#i-plus" /></svg></summary><p>Any time. Every chat has a Bot / Human switch, and replies from your team appear in the same thread.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT / CTA -->
+    <section class="cta" id="contact">
+      <div class="container cta-card" data-fade-scroll>
+        <img class="cta-mark" src="assets/watoro-mark.svg" width="64" height="64" alt="" />
+        <h2>Put your front desk on autopilot.</h2>
+        <p>Tell us about your business and we'll set up a walkthrough with your own services and staff.</p>
+        <div class="actions center">
+          <a class="btn btn-primary btn-lg" href="mailto:hello@example.com?subject=Watoro%20demo" data-contact-email><svg class="ic"><use href="#i-mail" /></svg>Request a demo</a>
+        </div>
+        <p class="cta-note"><mark class="fill">Contact email to be added</mark></p>
       </div>
     </section>
   </main>
 
   <footer class="footer">
-    <a class="brand" href="#top"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" /><path d="M21.5 11.2a7 7 0 1 0 0 9.6" /><circle cx="22" cy="16" r="2.2" /></svg><span>Clinicoro</span></a>
-    <p>© <span data-year>2026</span> Clinicoro · by Atovian</p>
-    <a href="https://app.clinicoro.atovian.com/login">Sign in →</a>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="logo" href="#top"><img src="assets/watoro-mark.svg" width="30" height="30" alt="" /><span class="wordmark">Wat<b>oro</b></span></a>
+        <p>Your business, on autopilot.</p>
+      </div>
+      <nav aria-label="Product"><h4>Product</h4><a href="#how">How it works</a><a href="#features">Features</a><a href="#industries">Industries</a><a href="#faq">FAQ</a></nav>
+      <nav aria-label="Legal"><h4>Legal</h4><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a><a href="data-deletion.html">Data deletion</a></nav>
+      <nav aria-label="Company"><h4>Company</h4><a href="#contact">Contact</a><span>Atovian, Kerala, India</span></nav>
+    </div>
+    <div class="container footer-bottom"><p>© <span data-year>2026</span> Watoro by Atovian. All rights reserved.</p><p>WhatsApp is a trademark of Meta Platforms, Inc. Watoro is not affiliated with Meta.</p></div>
   </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
