@@ -164,6 +164,16 @@ export function deriveLayout(wide: GridItem[], cols: number): GridItem[] {
     const widths = exact.map(Math.floor);
     let spare = Math.floor(exact.reduce((a, b) => a + b, 0) + 1e-9) - widths.reduce((a, b) => a + b, 0);
     for (let i = 0; spare > 0 && i < widths.length; i++, spare--) widths[i] += 1;
+    // A row of equal cards that doesn't divide evenly (four quarter
+    // tiles on 10 columns → 3,3,2,2) squeezes the last ones. Split it
+    // into equal rows instead: the most cards per row that divides both
+    // the grid and the row (four tiles on 10 columns → 2 rows of 5 + 5).
+    const same = row.every((it) => it.w === row[0].w);
+    if (cols > 2 && same && (row[0].w * cols) % 12 !== 0) {
+      let k = row.length;
+      while (k > 1 && (cols % k !== 0 || row.length % k !== 0)) k--;
+      if (k > 1) widths.fill(cols / k); // no even split → keep the shares
+    }
     // A row that doesn't start at the left edge (a card sitting under the
     // right half) keeps its offset when it fits, so the grid's upward
     // compaction slots it back under its neighbour.
