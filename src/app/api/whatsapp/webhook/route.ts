@@ -370,7 +370,19 @@ async function handleStatusUpdate(status: {
   status: string
   timestamp: string
   recipient_id: string
+  errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[]
 }) {
+  // Meta's only explanation for a `failed` send is this errors array
+  // (e.g. 131053 media download failed, 132000 param count mismatch,
+  // 131047 outside 24h window). We don't persist it — there's no column
+  // for it — so log it, otherwise a red ✕ in the inbox is undiagnosable.
+  if (status.status === 'failed') {
+    console.warn(
+      `[whatsapp webhook] message ${status.id} to ${status.recipient_id} failed:`,
+      JSON.stringify(status.errors ?? []),
+    )
+  }
+
   // 1) Mirror onto messages (legacy behavior) — Meta's status values
   //    already match the CHECK constraint on messages.status. No
   //    `.select()`: message_id is NOT unique (migration 009 — Meta ids
