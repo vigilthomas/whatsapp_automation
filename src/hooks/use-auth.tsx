@@ -26,6 +26,7 @@ import {
   type Action,
   type Permissions,
 } from "@/lib/auth/permissions";
+import { parseDashboardCards } from "@/lib/dashboard/card-switches";
 import {
   canEditSettings as canEditSettingsFor,
   canManageMembers as canManageMembersFor,
@@ -166,6 +167,12 @@ interface AuthContextValue {
   canAccessModule: (module: ModuleId) => boolean;
   /** Modules with `view`, in sidebar order. */
   sidebarModules: ModuleId[];
+  /**
+   * Dashboard cards switched off for the caller's role (Access Control →
+   * Dashboard, designations.dashboard_cards). Empty = all on — for
+   * members with no designation, owners, and before migration 069.
+   */
+  dashboardDisabled: ReadonlySet<string>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -173,6 +180,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // Stable empty matrix so `moduleAccess` keeps one identity across
 // renders while the account row is still loading.
 const EMPTY_MODULE_ACCESS: ModuleAccess = {};
+// Same idea for the dashboard card switches: one stable "all on".
+const EMPTY_SET: ReadonlySet<string> = new Set();
 
 /**
  * Flatten an unknown thrown/returned error into something console.error
@@ -229,20 +238,47 @@ async function fetchSuperAdmin(supabase: ReturnType<typeof createClient>): Promi
   }
 }
 
-/** Best-effort designation lookup; null when the member has none or 043 isn't applied. */
+/** A member's designation: its permissions and its dashboard card switches. */
+interface DesignationInfo {
+  permissions: Permissions;
+  dashboardDisabled: string[];
+}
+
+type DesignationCols = { permissions: unknown; dashboard_cards?: unknown };
+type DesignationRow = { designation_id: string | null; designation: DesignationCols | DesignationCols[] | null };
+
+/**
+ * Best-effort designation lookup; null when the member has none or 043
+ * isn't applied. Reads dashboard_cards (069) too, retrying without it
+ * when that column doesn't exist yet — every card is then on.
+ */
 async function fetchDesignation(
   supabase: ReturnType<typeof createClient>,
   userId: string,
-): Promise<Permissions | null> {
-  const { data, error } = await supabase
+): Promise<DesignationInfo | null> {
+  const withCards = await supabase
     .from("profiles")
-    .select("designation_id, designation:designations(permissions)")
+    .select("designation_id, designation:designations(permissions, dashboard_cards)")
     .eq("user_id", userId)
     .maybeSingle();
-  if (error || !data?.designation_id) return null;
-  const d = (data as { designation: { permissions: unknown } | { permissions: unknown }[] | null }).designation;
-  const raw = Array.isArray(d) ? d[0]?.permissions : d?.permissions;
-  return raw === undefined ? null : parsePermissions(raw);
+  let data = withCards.data as DesignationRow | null;
+  if (withCards.error) {
+    if (!/dashboard_cards/.test(withCards.error.message ?? "")) return null;
+    const plain = await supabase
+      .from("profiles")
+      .select("designation_id, designation:designations(permissions)")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (plain.error) return null;
+    data = plain.data as DesignationRow | null;
+  }
+  if (!data?.designation_id) return null;
+  const d = Array.isArray(data.designation) ? data.designation[0] : data.designation;
+  if (d?.permissions === undefined) return null;
+  return {
+    permissions: parsePermissions(d.permissions),
+    dashboardDisabled: parseDashboardCards(d.dashboard_cards).disabled,
+  };
 }
 
 /**
@@ -255,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [designation, setDesignation] = useState<Permissions | null>(null);
+  const [dashboardDisabled, setDashboardDisabled] = useState<ReadonlySet<string>>(EMPTY_SET);
   const [superAdmin, setSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   // Why the account/role couldn't be established, when it couldn't.
@@ -360,7 +397,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           fetchDesignation(supabase, userId),
           fetchSuperAdmin(supabase),
         ]);
-        setDesignation(nextDesignation);
+        setDesignation(nextDesignation?.permissions ?? null);
+        setDashboardDisabled(
+          nextDesignation?.dashboardDisabled.length ? new Set(nextDesignation.dashboardDisabled) : EMPTY_SET,
+        );
         setSuperAdmin(nextSuperAdmin);
 
         setProfile({
@@ -558,6 +598,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         can,
         canAccessModule,
         sidebarModules,
+        dashboardDisabled,
         accountStatus,
         accountStatusDetail: statusDetail,
         ...derived,
@@ -609,6 +650,7 @@ export function useAuth(): AuthContextValue {
       can: () => false,
       canAccessModule: () => false,
       sidebarModules: [],
+      dashboardDisabled: EMPTY_SET,
     };
   }
   return ctx;
