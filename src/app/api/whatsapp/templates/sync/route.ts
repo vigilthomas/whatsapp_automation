@@ -3,6 +3,7 @@ import { ForbiddenError, UnauthorizedError, toErrorResponse } from '@/lib/auth/a
 import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { WRONG_WABA_ID_MESSAGE } from '@/lib/whatsapp/meta-api'
+import { isMetaCdnUrl, sampleMediaUrl } from '@/lib/whatsapp/template-sample-media'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
 
@@ -217,7 +218,9 @@ export async function POST() {
           ? headerFormat.toLowerCase()
           : null
 
-      const row = {
+      const metaSampleUrl = sampleMediaUrl(header?.example?.header_handle?.[0])
+
+      const row: Record<string, unknown> = {
         // Account tenancy + user audit, same split as the submit
         // route. account_id is NOT NULL on message_templates
         // post-017, so an INSERT without it errors.
@@ -241,11 +244,22 @@ export async function POST() {
 
       const { data: existing, error: lookupErr } = await supabase
         .from('message_templates')
-        .select('id')
+        .select('id, header_media_url')
         .eq('account_id', accountId)
         .eq('name', t.name)
         .eq('language', t.language)
         .maybeSingle()
+
+      // Fill the send-time media link from Meta's sample, but never
+      // clobber a link the user set themselves (their own hosted image).
+      // A previous Meta CDN link is replaced, which refreshes it — those
+      // URLs are signed and expire, and re-syncing is the way to renew.
+      if (
+        metaSampleUrl &&
+        (!existing?.header_media_url || isMetaCdnUrl(existing.header_media_url))
+      ) {
+        row.header_media_url = metaSampleUrl
+      }
 
       if (lookupErr) {
         errors.push({
