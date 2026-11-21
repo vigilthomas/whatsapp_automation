@@ -275,6 +275,7 @@
       "ofOpenHours": "of open hours",
       "twoPlusVisits": "2+ completed visits",
       "wonLost": "{won} won · {lost} lost",
+      "loadFailed": "Couldn't load this card.",
       "nothingBooked": "Nothing booked in this period.",
       "sent": "Sent",
       "delivered": "Delivered",

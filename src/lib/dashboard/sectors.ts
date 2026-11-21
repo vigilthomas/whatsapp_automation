@@ -86,7 +86,14 @@ export function visibleCards(
   ids: readonly string[],
   can: (m: ModuleId) => boolean,
   disabled: ReadonlySet<string>,
+  /**
+   * False while the profile is loading: `can()` answers yes to reads then
+   * (so pages don't flash "no access"), and chats/contacts/deals are only
+   * gated here, not by RLS, so nothing may render or load until it's known.
+   */
+  ready = true,
 ): string[] {
+  if (!ready) return []
   return ids.filter((id) => {
     if (disabled.has(id)) return false
     const m = cardDef(id)?.module

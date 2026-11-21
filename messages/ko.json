@@ -275,6 +275,7 @@
       "ofOpenHours": "영업시간 대비",
       "twoPlusVisits": "완료 방문 2회 이상",
       "wonLost": "성사 {won} · 실패 {lost}",
+      "loadFailed": "이 카드를 불러오지 못했습니다.",
       "nothingBooked": "이 기간에 예약이 없습니다.",
       "sent": "발송",
       "delivered": "전달",

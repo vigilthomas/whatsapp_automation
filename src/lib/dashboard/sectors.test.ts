@@ -51,6 +51,9 @@ describe('visibleCards', () => {
   it('keeps cards with no module', () => {
     expect(visibleCards(['quick-actions'], () => false, new Set())).toEqual(['quick-actions'])
   })
+  it('shows nothing until permissions have loaded (can() answers yes while loading)', () => {
+    expect(visibleCards(ids, () => true, new Set(), false)).toEqual([])
+  })
 })
 
 describe('isScopedCard', () => {

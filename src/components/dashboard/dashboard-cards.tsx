@@ -20,6 +20,7 @@ import { useTranslations } from "next-intl";
 import {
   Briefcase,
   CalendarCheck,
+  CircleAlert,
   Coins,
   Handshake,
   MessageCircle,
@@ -51,6 +52,7 @@ import {
   utilisation,
   type ApptRow,
 } from "@/lib/dashboard/metrics";
+import { cardFailed } from "@/lib/dashboard/load-state";
 import { percentChange, previousRange, type DateRange } from "@/lib/dashboard/range";
 import {
   countCreatedIn,
@@ -153,9 +155,12 @@ export interface DashboardData {
   broadcasts: BroadcastResults | null;
   hours: BookingHours | null;
   loading: Record<Group, boolean>;
+  /** Groups whose query failed this request (their cards say so). */
+  failed: ReadonlySet<string>;
 }
 
-type Loaded = Omit<DashboardData, "range" | "hours" | "loading">;
+type Loaded = Omit<DashboardData, "range" | "hours" | "loading" | "failed">;
+const NONE_FAILED: ReadonlySet<string> = new Set();
 
 const EMPTY: Loaded = {
   appts: null,
@@ -204,6 +209,7 @@ export function useDashboardData(
   const db = useRef(createClient()).current;
   const [state, setState] = useState<Loaded>(EMPTY);
   const [loading, setLoading] = useState(() => allLoading(true));
+  const [failed, setFailed] = useState<ReadonlySet<string>>(NONE_FAILED);
   const [tick, setTick] = useState(0);
   const request = useRef(0);
   const lastKey = useRef("");
@@ -242,14 +248,29 @@ export function useDashboardData(
     if (fresh) {
       setState(EMPTY);
       setLoading(allLoading(true));
+      setFailed(NONE_FAILED);
     }
     const done = (g: Group) => {
       if (id === request.current) setLoading((l) => ({ ...l, [g]: false }));
     };
+    const mark = (g: Group, bad: boolean) => {
+      if (id !== request.current) return;
+      setFailed((f) => {
+        if (f.has(g) === bad) return f;
+        const next = new Set(f);
+        if (bad) next.add(g);
+        else next.delete(g);
+        return next;
+      });
+    };
     const run = (g: Group, job: () => Promise<void>) => {
       if (!groups.has(g)) return done(g);
       job()
-        .catch((err) => console.error(`[dashboard] ${g} failed:`, err))
+        .then(() => mark(g, false))
+        .catch((err) => {
+          console.error(`[dashboard] ${g} failed:`, err);
+          mark(g, true);
+        })
         .finally(() => done(g));
     };
     const prev = previousRange(range);
@@ -292,7 +313,7 @@ export function useDashboardData(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupKey, rangeKey, branch, tick, db, set]);
 
-  return { ...state, range, hours, loading };
+  return { ...state, range, hours, loading, failed };
 }
 
 // ------------------------------------------------------------ rendering
@@ -343,6 +364,18 @@ export function DashboardCard({ id, data }: { id: string; data: DashboardData })
   }, [data.staff, data.day]);
 
   const apptsReady = !L.appts && !!appts;
+
+  if (cardFailed(GROUPS_OF[id] ?? [], data.failed)) {
+    return id.startsWith("stat-") || id.startsWith("metric-") ? (
+      <StatTile icon={CircleAlert} tone="warn" label={tc(id, { range: "", day: "" })} value="—" sub={tr("loadFailed")} />
+    ) : (
+      <CardShell title={tc(id, { range: "", day: "" })} className="h-full">
+        <p className="flex flex-1 items-center justify-center gap-2 px-5 py-8 text-sm text-muted-foreground">
+          <CircleAlert className="size-4" strokeWidth={1.75} /> {tr("loadFailed")}
+        </p>
+      </CardShell>
+    );
+  }
 
   switch (id) {
     case "stat-bookings-today": {
@@ -430,7 +463,7 @@ export function DashboardCard({ id, data }: { id: string; data: DashboardData })
       );
     }
     case "today-bookings":
-      return <TodayAppointments items={data.day} loading={L.day} />;
+      return <TodayAppointments items={data.day} loading={L.day} tz={data.hours?.tz ?? null} />;
     case "staff-availability":
       return <DoctorAvailability doctors={doctors} loading={L.day || L.staff} />;
     case "bookings-trend":

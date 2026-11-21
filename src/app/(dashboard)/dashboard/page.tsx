@@ -20,6 +20,7 @@ import { defaultSector, isSector, parseVocabulary } from '@/lib/vocabulary'
 import { Button } from '@/components/ui/button'
 import { DashboardGrid } from '@/components/dashboard/dashboard-grid'
 import { FilterBar } from '@/components/dashboard/filter-bar'
+import { SkeletonCard } from '@/components/dashboard/skeleton'
 import { useBookingHours, useDashboardData } from '@/components/dashboard/dashboard-cards'
 
 /**
@@ -44,7 +45,7 @@ export default function DashboardPage() {
 
 function Dashboard() {
   const t = useTranslations('Dashboard')
-  const { user, profile, can, permissions, dashboardDisabled } = useAuth()
+  const { user, profile, profileLoading, can, permissions, dashboardDisabled } = useAuth()
   const { branding } = useBranding()
   const pathname = usePathname()
   const params = useSearchParams()
@@ -82,7 +83,11 @@ function Dashboard() {
   }, [db, user?.id])
 
   const scope = scopeOf(permissions, 'appointments')
-  const choices = useMemo(() => branchChoices(scope, myBranch, branches), [scope, myBranch, branches])
+  // Until the profile (and so the scope) is known, offer no branches at all.
+  const choices = useMemo(
+    () => (profileLoading ? { options: [], showAll: false, hidden: true } : branchChoices(scope, myBranch, branches)),
+    [profileLoading, scope, myBranch, branches],
+  )
 
   const filters = useMemo(() => parseFilters(new URLSearchParams(params.toString())), [params])
   const branch = clampBranch(filters, choices.options)
@@ -106,8 +111,8 @@ function Dashboard() {
   }
 
   const visible = useMemo(
-    () => visibleCards(SECTOR_CARDS[sector], (m) => can(m, 'read'), dashboardDisabled),
-    [sector, can, dashboardDisabled],
+    () => visibleCards(SECTOR_CARDS[sector], (m) => can(m, 'read'), dashboardDisabled, !profileLoading),
+    [sector, can, dashboardDisabled, profileLoading],
   )
   const layout = useMemo(() => packLayout(visible), [visible])
   const data = useDashboardData(visible, range, branch, hours)
@@ -173,7 +178,13 @@ function Dashboard() {
         onChange={setFilters}
       />
 
-      {visible.length === 0 ? (
+      {profileLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <SkeletonCard key={i} className="h-[132px]" />
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">{t('grid.empty')}</p>
       ) : (
         <DashboardGrid

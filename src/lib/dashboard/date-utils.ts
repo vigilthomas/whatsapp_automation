@@ -50,3 +50,12 @@ export function mondayIndex(d: Date): number {
 }
 
 export const DOW_SHORT_MON_FIRST = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+
+/** Clock time of an instant in the business timezone (the queue card). */
+export function formatClock(iso: string, tz: string | null, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    ...(tz ? { timeZone: tz } : {}),
+  }).format(new Date(iso))
+}

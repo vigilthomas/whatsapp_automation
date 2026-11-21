@@ -30,7 +30,11 @@ interface Page<T> {
   error: unknown
 }
 
-/** Run `page(from, to)` until a short page comes back or ROW_CAP is hit. */
+/**
+ * Run `page(from, to)` until a short page comes back or ROW_CAP is hit.
+ * Range loaders read newest first, so a capped result loses the OLDEST
+ * rows (the far end of a long range), never the days people look at.
+ */
 async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<Page<T>>): Promise<T[]> {
   const out: T[] = []
   for (let from = 0; from < ROW_CAP; from += PAGE) {
@@ -38,9 +42,21 @@ async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<Page<
     if (error) throw error
     const rows = data ?? []
     out.push(...rows)
-    if (rows.length < PAGE) break
+    if (rows.length < PAGE) return out
   }
+  console.warn(`[dashboard] stopped at ${ROW_CAP} rows; older rows in the range are not counted`)
   return out
+}
+
+interface Counted {
+  count: number | null
+  error: unknown
+}
+
+/** A head count's number, throwing its error rather than reading 0. */
+function countOf(r: Counted): number {
+  if (r.error) throw r.error
+  return r.count ?? 0
 }
 
 const APPT_ROW = 'starts_at, ends_at, status, service, doctor_id, contact_id, source'
@@ -53,7 +69,7 @@ export async function loadAppointmentsIn(db: DB, range: DateRange, branch: strin
       .gte('starts_at', range.from.toISOString())
       .lt('starts_at', range.to.toISOString())
     if (branch) q = q.eq('branch_id', branch)
-    return q.order('starts_at', { ascending: true }).range(a, b) as unknown as PromiseLike<Page<ApptRow>>
+    return q.order('starts_at', { ascending: false }).range(a, b) as unknown as PromiseLike<Page<ApptRow>>
   })
 }
 
@@ -158,7 +174,7 @@ export async function loadPointInTimeCounts(db: DB): Promise<PointInTimeCounts> 
     db.from('conversations').select('id', { count: 'exact', head: true }).eq('status', 'open'),
     db.from('contacts').select('id', { count: 'exact', head: true }),
   ])
-  return { openChats: convos.count ?? 0, customersTotal: contacts.count ?? 0 }
+  return { openChats: countOf(convos), customersTotal: countOf(contacts) }
 }
 
 export interface DealsSummary {
@@ -181,18 +197,19 @@ export async function loadDealsSummary(db: DB, range: DateRange): Promise<DealsS
       .eq('status', status)
       .gte('updated_at', range.from.toISOString())
       .lt('updated_at', range.to.toISOString())
-  const [open, won, lost] = await Promise.all([
-    db.from('deals').select('value').eq('status', 'open'),
+  type Row = { value: number | string | null }
+  const [values, won, lost] = await Promise.all([
+    fetchAll<Row>((a, b) =>
+      db.from('deals').select('value').eq('status', 'open').order('id').range(a, b) as unknown as PromiseLike<Page<Row>>,
+    ),
     inRange('won'),
     inRange('lost'),
   ])
-  if (open.error) throw open.error
-  const values = (open.data ?? []) as { value: number | string | null }[]
   return {
     openCount: values.length,
     openValue: values.reduce((s, d) => s + (Number(d.value) || 0), 0),
-    won: won.count ?? 0,
-    lost: lost.count ?? 0,
+    won: countOf(won as Counted),
+    lost: countOf(lost as Counted),
   }
 }
 
@@ -228,7 +245,7 @@ export async function loadMessagesIn(db: DB, range: DateRange): Promise<{ at: st
       .select('created_at, sender_type')
       .gte('created_at', range.from.toISOString())
       .lt('created_at', range.to.toISOString())
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .range(a, b) as unknown as PromiseLike<Page<{ created_at: string; sender_type: string }>>,
   )
   return rows.map((r) => ({ at: r.created_at, incoming: r.sender_type === 'customer' }))

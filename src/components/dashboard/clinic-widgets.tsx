@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+
+import { formatClock } from "@/lib/dashboard/date-utils";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -190,14 +192,16 @@ export function StatTile({
 export function TodayAppointments({
   items,
   loading,
+  tz = null,
 }: {
   items: Appointment[] | null;
   loading: boolean;
+  /** Business timezone: the rows are the business's day, so are the times. */
+  tz?: string | null;
 }) {
   const t = useTranslations("Dashboard.clinic");
   const tStatus = useTranslations("Appointments.status");
   const tAppt = useTranslations("Appointments");
-  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
   return (
     <CardShell title={t("todaysAppointments")} href="/appointments" hrefLabel={t("viewAll")} className="h-full">
@@ -215,7 +219,7 @@ export function TodayAppointments({
             return (
               <li key={a.id} className="flex items-center gap-4 border-t border-border px-5 py-3">
                 <span className="min-w-[72px] shrink-0 text-sm font-medium text-muted-foreground tabular-nums">
-                  {timeFmt.format(new Date(a.starts_at))}
+                  {formatClock(a.starts_at, tz)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">{patientLabel(a.contact)}</p>

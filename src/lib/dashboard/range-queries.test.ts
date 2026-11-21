@@ -6,13 +6,16 @@ import {
   loadAppointmentsIn,
   loadBookingHours,
   loadCompletedCountByContact,
+  loadDealsSummary,
+  loadMessagesIn,
+  loadPointInTimeCounts,
   loadServicePrices,
 } from './range-queries'
 
 type Call = [string, ...unknown[]]
 
 /** Records every builder call; awaiting the chain resolves the next queued result. */
-function fakeDb(results: unknown[]) {
+function fakeDb(results: unknown[] | ((log: Call[]) => unknown)) {
   const calls: Call[][] = []
   const db = {
     from(table: string) {
@@ -25,7 +28,10 @@ function fakeDb(results: unknown[]) {
           return chain
         }
       }
-      const next = () => Promise.resolve(results.shift() ?? { data: [], error: null })
+      const next = () =>
+        Promise.resolve(
+          (typeof results === 'function' ? results(log) : results.shift()) ?? { data: [], error: null },
+        )
       chain.maybeSingle = next
       chain.then = (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => next().then(ok, bad)
       return chain
@@ -95,5 +101,47 @@ describe('loadBookingHours', () => {
   it("reads the business's timezone", async () => {
     const { db } = fakeDb([{ data: { config: { timezone: 'Europe/London' } }, error: null }])
     expect((await loadBookingHours(db)).tz).toBe('Europe/London')
+  })
+})
+
+/** Which deals query a call log is: the open-pipeline row read, or a won/lost count. */
+const dealsKind = (log: Call[]) => (log.find(([m, c]) => m === 'eq' && c === 'status')?.[2] as string) ?? ''
+
+describe('loadDealsSummary', () => {
+  it('sums every open deal, paging past the 1000-row API limit', async () => {
+    const big = Array.from({ length: 1000 }, () => ({ value: 1 }))
+    const { db } = fakeDb((log) => {
+      const kind = dealsKind(log)
+      if (kind === 'open') {
+        const from = (log.find(([m]) => m === 'range')?.[1] as number) ?? 0
+        return { data: from === 0 ? big : [{ value: 5 }], error: null }
+      }
+      return { count: kind === 'won' ? 3 : 2, error: null }
+    })
+    const s = await loadDealsSummary(db, range)
+    expect(s).toEqual({ openCount: 1001, openValue: 1005, won: 3, lost: 2 })
+  })
+  it('throws when the won/lost count fails instead of showing 0', async () => {
+    const { db } = fakeDb((log) =>
+      dealsKind(log) === 'won' ? { count: null, error: new Error('won failed') } : { data: [], count: 0, error: null },
+    )
+    await expect(loadDealsSummary(db, range)).rejects.toThrow('won failed')
+  })
+})
+
+describe('loadPointInTimeCounts', () => {
+  it('throws when a count fails instead of showing 0', async () => {
+    const { db } = fakeDb((log) =>
+      log[0][1] === 'contacts' ? { count: null, error: new Error('contacts failed') } : { count: 4, error: null },
+    )
+    await expect(loadPointInTimeCounts(db)).rejects.toThrow('contacts failed')
+  })
+})
+
+describe('loadMessagesIn', () => {
+  it('reads newest first, so the row cap drops the oldest days, not the latest', async () => {
+    const { db, calls } = fakeDb([{ data: [], error: null }])
+    await loadMessagesIn(db, range)
+    expect(calls[0]).toContainEqual(['order', 'created_at', { ascending: false }])
   })
 })

@@ -121,3 +121,12 @@ describe("mondayIndex", () => {
     );
   });
 });
+
+describe("formatClock", () => {
+  it("shows the time in the business timezone, not the browser's", async () => {
+    const { formatClock } = await import("./date-utils");
+    // Two zones, so the test can't pass by matching the machine's own zone.
+    expect(formatClock("2026-11-21T03:30:00Z", "Asia/Kolkata", "en-GB")).toBe("9:00");
+    expect(formatClock("2026-11-21T03:30:00Z", "Europe/London", "en-GB")).toBe("3:30");
+  });
+});
