@@ -1,0 +1,74 @@
+name: Deploy
+
+# Build and deploy to the server whenever main changes — but only after
+# CI (lint, typecheck, test, build) has passed on that commit, so a
+# broken push never reaches production. Can also be run by hand from
+# the Actions tab ("Run workflow").
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST         server address, e.g. 150.230.130.75
+#   DEPLOY_USER         SSH user, e.g. ubuntu
+#   DEPLOY_SSH_KEY      private key that user accepts (whole file, with BEGIN/END lines)
+#   DEPLOY_KNOWN_HOSTS  the server's host key line (`ssh-keyscan -t ed25519 <host>`)
+# Optional repository variable:
+#   DEPLOY_PATH         checkout on the server (default ~/Projects/clinicoro)
+#
+# The server-side steps live in scripts/deploy.sh.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; a newer one waits rather than cancelling a
+# half-finished rebuild.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build and deploy on the server
+    # From CI: only a successful run for a push to main (not a PR).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/Projects/clinicoro' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$USER@$HOST" \
+            "DEPLOY_PATH=$DEPLOY_PATH DEPLOY_SHA=$DEPLOY_SHA bash -s" < scripts/deploy.sh
+
+      - name: Clean up key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
