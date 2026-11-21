@@ -68,7 +68,7 @@ describe("findTimes", () => {
     expect(r.ok).toBe(true);
     const days = (r as unknown as { days: { date: string; times: { time: string; stylist: string }[] }[] }).days;
     expect(days).toHaveLength(1);
-    expect(days[0].times[0]).toEqual({ time: "09:00", stylist: "Anjali Menon" });
+    expect(days[0].times[0]).toEqual({ time: "09:00", label: "9:00 am", stylist: "Anjali Menon" });
     // Rahul isn't linked to this service, so he's never offered for it.
     expect(days[0].times.every((t) => t.stylist === "Anjali Menon")).toBe(true);
   });
@@ -89,6 +89,8 @@ describe("findTimes", () => {
       days: { times: { time: string }[] }[];
     };
     expect(r.days[0].times[0].time).toBe("16:00");
+    // Written out, so the model never has to convert 24-hour times (it once wrote noon as "12:00 am").
+    expect((r.days[0].times[0] as unknown as { label: string }).label).toBe("4:00 pm");
     expect(r.days[0].times.every((t) => t.time >= "16:00")).toBe(true);
   });
 
@@ -181,9 +183,73 @@ describe("myAppointments", () => {
     expect(r.upcoming.find((a) => a.id === "a-cxl")).toBeUndefined();
   });
 
+  it("always shows a recent missed appointment, however many other bookings there are", async () => {
+    const many: OwnAppointment[] = [
+      ...mine,
+      // Lots of later past visits and future cancellations.
+      ...Array.from({ length: 8 }, (_, i) => ({
+        id: `c${i}`,
+        service: "Hair Spa",
+        doctor_id: "d2",
+        branch_id: "b1",
+        starts_at: `2025-11-2${i % 2 ? 0 : 1}T0${i}:00:00Z`,
+        ends_at: `2025-11-2${i % 2 ? 0 : 1}T0${i}:30:00Z`,
+        status: i % 2 ? "completed" : "cancelled",
+      })),
+      ...Array.from({ length: 6 }, (_, i) => ({
+        id: `f${i}`,
+        service: "Hair Spa",
+        doctor_id: "d2",
+        branch_id: "b1",
+        starts_at: `2025-12-0${i + 1}T05:00:00Z`,
+        ends_at: `2025-12-0${i + 1}T06:00:00Z`,
+        status: "cancelled",
+      })),
+    ];
+    const r = (await myAppointments(deps({ own: own(many) }))) as unknown as { past: { id: string; status: string }[]; missed: { id: string }[] };
+    expect(r.missed.map((a) => a.id)).toEqual(["a-miss"]);
+    // "past" is what already happened — never a future cancellation.
+    expect(r.past.some((a) => a.id.startsWith("f"))).toBe(false);
+  });
+
   it("says so when there are none, and fails safely without the lookup", async () => {
-    expect(await myAppointments(deps({ own: own([]) }))).toMatchObject({ ok: true, upcoming: [], past: [] });
+    expect(await myAppointments(deps({ own: own([]) }))).toMatchObject({ ok: true, upcoming: [], past: [], missed: [] });
     expect(await myAppointments(deps())).toMatchObject({ ok: false });
+  });
+});
+
+describe("appointment codes", () => {
+  const uuid = "2010058a-6873-4341-bfe4-4572e5e08b89";
+  const list: OwnAppointment[] = [{ ...mine[0], id: uuid }];
+  it("shows a short code instead of the database id, and acts on that code", async () => {
+    const o = own(list);
+    const r = (await myAppointments(deps({ own: o }))) as unknown as { upcoming: { id: string }[] };
+    expect(r.upcoming[0].id).toBe("2010058a");
+    expect(JSON.stringify(r)).not.toContain(uuid);
+    expect(await cancelAppointment(deps({ own: o }), call({ tool: "cancel", appointment: "2010058a" }))).toMatchObject({ ok: true });
+    expect(o.cancel).toHaveBeenCalledWith(uuid);
+  });
+  it("refuses a code that matches none or more than one of their bookings", async () => {
+    const two: OwnAppointment[] = [list[0], { ...list[0], id: "2010058a-ffff-4341-bfe4-4572e5e08b89" }];
+    const o = own(two);
+    expect(await cancelAppointment(deps({ own: o }), call({ tool: "cancel", appointment: "2010058a" }))).toMatchObject({ ok: false });
+    expect(await cancelAppointment(deps({ own: o }), call({ tool: "cancel", appointment: "2010" }))).toMatchObject({ ok: false });
+    expect(o.cancel).not.toHaveBeenCalled();
+  });
+});
+
+describe("rescheduling keeps the same person", () => {
+  it("uses the appointment's own stylist even if the model shortens a name that matches someone else", async () => {
+    // "Rahul Nair" is a different person from "Rahul Nair (Demo)".
+    const doctors = [
+      { id: "d1", name: "Anjali Menon", branch_id: "b1" },
+      { id: "d2", name: "Rahul Nair (Demo)", branch_id: "b1" },
+      { id: "d3", name: "Rahul Nair", branch_id: "b2" },
+    ];
+    const o = own();
+    const r = await rescheduleAppointment(deps({ own: o, doctors }), call({ tool: "reschedule", appointment: "a-up", stylist: "Rahul Nair", start: "2025-11-27 11:00" }));
+    expect(r).toMatchObject({ ok: true });
+    expect(o.move).toHaveBeenCalledWith("a-up", expect.objectContaining({ doctorId: "d2" }));
   });
 });
 
@@ -231,7 +297,8 @@ describe("rescheduleAppointment", () => {
       days: { times: { time: string }[] }[];
     };
     expect(t.days[0].times.map((x) => x.time)).not.toContain("10:00");
-    const t2 = (await findTimes(deps({ busy }), call({ service: "Hair Spa", stylist: "Rahul", date: "2025-11-25", appointment: "a-up" }))) as unknown as {
+    // Only the customer's own booking (from their list) is ignored.
+    const t2 = (await findTimes(deps({ busy, own: own() }), call({ service: "Hair Spa", stylist: "Rahul", date: "2025-11-25", appointment: "a-up" }))) as unknown as {
       days: { times: { time: string }[] }[];
     };
     expect(t2.days[0].times.map((x) => x.time)).toContain("10:00");

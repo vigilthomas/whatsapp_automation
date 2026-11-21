@@ -140,6 +140,15 @@ function localTime(slot: Slot, day: string, deps: BookingDeps): string {
   return hhmm(Math.round((slot.start.getTime() - zonedInstant(day, 0, deps.config.timezone).getTime()) / 60_000));
 }
 
+/**
+ * One offered time: "HH:MM" for actions, the same time written out for the
+ * customer ("4:00 pm" — the model once wrote noon as "12:00 am" when left
+ * to convert), and who it's with.
+ */
+function timeOption(slot: Slot, day: string, deps: BookingDeps) {
+  return { time: localTime(slot, day, deps), label: timeLabel(slot.start, deps.config.timezone), stylist: stylistName(slot.doctorId, deps) };
+}
+
 function stylistName(id: string | null, deps: BookingDeps): string | null {
   return id ? (deps.doctors.find((d) => d.id === id)?.name ?? null) : null;
 }
@@ -152,7 +161,9 @@ function without(deps: BookingDeps, appointmentId: string): BookingDeps {
 
 export async function findTimes(deps: BookingDeps, call: ToolCall): Promise<ToolResult> {
   // While rescheduling, the booking being moved doesn't block its own new time.
-  deps = without(deps, call.appointment);
+  const own = (deps as AiDeps).own;
+  const moving = call.appointment && own ? findOwn(await own.list(), call.appointment) : null;
+  deps = without(deps, moving?.id ?? "");
   const r = resolve(deps, call);
   if (isResult(r)) return r;
   const open = candidateDays(deps.config, deps.now);
@@ -177,7 +188,7 @@ export async function findTimes(deps: BookingDeps, call: ToolCall): Promise<Tool
     out.push({
       date: day,
       label: dayLabel(day, deps.config.timezone),
-      times: slots.slice(0, MAX_TIMES_PER_DAY).map((s) => ({ time: localTime(s, day, deps), stylist: stylistName(s.doctorId, deps) })),
+      times: slots.slice(0, MAX_TIMES_PER_DAY).map((s) => timeOption(s, day, deps)),
     });
     if (!call.date && out.length >= DAYS_WHEN_UNSPECIFIED) break;
   }
@@ -212,7 +223,7 @@ export async function bookTime(deps: BookingDeps, call: ToolCall): Promise<ToolR
     return {
       ok: false,
       error: `${day} ${time} is not free. Offer one of these instead.`,
-      freeTimes: slots.slice(0, MAX_TIMES_PER_DAY).map((s) => ({ time: localTime(s, day, deps), stylist: stylistName(s.doctorId, deps) })),
+      freeTimes: slots.slice(0, MAX_TIMES_PER_DAY).map((s) => timeOption(s, day, deps)),
     };
   }
 
@@ -245,13 +256,31 @@ function describeOwn(a: OwnAppointment, deps: BookingDeps) {
   const start = new Date(a.starts_at);
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: deps.config.timezone }).format(start);
   return {
-    id: a.id,
+    id: codeOf(a.id),
     service: a.service,
     stylist: stylistName(a.doctor_id, deps),
     date: dayLabel(day, deps.config.timezone),
     time: timeLabel(start, deps.config.timezone),
     status: a.status,
   };
+}
+
+/**
+ * The short code the model (and so possibly the customer) sees instead of
+ * the database id. Resolved back against this contact's own list only.
+ */
+const CODE_LENGTH = 8;
+const codeOf = (id: string) => id.slice(0, CODE_LENGTH);
+
+/** The own appointment a code (or full id) points at; null when none or ambiguous. */
+function findOwn(list: readonly OwnAppointment[], ref: string): OwnAppointment | null {
+  const r = ref.trim().toLowerCase();
+  if (!r) return null;
+  const exact = list.find((a) => a.id.toLowerCase() === r);
+  if (exact) return exact;
+  if (r.length < CODE_LENGTH) return null;
+  const hits = list.filter((a) => a.id.toLowerCase().startsWith(r));
+  return hits.length === 1 ? hits[0] : null;
 }
 
 const isUpcoming = (a: OwnAppointment, now: Date) => ACTIVE.has(a.status) && Date.parse(a.starts_at) > now.getTime();
@@ -263,23 +292,25 @@ const CHANGED = "That appointment changed meanwhile. Call my_appointments again.
 export async function myAppointments(deps: AiDeps): Promise<ToolResult> {
   if (!deps.own) return { ok: false, error: "Appointments can't be looked up right now. Hand the chat to staff." };
   const all = await deps.own.list();
+  const now = deps.now.getTime();
   const upcoming = all.filter((a) => isUpcoming(a, deps.now)).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-  const past = all
-    .filter((a) => !upcoming.includes(a))
-    .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
-    .slice(0, 5);
+  // What already happened (any status), newest first. Future cancellations aren't "past".
+  const past = all.filter((a) => Date.parse(a.starts_at) <= now).sort((a, b) => b.starts_at.localeCompare(a.starts_at));
+  // Missed ones are listed on their own so they're never cut off by a busy history.
+  const missed = past.filter((a) => a.status === "no_show");
   return {
     ok: true,
-    note: "Only this WhatsApp number's own appointments. status: scheduled/confirmed = booked, completed = attended, no_show = missed, cancelled = cancelled.",
+    note: "Only this WhatsApp number's own appointments, from the last 30 days on. status: scheduled/confirmed = booked, completed = attended, no_show = missed, cancelled = cancelled. 'missed' lists every missed one in that time.",
     upcoming: upcoming.slice(0, 10).map((a) => describeOwn(a, deps)),
-    past: past.map((a) => describeOwn(a, deps)),
+    missed: missed.slice(0, 5).map((a) => describeOwn(a, deps)),
+    past: past.slice(0, 6).map((a) => describeOwn(a, deps)),
   };
 }
 
 /** The sender's own upcoming appointment with this id, or null. */
 async function ownUpcoming(deps: AiDeps, id: string): Promise<OwnAppointment | null> {
   if (!deps.own || !id.trim()) return null;
-  const a = (await deps.own.list()).find((x) => x.id === id.trim());
+  const a = findOwn(await deps.own.list(), id);
   return a && isUpcoming(a, deps.now) ? a : null;
 }
 
@@ -295,11 +326,16 @@ export async function rescheduleAppointment(deps: AiDeps, call: ToolCall): Promi
   const a = await ownUpcoming(deps, call.appointment);
   if (!a || !deps.own) return { ok: false, error: NOT_YOURS };
   const free = without(deps, a.id);
-  // Same service; the same stylist unless the customer asked for another.
+  // Same service; the same stylist (by id) unless the customer asked for
+  // someone clearly different — a shortened name ("Rahul Nair" for
+  // "Rahul Nair (Demo)") still means the current one.
+  const current = stylistName(a.doctor_id, deps);
+  const asked = norm(call.stylist);
+  const same = !asked || ANY.test(asked) || (current && (norm(current).includes(asked) || asked.includes(norm(current))));
   const r = resolve(free, {
     ...call,
     service: a.service ?? "",
-    stylist: call.stylist.trim() || stylistName(a.doctor_id, deps) || "any",
+    stylist: same ? (current ?? "any") : call.stylist,
   });
   if (isResult(r)) {
     return r.ok ? r : { ...r, error: `${r.error} (Rescheduling keeps the service; for another service, book a new appointment.)` };
@@ -317,7 +353,7 @@ export async function rescheduleAppointment(deps: AiDeps, call: ToolCall): Promi
     return {
       ok: false,
       error: `${day} ${time} is not free. Offer one of these instead.`,
-      freeTimes: slots.slice(0, MAX_TIMES_PER_DAY).map((s) => ({ time: localTime(s, day, deps), stylist: stylistName(s.doctorId, deps) })),
+      freeTimes: slots.slice(0, MAX_TIMES_PER_DAY).map((s) => timeOption(s, day, deps)),
     };
   }
   const stylist = slot.doctorId ? deps.doctors.find((d) => d.id === slot.doctorId) : undefined;
