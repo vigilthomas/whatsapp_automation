@@ -171,6 +171,19 @@ export interface ModelDecision {
 
 const toolArg = (v: unknown, max = 100) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
+/**
+ * The customer's own "start over" commands. In Bot mode they make the
+ * assistant forget the chat so far (like the inbox's Start new) and get
+ * RESET_REPLY; nothing else happens. Exact words only, so a sentence that
+ * merely contains one is an ordinary message.
+ */
+const RESET_COMMANDS = new Set(["/clear", "/new", "/restart", "/reset"]);
+export const RESET_REPLY = "Okay, let's start fresh. How can I help you?";
+
+export function isResetCommand(text: string): boolean {
+  return RESET_COMMANDS.has(text.trim().toLowerCase());
+}
+
 /** What to tell the patient when the model's own holding message is unusable. */
 export const DEFAULT_HANDOFF_REPLY = "Thanks for your message. A member of our team will reply to you shortly.";
 

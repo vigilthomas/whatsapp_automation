@@ -525,7 +525,12 @@
       "why": "Why",
       "notReady": "The AI assistant isn't switched on yet, so Bot mode won't reply.",
       "handedOff": "The assistant handed this chat over: {reason}",
-      "openSettings": "Open AI assistant settings"
+      "openSettings": "Open AI assistant settings",
+      "startNew": "Start new",
+      "startNewTitle": "Start a new AI conversation?",
+      "startNewDesc": "The AI assistant forgets this chat so far and treats the next message as a new conversation. The messages stay here for your team, and appointments are not changed.",
+      "startNewConfirm": "Start new",
+      "startNewDone": "The AI assistant will start fresh in this chat"
     }
   },
   "Contacts": {

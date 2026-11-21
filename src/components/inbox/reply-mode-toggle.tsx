@@ -7,6 +7,10 @@
  * it back to staff when it doesn't know (the switch then flips to Human
  * by itself and shows why). Human: staff reply; the assistant stays quiet.
  *
+ * "Start new" (the circular arrow) makes the AI forget this chat so far:
+ * it reads only messages after that moment (POST …/ai-reset, migration
+ * 071). Messages stay for staff; appointments are untouched.
+ *
  * Access control module `ai-assistant`: without View the switch isn't shown
  * at all; without Edit it shows the mode but can't be flipped. The routes
  * behind it enforce the same rule.
@@ -14,10 +18,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Bot, Info, Loader2, UserRound } from "lucide-react";
+import { Bot, Info, Loader2, RotateCcw, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +37,7 @@ export function ReplyModeToggle({ conversationId }: { conversationId: string }) 
   const [ready, setReady] = useState(true);
   const [summary, setSummary] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/conversations/${conversationId}/ai-mode`, { cache: "no-store" }).catch(() => null);
@@ -79,6 +85,25 @@ export function ReplyModeToggle({ conversationId }: { conversationId: string }) 
     }
   };
 
+  const startNew = async () => {
+    if (!editable || saving) return;
+    const ok = await confirm({ title: t("startNewTitle"), description: t("startNewDesc"), confirmLabel: t("startNewConfirm") });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/ai-reset`, { method: "POST" });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(d.error ?? t("failed"));
+        return;
+      }
+      setSummary(null);
+      toast.success(t("startNewDone"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const option = (value: Mode, Icon: typeof Bot, label: string) => (
     <button
       type="button"
@@ -114,6 +139,18 @@ export function ReplyModeToggle({ conversationId }: { conversationId: string }) 
         {option("bot", Bot, t("bot"))}
         {saving && <Loader2 className="mx-1 size-3 animate-spin text-muted-foreground" />}
       </div>
+      {editable && (
+        <button
+          type="button"
+          onClick={() => void startNew()}
+          disabled={saving}
+          aria-label={t("startNew")}
+          title={t("startNewTitle")}
+          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+        >
+          <RotateCcw className="size-3.5" />
+        </button>
+      )}
       {note && (
         <Popover>
           <PopoverTrigger

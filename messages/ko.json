@@ -525,7 +525,12 @@
       "why": "이유",
       "notReady": "AI 도우미가 아직 켜져 있지 않아 봇 모드가 답하지 않습니다.",
       "handedOff": "도우미가 이 채팅을 넘겼습니다: {reason}",
-      "openSettings": "AI 도우미 설정 열기"
+      "openSettings": "AI 도우미 설정 열기",
+      "startNew": "새로 시작",
+      "startNewTitle": "AI 대화를 새로 시작할까요?",
+      "startNewDesc": "AI 어시스턴트가 지금까지의 대화를 잊고 다음 메시지부터 새 대화로 다룹니다. 메시지는 팀을 위해 그대로 남고, 예약은 바뀌지 않습니다.",
+      "startNewConfirm": "새로 시작",
+      "startNewDone": "이 채팅에서 AI 어시스턴트가 새로 시작합니다"
     }
   },
   "Contacts": {

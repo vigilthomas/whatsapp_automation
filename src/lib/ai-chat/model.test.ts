@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CLINIC_SETTINGS, parseClinicSettings } from "@/lib/clinic/settings";
-import { DEFAULT_HANDOFF_REPLY, buildSystemPrompt, effectiveMode, parseModelReply, toTurns } from "./model";
+import { DEFAULT_HANDOFF_REPLY, RESET_REPLY, buildSystemPrompt, effectiveMode, isResetCommand, parseModelReply, toTurns } from "./model";
 
 describe("effectiveMode", () => {
   it("uses the chat's own switch, else the account default", () => {
@@ -130,5 +130,17 @@ describe("toTurns", () => {
       { role: "user", content: "Hi\nOpen today?" },
       { role: "assistant", content: "Yes, 9 to 6." },
     ]);
+  });
+});
+
+describe("isResetCommand", () => {
+  it("recognises the customer's own start-over commands", () => {
+    for (const t of ["/clear", "/new", "/restart", " /CLEAR ", "/reset"]) expect(isResetCommand(t)).toBe(true);
+  });
+  it("leaves ordinary messages alone", () => {
+    for (const t of ["clear", "new appointment", "please /clear my booking", "", "/clearance"]) expect(isResetCommand(t)).toBe(false);
+  });
+  it("has a short fixed reply", () => {
+    expect(RESET_REPLY.length).toBeGreaterThan(5);
   });
 });

@@ -21,6 +21,11 @@
 // (/api/ai/test-chat), which uses prepareAssistant + toolRunner below
 // with `dryRun` so nothing is sent or saved.
 //
+// "Start new" in the inbox, or the customer sending /clear (/new,
+// /restart, /reset) — conversations.ai_context_since, migration 071 —
+// makes the model read only messages after that moment: a fresh
+// conversation, with the thread itself and appointments left untouched.
+//
 // Security: the customer is always the webhook's contact. The appointment
 // lookup is built for that contact id here; the model never chooses
 // whose appointments it sees, and cancel/reschedule filter by
@@ -39,7 +44,7 @@ import { decrypt } from "@/lib/whatsapp/encryption";
 import { sendMessageToConversation } from "@/lib/whatsapp/send-message";
 import { parseClinicSettings } from "@/lib/clinic/settings";
 import { parseVocabulary, resolveTerms } from "@/lib/vocabulary";
-import { DEFAULT_HANDOFF_REPLY, buildSystemPrompt, effectiveMode, toTurns, type ChatTurn } from "./model";
+import { DEFAULT_HANDOFF_REPLY, RESET_REPLY, buildSystemPrompt, effectiveMode, isResetCommand, toTurns, type ChatTurn } from "./model";
 import { PROVIDERS, complete, isAiProvider, type AiProvider } from "./provider";
 import { runTool, type AiDeps, type CustomerBookings, type OwnAppointment, type ToolCall, type ToolResult } from "./booking";
 import { converse } from "./conversation";
@@ -280,6 +285,21 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
 
   if (!text.trim()) return handoff("They sent an attachment.");
 
+  // The customer's own "/clear" (or /new, /restart, /reset): start over,
+  // exactly like the inbox's Start new. Before migration 071 the update
+  // fails and the message is answered like any other.
+  if (isResetCommand(text)) {
+    const { error } = await db
+      .from("conversations")
+      .update({ ai_context_since: new Date().toISOString(), ai_reply_count: 0, ai_handoff_summary: null })
+      .eq("id", conversationId)
+      .eq("account_id", accountId);
+    if (!error) {
+      await sendAsBot(db, accountId, conversationId, RESET_REPLY);
+      return { replied: true, handedOff: false };
+    }
+  }
+
   await resetCapAfterQuiet(db, accountId, conversationId);
   const { data: claimed } = await db.rpc("claim_ai_reply_slot", {
     conversation_id: conversationId,
@@ -289,12 +309,21 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
 
   let decision;
   try {
-    const { data: recent } = await db
+    // "Start new" (migration 071): only what was said after it. Separate
+    // read so a database without the column keeps working as before.
+    const { data: reset } = await db
+      .from("conversations")
+      .select("ai_context_since")
+      .eq("id", conversationId)
+      .eq("account_id", accountId)
+      .maybeSingle();
+    const since = (reset?.ai_context_since as string | null | undefined) ?? null;
+    let history = db
       .from("messages")
       .select("sender_type, content_text, created_at")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: false })
-      .limit(20);
+      .eq("conversation_id", conversationId);
+    if (since) history = history.gt("created_at", since);
+    const { data: recent } = await history.order("created_at", { ascending: false }).limit(20);
     const turns = toTurns(((recent ?? []) as { sender_type: string; content_text: string | null }[]).reverse());
     if (!turns.length) turns.push({ role: "user", content: text });
     ({ decision } = await converse({
