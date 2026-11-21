@@ -72,6 +72,16 @@ export const SETTINGS_MODULES = [
 
 export type SettingsModuleId = (typeof SETTINGS_MODULES)[number];
 
+/** Settings modules on the personal page (/account, "Settings"). */
+export const PERSONAL_SETTINGS_MODULES = [
+  "settings-profile",
+  "settings-security",
+  "settings-appearance",
+] as const satisfies readonly SettingsModuleId[];
+
+/** Settings modules on /settings ("Admin settings"); Currency rides on `deals`. */
+export const ADMIN_SETTINGS_MODULES = ["settings-overview", "settings-clinic"] as const satisfies readonly SettingsModuleId[];
+
 export function isSettingsModule(value: unknown): value is SettingsModuleId {
   return typeof value === "string" && (SETTINGS_MODULES as readonly string[]).includes(value);
 }

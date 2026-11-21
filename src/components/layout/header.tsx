@@ -8,7 +8,7 @@ import Link from "next/link";
 
 import { useAuth } from "@/hooks/use-auth";
 import { usePageLabel } from "@/hooks/use-page-label";
-import { SETTINGS_MODULES } from "@/lib/auth/module-access";
+import { ADMIN_SETTINGS_MODULES, PERSONAL_SETTINGS_MODULES } from "@/lib/auth/module-access";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -65,7 +65,8 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   // The sidebar's (possibly renamed) name for this page, like the page heading.
   const pageLabel = usePageLabel();
   const { profile, signOut, can } = useAuth();
-  const settingsReadable = SETTINGS_MODULES.some((m) => can(m, "read"));
+  const personalReadable = PERSONAL_SETTINGS_MODULES.some((m) => can(m, "read"));
+  const adminReadable = [...ADMIN_SETTINGS_MODULES, "deals" as const].some((m) => can(m, "read"));
   const unread = useUnreadNotifications();
 
   const [query, setQuery] = useState("");
@@ -176,19 +177,19 @@ export function Header({ onOpenSidebar }: HeaderProps) {
               {t("menuProfile")}
             </DropdownMenuItem>
           ) : null}
-          {settingsReadable ? (
+          {personalReadable ? (
             <DropdownMenuItem render={<Link href="/account" className={itemClass} />}>
               <UserCog className="size-4" />
               {t("menuSettings")}
             </DropdownMenuItem>
           ) : null}
-          {settingsReadable ? (
+          {adminReadable ? (
             <DropdownMenuItem render={<Link href="/settings" className={itemClass} />}>
               <Settings className="size-4" />
               {t("menuAdminSettings")}
             </DropdownMenuItem>
           ) : null}
-          {settingsReadable ? <DropdownMenuSeparator className="bg-border" /> : null}
+          {personalReadable || adminReadable ? <DropdownMenuSeparator className="bg-border" /> : null}
           <DropdownMenuItem onClick={signOut} className={itemClass}>
             <LogOut className="size-4" />
             {t("menuSignOut")}

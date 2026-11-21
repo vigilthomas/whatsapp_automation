@@ -57,7 +57,7 @@ import {
 } from "@/lib/branding-menu";
 import { BRAND_ICONS } from "@/lib/branding-icons";
 import { LOCKED_SETTINGS, orderSettingsSections, tidySettingsMenu, type SettingsItemOverride } from "@/lib/settings-menu";
-import { RAIL_GROUPS, RAIL_SECTION_IDS, SECTION_META } from "./settings-sections";
+import { RAIL_SECTION_IDS, SECTION_META, railGroupsFor } from "./settings-sections";
 import { cn } from "@/lib/utils";
 import { SettingsPanelHead } from "./settings-panel-head";
 
@@ -514,114 +514,120 @@ export function MenuPanel() {
           <div key={s.id}>{sectionCard(s.id)}</div>
         ))}
 
-        {/* The Settings page's own side list (lib/settings-menu). */}
-        <div className="rounded-xl border border-border bg-card">
-          <div className={cn("flex items-center gap-2 px-3 py-2", open.settingsPage && "border-b border-border")}>
-            <h3 className="px-1 text-sm font-semibold text-foreground">{t("settingsPage")}</h3>
-            <button
-              type="button"
-              aria-expanded={!!open.settingsPage}
-              aria-label={`${open.settingsPage ? t("collapse") : t("expand")}: ${t("settingsPage")}`}
-              onClick={() => setOpen((o) => ({ ...o, settingsPage: !o.settingsPage }))}
-              className="ml-auto flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              {t("itemCount", { count: Object.values(RAIL_SECTION_IDS).flat().length })}
-              <ChevronDown className={cn("size-4 transition-transform", open.settingsPage && "rotate-180")} />
-            </button>
-          </div>
-          {open.settingsPage && (
-            <div className="space-y-3 p-3">
-              <p className="px-1 text-xs text-muted-foreground">{t("settingsPageHint")}</p>
-              {RAIL_GROUPS.map(({ group }) => {
-                const ids = orderSettingsSections(RAIL_SECTION_IDS[group] ?? [], group, draft.settings);
-                if (ids.length === 0) return null;
-                return (
-                  <div key={group}>
-                    {group !== "top" && (
-                      <p className="px-1 pb-1 text-[11px] font-semibold tracking-[0.09em] text-muted-foreground uppercase">
-                        {tSettings(`groups.${group}`)}
-                      </p>
-                    )}
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={reorderSettings(group)}>
-                      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-                        <ul className="divide-y divide-border rounded-lg border border-border">
-                          {ids.map((id) => {
-                            const o = draft.settings?.items?.[id] ?? {};
-                            const meta = SECTION_META[id as keyof typeof SECTION_META];
-                            const Icon = (o.icon && BRAND_ICONS[o.icon]) || meta.icon;
-                            const name = tSettings(`sections.${id}`);
-                            const locked = LOCKED_SETTINGS.includes(id);
-                            return (
-                              <li key={id}>
-                                <Sortable id={id} disabled={readOnly || ids.length < 2}>
-                                  {(handle) => (
-                                    <div className={cn("flex flex-wrap items-center gap-2.5 bg-card px-3 py-2 sm:flex-nowrap", o.hidden && "opacity-60")}>
-                                      {handle}
-                                      <Popover>
-                                        <PopoverTrigger
-                                          disabled={readOnly}
-                                          aria-label={t("chooseIcon")}
-                                          className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-60"
-                                        >
-                                          <Icon className="size-4" />
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[296px] p-2">
-                                          <div className="grid grid-cols-7 gap-1">
-                                            {Object.entries(BRAND_ICONS).map(([key, I]) => (
+        {/* The side lists of Admin settings and the personal Settings page (lib/settings-menu). */}
+        {(["admin", "personal"] as const).map((scope) => {
+          const key = scope === "admin" ? "adminSettingsPage" : "settingsPage";
+          const groups = railGroupsFor(scope);
+          return (
+            <div key={scope} className="rounded-xl border border-border bg-card">
+              <div className={cn("flex items-center gap-2 px-3 py-2", open[key] && "border-b border-border")}>
+                <h3 className="px-1 text-sm font-semibold text-foreground">{t(key)}</h3>
+                <button
+                  type="button"
+                  aria-expanded={!!open[key]}
+                  aria-label={`${open[key] ? t("collapse") : t("expand")}: ${t(key)}`}
+                  onClick={() => setOpen((o) => ({ ...o, [key]: !o[key] }))}
+                  className="ml-auto flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  {t("itemCount", { count: groups.flatMap(({ group }) => RAIL_SECTION_IDS[group] ?? []).length })}
+                  <ChevronDown className={cn("size-4 transition-transform", open[key] && "rotate-180")} />
+                </button>
+              </div>
+              {open[key] && (
+                <div className="space-y-3 p-3">
+                  <p className="px-1 text-xs text-muted-foreground">{t(`${key}Hint`)}</p>
+                  {groups.map(({ group }) => {
+                    const ids = orderSettingsSections(RAIL_SECTION_IDS[group] ?? [], group, draft.settings);
+                    if (ids.length === 0) return null;
+                    return (
+                      <div key={group}>
+                        {group !== "top" && (
+                          <p className="px-1 pb-1 text-[11px] font-semibold tracking-[0.09em] text-muted-foreground uppercase">
+                            {tSettings(`groups.${group}`)}
+                          </p>
+                        )}
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={reorderSettings(group)}>
+                          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+                            <ul className="divide-y divide-border rounded-lg border border-border">
+                              {ids.map((id) => {
+                                const o = draft.settings?.items?.[id] ?? {};
+                                const meta = SECTION_META[id as keyof typeof SECTION_META];
+                                const Icon = (o.icon && BRAND_ICONS[o.icon]) || meta.icon;
+                                const name = tSettings(`sections.${id}`);
+                                const locked = LOCKED_SETTINGS.includes(id);
+                                return (
+                                  <li key={id}>
+                                    <Sortable id={id} disabled={readOnly || ids.length < 2}>
+                                      {(handle) => (
+                                        <div className={cn("flex flex-wrap items-center gap-2.5 bg-card px-3 py-2 sm:flex-nowrap", o.hidden && "opacity-60")}>
+                                          {handle}
+                                          <Popover>
+                                            <PopoverTrigger
+                                              disabled={readOnly}
+                                              aria-label={t("chooseIcon")}
+                                              className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-60"
+                                            >
+                                              <Icon className="size-4" />
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[296px] p-2">
+                                              <div className="grid grid-cols-7 gap-1">
+                                                {Object.entries(BRAND_ICONS).map(([key, I]) => (
+                                                  <button
+                                                    key={key}
+                                                    type="button"
+                                                    title={key}
+                                                    aria-label={key}
+                                                    onClick={() => setSettingsItem(id, { icon: key })}
+                                                    className={cn("flex size-9 items-center justify-center rounded-md hover:bg-muted", o.icon === key && "bg-primary-soft text-primary")}
+                                                  >
+                                                    <I className="size-4" />
+                                                  </button>
+                                                ))}
+                                              </div>
                                               <button
-                                                key={key}
                                                 type="button"
-                                                title={key}
-                                                aria-label={key}
-                                                onClick={() => setSettingsItem(id, { icon: key })}
-                                                className={cn("flex size-9 items-center justify-center rounded-md hover:bg-muted", o.icon === key && "bg-primary-soft text-primary")}
+                                                className="mt-2 w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted"
+                                                onClick={() => setSettingsItem(id, { icon: undefined })}
                                               >
-                                                <I className="size-4" />
+                                                {t("defaultIcon")}
                                               </button>
-                                            ))}
-                                          </div>
-                                          <button
-                                            type="button"
-                                            className="mt-2 w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted"
-                                            onClick={() => setSettingsItem(id, { icon: undefined })}
-                                          >
-                                            {t("defaultIcon")}
-                                          </button>
-                                        </PopoverContent>
-                                      </Popover>
-                                      <Input
-                                        aria-label={`${t("rename")}: ${name}`}
-                                        className="h-9 min-w-0 flex-1 basis-40"
-                                        maxLength={MENU_LABEL_MAX}
-                                        placeholder={name}
-                                        disabled={readOnly}
-                                        value={o.label ?? ""}
-                                        onChange={(e) => setSettingsItem(id, { label: e.target.value })}
-                                      />
-                                      <label className="flex w-36 shrink-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground">
-                                        <Switch
-                                          aria-label={`${t("show")}: ${name}`}
-                                          checked={locked || !o.hidden}
-                                          disabled={readOnly || locked}
-                                          onCheckedChange={(on: boolean) => setSettingsItem(id, { hidden: !on })}
-                                        />
-                                        {locked ? t("locked") : t("show")}
-                                      </label>
-                                    </div>
-                                  )}
-                                </Sortable>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </SortableContext>
-                    </DndContext>
-                  </div>
-                );
-              })}
+                                            </PopoverContent>
+                                          </Popover>
+                                          <Input
+                                            aria-label={`${t("rename")}: ${name}`}
+                                            className="h-9 min-w-0 flex-1 basis-40"
+                                            maxLength={MENU_LABEL_MAX}
+                                            placeholder={name}
+                                            disabled={readOnly}
+                                            value={o.label ?? ""}
+                                            onChange={(e) => setSettingsItem(id, { label: e.target.value })}
+                                          />
+                                          <label className="flex w-36 shrink-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground">
+                                            <Switch
+                                              aria-label={`${t("show")}: ${name}`}
+                                              checked={locked || !o.hidden}
+                                              disabled={readOnly || locked}
+                                              onCheckedChange={(on: boolean) => setSettingsItem(id, { hidden: !on })}
+                                            />
+                                            {locked ? t("locked") : t("show")}
+                                          </label>
+                                        </div>
+                                      )}
+                                    </Sortable>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </SortableContext>
+                        </DndContext>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })}
       </div>
 
     </section>

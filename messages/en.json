@@ -2330,7 +2330,9 @@
       "deleteSectionTitle": "Delete “{name}”?",
       "deleteSectionDesc": "{count, plural, =0 {The section is removed from the menu.} =1 {Its 1 item goes back to its usual group.} other {Its # items go back to their usual groups.}} Nothing changes until you save.",
       "settingsPage": "Settings page",
-      "settingsPageHint": "The list on the left of the Settings page. Rename, change the icon, hide or drag to reorder within a group. Hiding only takes a section out of the list; Access control still decides who can open it."
+      "adminSettingsPage": "Admin settings page",
+      "adminSettingsPageHint": "The list on the left of Admin settings. Rename, change the icon, hide or drag to reorder within a group. Hiding only takes a section out of the list; Access control still decides who can open it.",
+      "settingsPageHint": "The list on the left of the personal Settings page (profile, login & security, appearance). Rename, change the icon, hide or drag to reorder. Hiding only takes a section out of the list; Access control still decides who can open it."
     },
     "appearance": {
       "title": "Appearance",
@@ -2447,6 +2449,7 @@
         "leaves": "Leaves",
         "ai-assistant": "AI assistant"
       },
+      "adminSettingsModules": "Admin settings",
       "settingsModules": "Settings",
       "notApplicable": "Not used here",
       "undo": "Undo",

@@ -25,7 +25,13 @@ import { Check, ChevronDown, GripVertical, Loader2, LockKeyhole, Minus, Plus, Se
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranding } from "@/hooks/use-branding";
-import { MODULES, SETTINGS_MODULES, isSettingsModule, type ModuleId } from "@/lib/auth/module-access";
+import {
+  ADMIN_SETTINGS_MODULES,
+  MODULES,
+  PERSONAL_SETTINGS_MODULES,
+  isSettingsModule,
+  type ModuleId,
+} from "@/lib/auth/module-access";
 import {
   ACTIONS,
   actionsFor,
@@ -388,7 +394,9 @@ export function AccessControlPanel() {
     const placedModules = new Set(out.flatMap((s) => s.modules));
     const rest = MODULES.filter((m) => !placedModules.has(m) && !isSettingsModule(m) && m !== "deals");
     if (rest.length) out.push({ id: "other", label: t("otherModules"), modules: rest });
-    out.push({ id: "settings", label: t("settingsModules"), modules: [...SETTINGS_MODULES, "deals"] });
+    // Same split as the pages: Admin settings (/settings), then the personal Settings (/account).
+    out.push({ id: "admin-settings", label: t("adminSettingsModules"), modules: [...ADMIN_SETTINGS_MODULES, "deals"] });
+    out.push({ id: "settings", label: t("settingsModules"), modules: [...PERSONAL_SETTINGS_MODULES] });
     return out.filter((s) => s.modules.length && !FIXED_SECTIONS.includes(s.id));
   }, [placed, branding.menu, t, tMenu, tSidebar]);
 
