@@ -1553,7 +1553,9 @@
       "overlap": "This [[staff]] already has [[a:booking]] at that time. Pick another slot."
     },
     "allBranches": "All branches",
-    "filterBranch": "Filter by branch"
+    "filterBranch": "Filter by branch",
+    "statusFilter": "Status: {status}",
+    "clearStatusFilter": "Clear the status filter"
   },
   "Confirm": {
     "defaultDescription": "Please confirm to continue.",

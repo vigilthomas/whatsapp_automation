@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Download, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus, Search, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -28,6 +28,7 @@ import { AppointmentList, useAppointmentTable } from "@/components/appointments/
 import { exportColumns } from "@/components/ui/data-table";
 import { NativeSelect } from "@/components/ui/native-select";
 import { PageHeading } from "@/components/layout/page-heading";
+import { parseAppointmentsLink } from "@/lib/appointments/deep-link";
 import { AppointmentActions } from "@/components/appointments/appointment-actions";
 import {
   AppointmentDialog,
@@ -63,16 +64,19 @@ function AppointmentsPageInner() {
   const canEdit = can("appointments", "edit");
   const canExport = can("appointments", "export");
 
-  const [view, setView] = useState<View>("day");
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  // Dashboard cards link here with ?from=&to=&branch=&status= (read once).
+  const [link] = useState(() => parseAppointmentsLink(new URLSearchParams(searchParams.toString())));
+  const [view, setView] = useState<View>(link.view ?? "day");
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(link.day ?? new Date()));
   // Day view cursor — always inside the fetched week.
   const [day, setDay] = useState(() => {
-    const d = new Date();
+    const d = new Date(link.day ?? new Date());
     d.setHours(0, 0, 0, 0);
     return d;
   });
   const [search, setSearch] = useState("");
-  const [branchId, setBranchId] = useState("");
+  const [branchId, setBranchId] = useState(link.branch ?? "");
+  const [statusFilter, setStatusFilter] = useState<AppointmentStatus | null>(link.status);
   const [doctorId, setDoctorId] = useState("");
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -98,7 +102,10 @@ function AppointmentsPageInner() {
         fetch("/api/master/branches", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
       ]);
       setDoctors(Array.isArray(d.records) ? d.records : []);
-      setBranches(Array.isArray(c.records) ? c.records : []);
+      const list: MasterRecord[] = Array.isArray(c.records) ? c.records : [];
+      setBranches(list);
+      // A linked branch this member can't see: show all instead of nothing.
+      setBranchId((b) => (b && !list.some((x) => x.id === b) ? "" : b));
     })();
   }, []);
 
@@ -203,9 +210,10 @@ function AppointmentsPageInner() {
 
   const q = search.trim().toLowerCase();
   const matches = (a: Appointment) =>
-    !q ||
+    (!statusFilter || a.status === statusFilter) &&
+    (!q ||
     patientLabel(a.contact).toLowerCase().includes(q) ||
-    (a.contact?.phone ?? "").replace(/\D/g, "").includes(q.replace(/\D/g, "") || "\u0000");
+    (a.contact?.phone ?? "").replace(/\D/g, "").includes(q.replace(/\D/g, "") || "\u0000"));
   const dayRows = useMemo(() => {
     const start = day.getTime();
     const end = start + 86_400_000;
@@ -216,7 +224,7 @@ function AppointmentsPageInner() {
       })
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointments, day, q]);
+  }, [appointments, day, q, statusFilter]);
   const selected = appointments.find((a) => a.id === selectedId) ?? null;
 
   const step = (dir: -1 | 1) => {
@@ -318,6 +326,17 @@ function AppointmentsPageInner() {
             </option>
           ))}
         </NativeSelect>
+        {statusFilter ? (
+          <button
+            type="button"
+            onClick={() => setStatusFilter(null)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-input bg-card px-3 text-[13px] text-foreground hover:bg-muted"
+            aria-label={t("clearStatusFilter")}
+          >
+            {t("statusFilter", { status: t(`status.${statusFilter}`) })}
+            <X className="size-3.5 text-muted-foreground" strokeWidth={2} />
+          </button>
+        ) : null}
         <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-[10px] border border-input bg-card px-3 text-[13.5px] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20 sm:w-[260px]">
           <Search className="size-4 shrink-0 text-muted-foreground/70" strokeWidth={1.75} />
           <input

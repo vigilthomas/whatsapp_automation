@@ -1553,7 +1553,9 @@
       "overlap": "이 [[staff]]는 해당 시간에 이미 [[booking]]이 있습니다. 다른 시간을 선택하세요."
     },
     "allBranches": "모든 지점",
-    "filterBranch": "지점으로 거르기"
+    "filterBranch": "지점으로 거르기",
+    "statusFilter": "상태: {status}",
+    "clearStatusFilter": "상태 필터 지우기"
   },
   "Confirm": {
     "defaultDescription": "계속하려면 확인하세요.",
