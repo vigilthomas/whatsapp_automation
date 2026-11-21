@@ -13,7 +13,9 @@ name: Deploy
 # Optional repository variable:
 #   DEPLOY_PATH         checkout on the server (default ~/Projects/clinicoro)
 #
-# The server-side steps live in scripts/deploy.sh.
+# The server-side steps live in scripts/deploy.sh. The app is served at
+# https://app.clinicoro.atovian.com; the static landing page in landing/
+# is copied to https://clinicoro.atovian.com on the same deploy.
 
 on:
   workflow_run:
