@@ -170,20 +170,23 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           // Mobile: fixed drawer that slides in from the left.
           "fixed inset-y-0 left-0 z-40 flex h-full w-[248px] flex-col border-r border-sidebar-border bg-sidebar",
           "transition-transform duration-200 ease-out will-change-transform",
-          open ? "translate-x-0" : "-translate-x-full",
+          // Closed: also `invisible`, so nothing (a long business name pushing
+          // the close button past the 248px edge) peeks in, and Tab can't
+          // reach links in the hidden drawer.
+          open ? "visible translate-x-0" : "invisible -translate-x-full",
           // Desktop: static, always visible — reset all the mobile framing.
-          "lg:static lg:z-0 lg:w-[248px] lg:translate-x-0 lg:transition-none",
+          "lg:visible lg:static lg:z-0 lg:w-[248px] lg:translate-x-0 lg:transition-none",
         )}
         aria-label="Primary"
       >
         {/* Logo row. On mobile we put a close button here; on desktop the
             close button is hidden since the sidebar is always-visible. */}
         <div className="flex shrink-0 items-center justify-between gap-2 px-5 pt-[18px] pb-1">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <BrandMark className="h-[34px] w-[34px]" />
+          <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-2.5">
+            <BrandMark className="h-[34px] w-[34px] shrink-0" />
             <span className="flex min-w-0 flex-col">
               <span
-                className="truncate font-heading text-lg leading-[1.1] font-bold text-navy dark:text-foreground"
+                className="line-clamp-2 font-heading text-lg leading-[1.1] font-bold break-words text-navy dark:text-foreground"
                 style={branding.title_color ? { color: "var(--brand-title)" } : undefined}
               >
                 {branding.title || t("title")}
@@ -200,7 +203,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             type="button"
             onClick={onClose}
             aria-label={t("closeMenu")}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
