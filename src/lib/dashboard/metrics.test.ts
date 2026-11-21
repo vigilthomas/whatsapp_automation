@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DayHours, Weekday } from '@/lib/booking/settings'
-import { bucketSeries, countBy, estimatedTakings, noShowRate, returningClients, utilisation, type ApptRow } from './metrics'
+import { bucketSeries, countBy, messageSeries, trendPoints, estimatedTakings, noShowRate, returningClients, utilisation, type ApptRow } from './metrics'
 import { resolveRange } from './range'
 
 const row = (over: Partial<ApptRow>): ApptRow => ({
@@ -101,5 +101,43 @@ describe('bucketSeries', () => {
     const r = resolveRange('custom', now, 'Asia/Kolkata', { from: '2026-11-16', to: '2026-11-17' })
     const s = bucketSeries([{ at: '2026-11-16T20:00:00Z' }], r) // 01:30 on the 17th in Kolkata
     expect(s.map((b) => b.count)).toEqual([0, 1])
+  })
+})
+
+describe('trendPoints', () => {
+  it('splits bookings per bucket into in-clinic, WhatsApp and cancelled/no-show', () => {
+    const r = resolveRange('custom', new Date('2026-11-21T10:00:00Z'), 'UTC', { from: '2026-11-16', to: '2026-11-17' })
+    const pts = trendPoints(
+      [
+        row({ starts_at: '2026-11-16T09:00:00Z', status: 'confirmed', source: 'whatsapp' }),
+        row({ starts_at: '2026-11-16T10:00:00Z', status: 'completed', source: 'manual' }),
+        row({ starts_at: '2026-11-17T10:00:00Z', status: 'no_show' }),
+        row({ starts_at: '2026-11-17T11:00:00Z', status: 'cancelled', source: 'whatsapp' }),
+      ],
+      r,
+    )
+    expect(pts.map(({ day, inClinic, viaWhatsApp, cancelled }) => [day, inClinic, viaWhatsApp, cancelled])).toEqual([
+      ['2026-11-16', 1, 1, 0],
+      ['2026-11-17', 0, 0, 2],
+    ])
+  })
+})
+
+describe('messageSeries', () => {
+  it('counts incoming and outgoing per bucket', () => {
+    const r = resolveRange('custom', new Date('2026-11-21T10:00:00Z'), 'UTC', { from: '2026-11-16', to: '2026-11-17' })
+    expect(
+      messageSeries(
+        [
+          { at: '2026-11-16T09:00:00Z', incoming: true },
+          { at: '2026-11-16T09:01:00Z', incoming: false },
+          { at: '2026-11-17T09:00:00Z', incoming: true },
+        ],
+        r,
+      ),
+    ).toEqual([
+      { day: '2026-11-16', incoming: 1, outgoing: 1 },
+      { day: '2026-11-17', incoming: 1, outgoing: 0 },
+    ])
   })
 })

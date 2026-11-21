@@ -18,7 +18,7 @@ import type { DoctorLoad, RecentConversation, TrendPoint } from "@/lib/dashboard
 import { WORK_END_HOUR, WORK_START_HOUR } from "@/components/appointments/appointment-calendar";
 import { BarChart } from "@/components/tremor/bar-chart";
 import { Badge } from "@/components/ui/badge";
-import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
+import { CardTag, CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 // Widgets for the clinic dashboard, one per card in the reference
 // layout (public/Main-html). Each is presentational: the page loads
@@ -80,12 +80,12 @@ export function CardShell({
       <div className="flex items-center justify-between gap-2 px-5 pt-[18px] pb-3.5">
         <h3 className="flex min-w-0 items-center gap-2 font-heading text-[15px] font-semibold text-foreground">
           <CardTitleIcon />
-          <span className="truncate">{meta?.title ?? title}</span>
+          <span className="truncate">{meta?.title ?? title}</span><CardTag />
         </h3>
         {action ??
-          (href && hrefLabel ? (
+          ((meta?.href ?? href) && hrefLabel ? (
             <Link
-              href={href}
+              href={(meta?.href ?? href)!}
               className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-teal-700 hover:text-teal"
             >
               {hrefLabel} <ArrowRight className="size-3.5" strokeWidth={1.75} />
@@ -123,8 +123,11 @@ export function StatTile({
   subTone?: "muted" | "primary" | "amber";
   /** Icon box tint (reference `.icon-box.mint` / `.info` / `.warn`). */
   tone?: "mint" | "info" | "warn";
-  /** Optional trend pill, e.g. { pct: 20, up: true }. */
-  trend?: { pct: number; up: boolean } | null;
+  /**
+   * Optional trend pill vs the previous period, e.g. { pct: 20, up: true }.
+   * `good` sets the colour when up isn't the good direction (no-shows).
+   */
+  trend?: { pct: number; up: boolean; good?: boolean } | null;
 }) {
   const meta = useCardMeta();
   const Icon = meta?.Icon ?? GivenIcon;
@@ -142,12 +145,15 @@ export function StatTile({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-[13px] text-muted-foreground">{meta?.title ?? label}</p>
+          <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground">
+            <span className="truncate">{meta?.title ?? label}</span>
+            <CardTag />
+          </p>
           {trend ? (
             <span
               className={cn(
-                "inline-flex h-[22px] items-center gap-0.5 rounded-full px-2 text-[11.5px] font-bold",
-                trend.up ? "bg-success-bg text-success-fg" : "bg-warn-bg text-warn-fg",
+                "inline-flex h-[22px] shrink-0 items-center gap-0.5 rounded-full px-2 text-[11.5px] font-bold",
+                (trend.good ?? trend.up) ? "bg-success-bg text-success-fg" : "bg-warn-bg text-warn-fg",
               )}
             >
               {trend.up ? (

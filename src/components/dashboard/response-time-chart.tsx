@@ -20,7 +20,7 @@ interface ResponseTimeChartProps {
 }
 
 import { useTranslations } from 'next-intl'
-import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
+import { CardTag, CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 // Single category, single colour — the data is "average minutes
 // per weekday". Tremor expects categories as the second tuple in
@@ -54,7 +54,7 @@ export function ResponseTimeChart({
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <CardTitleIcon />
-            <span className="truncate">{meta?.title ?? t('title')}</span>
+            <span className="truncate">{meta?.title ?? t('title')}</span><CardTag />
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {t('description')}

@@ -11,10 +11,13 @@ type RangeDays = 7 | 30 | 90
 
 interface ConversationsChartProps {
   /** Per-range data, so switching tabs never re-fetches. */
-  series: Record<RangeDays, ConversationsSeriesPoint[] | null>
+  series?: Record<RangeDays, ConversationsSeriesPoint[] | null>
+  /** One series for a range chosen elsewhere (the dashboard filter bar). Wins over `series`. */
+  points?: ConversationsSeriesPoint[] | null
   loading: boolean
-  range: RangeDays
-  onRangeChange: (r: RangeDays) => void
+  range?: RangeDays
+  /** Omit to hide the 7/30/90 tabs (the dashboard's filter bar sets the range). */
+  onRangeChange?: (r: RangeDays) => void
 }
 
 // ------------------------------------------------------------
@@ -28,12 +31,12 @@ const VB_H = 240
 const PADDING = { top: 16, right: 16, bottom: 28, left: 40 }
 
 import { useTranslations } from 'next-intl'
-import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
+import { CardTag, CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
-export function ConversationsChart({ series, loading, range, onRangeChange }: ConversationsChartProps) {
+export function ConversationsChart({ series, points, loading, range = 30, onRangeChange }: ConversationsChartProps) {
   const t = useTranslations('Dashboard.conversationsChart')
   const meta = useCardMeta()
-  const data = series[range]
+  const data = points !== undefined ? points : (series?.[range] ?? null)
 
   // Memoise the max so per-day hover math doesn't recompute it.
   const { maxY, niceTicks } = useMemo(() => {
@@ -54,10 +57,10 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       <header className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><CardTitleIcon /><span className="truncate">{meta?.title ?? t('title')}</span></h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><CardTitleIcon /><span className="truncate">{meta?.title ?? t('title')}</span><CardTag /></h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('description')}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1">
+        {onRangeChange ? <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1">
           {[7, 30, 90].map((r) => (
             <button
               key={r}
@@ -73,7 +76,7 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
               {t('days', { count: r })}
             </button>
           ))}
-        </div>
+        </div> : null}
       </header>
 
       <div className="p-5">

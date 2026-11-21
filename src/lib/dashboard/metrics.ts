@@ -124,3 +124,48 @@ export function bucketSeries(rows: { at: string }[], range: DateRange): { key: s
   }
   return out
 }
+
+/** The bucket keys of a range, in order, with their labels. */
+function bucketKeys(range: DateRange): { key: string; label: string; size: 'day' | 'week' | 'month' }[] {
+  const size = bucketFor(range)
+  const out: { key: string; label: string; size: 'day' | 'week' | 'month' }[] = []
+  for (let k = bucketStart(range.fromDay, size); k <= range.toDay; k = nextBucket(k, size)) {
+    out.push({ key: k, label: bucketLabel(k, size), size })
+  }
+  return out
+}
+
+/** Bookings per bucket for the trend chart: in-clinic, via WhatsApp, cancelled + no-show. */
+export function trendPoints(
+  rows: ApptRow[],
+  range: DateRange,
+): { day: string; label: string; inClinic: number; viaWhatsApp: number; cancelled: number }[] {
+  const keys = bucketKeys(range)
+  const pts = new Map(keys.map(({ key, label }) => [key, { day: key, label, inClinic: 0, viaWhatsApp: 0, cancelled: 0 }]))
+  const size = keys[0]?.size ?? 'day'
+  for (const r of rows) {
+    const p = pts.get(bucketStart(localDay(new Date(r.starts_at), range.tz), size))
+    if (!p) continue
+    if (r.status === 'cancelled' || r.status === 'no_show') p.cancelled++
+    else if (r.source === 'whatsapp') p.viaWhatsApp++
+    else p.inClinic++
+  }
+  return [...pts.values()]
+}
+
+/** Messages per bucket for the conversations chart. */
+export function messageSeries(
+  rows: { at: string; incoming: boolean }[],
+  range: DateRange,
+): { day: string; incoming: number; outgoing: number }[] {
+  const keys = bucketKeys(range)
+  const pts = new Map(keys.map(({ key }) => [key, { day: key, incoming: 0, outgoing: 0 }]))
+  const size = keys[0]?.size ?? 'day'
+  for (const r of rows) {
+    const p = pts.get(bucketStart(localDay(new Date(r.at), range.tz), size))
+    if (!p) continue
+    if (r.incoming) p.incoming++
+    else p.outgoing++
+  }
+  return [...pts.values()]
+}

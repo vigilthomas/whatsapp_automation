@@ -39,7 +39,7 @@ const KIND_THEME: Record<ActivityKind, KindTheme> = {
 }
 
 import { useTranslations } from 'next-intl'
-import { CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
+import { CardTag, CardTitleIcon, useCardMeta } from "@/components/dashboard/card-meta";
 
 export function ActivityFeed({ items, loading }: ActivityFeedProps) {
   const t = useTranslations('Dashboard.activityFeed')
@@ -63,7 +63,7 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
       <header className="flex items-center justify-between px-5 pt-[18px] pb-3.5">
         <h3 className="flex min-w-0 items-center gap-2 font-heading text-[15px] font-semibold text-foreground">
           <CardTitleIcon />
-          <span className="truncate">{meta?.title ?? t('title')}</span>
+          <span className="truncate">{meta?.title ?? t('title')}</span><CardTag />
         </h3>
         <Link
           href="/inbox"
