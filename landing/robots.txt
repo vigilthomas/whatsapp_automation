@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://clinicoro.atovian.com/sitemap.xml
+Sitemap: https://watoro.atovian.com/sitemap.xml

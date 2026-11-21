@@ -15,7 +15,7 @@ name: Deploy
 #
 # The server-side steps live in scripts/deploy.sh. The app is served at
 # https://app.clinicoro.atovian.com; the static landing page in landing/
-# is copied to https://clinicoro.atovian.com on the same deploy.
+# is copied to https://watoro.atovian.com on the same deploy.
 
 on:
   workflow_run:

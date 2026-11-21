@@ -44,7 +44,7 @@ fi
 git merge --quiet --ff-only "$SHA"
 echo "==> At $(git log --oneline -1)"
 
-# The static landing page (landing/ → clinicoro.atovian.com) ships with
+# The static landing page (landing/ → watoro.atovian.com) ships with
 # every deploy; nginx serves it straight from this folder.
 LANDING_DIR="${LANDING_DIR:-/var/www/clinicoro-site}"
 if [ -d landing ] && [ -d "$LANDING_DIR" ] && [ -w "$LANDING_DIR" ]; then
