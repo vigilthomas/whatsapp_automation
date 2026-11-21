@@ -13,6 +13,7 @@ import type { AccountMember } from "@/types";
 import type { MasterRecord } from "@/lib/master/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -470,8 +471,7 @@ export function UsersPanel() {
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="text-muted-foreground">{t("fields.password")} *</Label>
-                  <Input
-                    type="password"
+                  <PasswordInput
                     value={draft.password}
                     onChange={(e) => set("password", e.target.value)}
                     minLength={8}

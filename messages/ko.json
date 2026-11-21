@@ -59,7 +59,9 @@
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
     "doctorServices": "[[staff]]별 서비스",
-    "leaves": "휴가"
+    "leaves": "휴가",
+    "adminSettings": "관리자 설정",
+    "menuAdminSettings": "관리자 설정"
   },
   "MobileNav": {
     "label": "기본 메뉴",
@@ -91,7 +93,9 @@
     "defaultAvatar": "아바타",
     "menuProfile": "프로필",
     "menuSettings": "설정",
-    "menuSignOut": "로그아웃"
+    "menuSignOut": "로그아웃",
+    "adminSettings": "관리자 설정",
+    "menuAdminSettings": "관리자 설정"
   },
   "ModeToggle": {
     "switchMode": "{mode} 모드로 전환"
@@ -2626,7 +2630,8 @@
       "notReady": "대시보드 설정에는 064_vocabulary_and_layouts.sql 마이그레이션이 필요합니다. 실행 전에는 기본 이름이 사용되며 저장할 수 없습니다.",
       "readOnly": "메인 계정의 소유자와 관리자만 바꿀 수 있습니다."
     },
-    "railLabel": "설정 섹션"
+    "railLabel": "설정 섹션",
+    "adminPageTitle": "관리자 설정"
   },
   "Booking": {
     "title": "[[booking]] 도우미",
@@ -2814,5 +2819,9 @@
     "moveColumn": "{name} 열 이동",
     "resizeColumn": "{name} 열 크기 조정",
     "nothingHere": "아직 항목이 없습니다."
+  },
+  "PasswordInput": {
+    "show": "비밀번호 보기",
+    "hide": "비밀번호 숨기기"
   }
 }

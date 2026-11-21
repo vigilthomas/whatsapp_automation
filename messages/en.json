@@ -59,7 +59,9 @@
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
     "doctorServices": "[[Staff]] services",
-    "leaves": "Leaves"
+    "leaves": "Leaves",
+    "adminSettings": "Admin settings",
+    "menuAdminSettings": "Admin settings"
   },
   "MobileNav": {
     "label": "Primary",
@@ -91,7 +93,9 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
-    "menuSignOut": "Sign out"
+    "menuSignOut": "Sign out",
+    "adminSettings": "Admin settings",
+    "menuAdminSettings": "Admin settings"
   },
   "ModeToggle": {
     "switchMode": "Switch to {mode} mode"
@@ -2626,7 +2630,8 @@
       "notReady": "Dashboard settings need migration 064_vocabulary_and_layouts.sql. Until it's run, the default names are used and changes can't be saved.",
       "readOnly": "Only the owners and admins of the main account can change these."
     },
-    "railLabel": "Settings sections"
+    "railLabel": "Settings sections",
+    "adminPageTitle": "Admin settings"
   },
   "Booking": {
     "title": "Booking assistant",
@@ -2814,5 +2819,9 @@
     "moveColumn": "Move {name} column",
     "resizeColumn": "Resize {name} column",
     "nothingHere": "Nothing here yet."
+  },
+  "PasswordInput": {
+    "show": "Show password",
+    "hide": "Hide password"
   }
 }

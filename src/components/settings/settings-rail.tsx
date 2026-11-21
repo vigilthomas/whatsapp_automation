@@ -7,10 +7,11 @@ import { useBranding } from '@/hooks/use-branding';
 
 import { cn } from '@/lib/utils';
 import {
-  RAIL_GROUPS,
   RAIL_SECTION_IDS,
+  railGroupsFor,
   railShows,
   SECTION_META,
+  type SettingsScope,
   type SettingsSection,
 } from './settings-sections';
 import { BRAND_ICONS } from '@/lib/branding-icons';
@@ -31,10 +32,13 @@ export function SettingsRail({
   active,
   onSelect,
   hints,
+  scope = 'admin',
 }: {
   active: SettingsSection;
   onSelect: (section: SettingsSection) => void;
   hints?: Partial<Record<SettingsSection, ReactNode>>;
+  /** Which page: Account groups on the personal one, the rest on Admin settings. */
+  scope?: SettingsScope;
 }) {
   const t = useTranslations('Settings');
   const { canManageMembers, can } = useAuth();
@@ -63,7 +67,7 @@ export function SettingsRail({
         'lg:sticky lg:top-0 lg:flex-col lg:overflow-visible lg:border-b-0 lg:pb-0',
       )}
     >
-      {RAIL_GROUPS.map(({ label, group }) => {
+      {railGroupsFor(scope).map(({ label, group }) => {
         // Sidebar menu edits (order, hiding). A hidden section that is open
         // right now stays listed, so the page never loses its own entry.
         const items = (orderSettingsSections(RAIL_SECTION_IDS[group] ?? [], group, menu) as SettingsSection[]).filter(

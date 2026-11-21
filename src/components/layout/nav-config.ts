@@ -27,6 +27,7 @@ import {
   UsersRound,
   Workflow,
   Zap,
+  UserCog,
 } from "lucide-react";
 import type { ModuleId } from "@/lib/auth/module-access";
 import type { MenuSection } from "@/lib/branding-menu";
@@ -113,11 +114,14 @@ export const navGroups: NavGroup[] = [
 // so saved menus that mention it still resolve.
 export const afterGroupItems: NavItem[] = [];
 
-// Pinned to the foot of the sidebar: the admin tools, then Settings.
+// Pinned to the foot of the sidebar: the admin tools, Admin settings, then
+// the person's own Settings.
 export const bottomNavItems: NavItem[] = [
   { href: "/access-control", labelKey: "accessControl", icon: LockKeyhole, adminOnly: true },
   { href: "/workspace/menu", labelKey: "sidebarMenu", icon: PanelLeft, clinicAdminOnly: true },
-  { href: "/settings", labelKey: "settings", icon: Settings },
+  { href: "/settings", labelKey: "adminSettings", icon: Settings },
+  // The signed-in person's own settings: profile, login & security, appearance.
+  { href: "/account", labelKey: "settings", icon: UserCog },
 ];
 
 /** Every place an item can sit: the top list, each group, then the two fixed lists. */

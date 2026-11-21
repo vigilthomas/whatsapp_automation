@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, LogOut, Menu, Search, Settings, User } from "lucide-react";
+import { Bell, LogOut, Menu, Search, Settings, User, UserCog } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 
@@ -32,7 +32,8 @@ const pageTitles: Record<string, string> = {
   "/automations": "automations",
   "/flows": "flows",
   "/access-control": "accessControl",
-  "/settings": "settings",
+  "/settings": "adminSettings",
+  "/account": "settings",
 };
 
 function getPageTitleKey(pathname: string): string {
@@ -170,15 +171,21 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           </div>
           <DropdownMenuSeparator className="bg-border lg:hidden" />
           {can("settings-profile", "read") ? (
-            <DropdownMenuItem render={<Link href="/settings?tab=profile" className={itemClass} />}>
+            <DropdownMenuItem render={<Link href="/account?tab=profile" className={itemClass} />}>
               <User className="size-4" />
               {t("menuProfile")}
             </DropdownMenuItem>
           ) : null}
           {settingsReadable ? (
+            <DropdownMenuItem render={<Link href="/account" className={itemClass} />}>
+              <UserCog className="size-4" />
+              {t("menuSettings")}
+            </DropdownMenuItem>
+          ) : null}
+          {settingsReadable ? (
             <DropdownMenuItem render={<Link href="/settings" className={itemClass} />}>
               <Settings className="size-4" />
-              {t("menuSettings")}
+              {t("menuAdminSettings")}
             </DropdownMenuItem>
           ) : null}
           {settingsReadable ? <DropdownMenuSeparator className="bg-border" /> : null}

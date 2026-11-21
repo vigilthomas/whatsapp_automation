@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
@@ -226,9 +227,8 @@ export function AiPanel() {
               <Label htmlFor="ai-key" className="flex items-center gap-1.5">
                 <KeyRound className="size-3.5" /> {info.needsKey ? t("apiKey") : t("apiKeyOptional")}
               </Label>
-              <Input
+              <PasswordInput
                 id="ai-key"
-                type="password"
                 autoComplete="off"
                 value={form.api_key}
                 onChange={(e) => set("api_key", e.target.value)}

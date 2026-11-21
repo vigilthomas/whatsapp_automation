@@ -99,6 +99,24 @@ export function workspaceHref(section: WorkspaceSection): string {
 }
 
 /**
+ * Settings is split in two (2026-11-21): the personal page (/account,
+ * "Settings") holds what's about the signed-in person — profile, login
+ * & security, appearance; /settings ("Admin settings") holds the
+ * business's own setup. A `/settings?tab=profile` link forwards.
+ */
+export const PERSONAL_SECTIONS = ['profile', 'security', 'appearance'] as const satisfies readonly SettingsSection[];
+
+export type SettingsScope = 'admin' | 'personal';
+
+export function isPersonalSection(value: unknown): value is (typeof PERSONAL_SECTIONS)[number] {
+  return typeof value === 'string' && (PERSONAL_SECTIONS as readonly string[]).includes(value);
+}
+
+export function personalHref(section: (typeof PERSONAL_SECTIONS)[number]): string {
+  return `/account?tab=${section}`;
+}
+
+/**
  * Sections that now live on their own top-level route rather than in
  * the settings rail. The settings page forwards `?tab=<section>` to
  * the href so Overview tiles and older links keep working. Master
@@ -106,6 +124,7 @@ export function workspaceHref(section: WorkspaceSection): string {
  * explicitly.
  */
 export function movedSectionHref(section: SettingsSection): string | null {
+  if (isPersonalSection(section)) return personalHref(section);
   if (isMasterSection(section)) return masterHref(section);
   if (isWorkspaceSection(section)) return workspaceHref(section);
   if (section === 'access') return '/access-control';
@@ -177,10 +196,15 @@ function isSection(value: string | null): value is SettingsSection {
  * merged "Fields & tags" section). Anything unknown falls back to the
  * Overview landing.
  */
-export function resolveSection(raw: string | null): SettingsSection {
+export function resolveSection(raw: string | null, scope: SettingsScope = 'admin'): SettingsSection {
   if (raw === 'tags' || raw === 'custom-fields') return 'fields';
   if (isSection(raw)) return raw;
-  return DEFAULT_SECTION;
+  return scope === 'personal' ? 'profile' : DEFAULT_SECTION;
+}
+
+/** The rail groups one settings page shows: Account on the personal page, the rest on Admin settings. */
+export function railGroupsFor(scope: SettingsScope): typeof RAIL_GROUPS {
+  return RAIL_GROUPS.filter(({ group }) => (group === 'account') === (scope === 'personal'));
 }
 
 /** Whether the settings rail lists a section for this member. */
@@ -210,8 +234,18 @@ export const PAGE_SECTIONS = SETTINGS_SECTIONS.filter((s) => SECTION_META[s].mod
 export function allowedSection(
   section: SettingsSection,
   canRead: (module: ModuleId) => boolean,
+  scope: SettingsScope = 'admin',
 ): SettingsSection | null {
-  const gate = SECTION_META[section].module;
-  if (!gate || canRead(gate)) return section;
-  return PAGE_SECTIONS.find((s) => canRead(SECTION_META[s].module!)) ?? null;
+  const readable = (s: SettingsSection) => {
+    const gate = SECTION_META[s].module;
+    return !gate || canRead(gate);
+  };
+  if (scope === 'personal') {
+    if (isPersonalSection(section) && readable(section)) return section;
+    return PERSONAL_SECTIONS.find(readable) ?? null;
+  }
+  if (readable(section)) return section;
+  // Admin page: its own sections first; else an Account one (which forwards).
+  const order = [...PAGE_SECTIONS.filter((s) => !isPersonalSection(s)), ...PERSONAL_SECTIONS];
+  return order.find((s) => canRead(SECTION_META[s].module!)) ?? null;
 }
