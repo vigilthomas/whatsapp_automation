@@ -3,7 +3,11 @@ import { ForbiddenError, UnauthorizedError, toErrorResponse } from '@/lib/auth/a
 import { requireRoleAndPermission } from '@/lib/auth/permission-guard'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { WRONG_WABA_ID_MESSAGE } from '@/lib/whatsapp/meta-api'
-import { isMetaCdnUrl, sampleMediaUrl } from '@/lib/whatsapp/template-sample-media'
+import {
+  isMetaCdnUrl,
+  rehostTemplateSample,
+  sampleMediaUrl,
+} from '@/lib/whatsapp/template-sample-media'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
 
@@ -250,15 +254,24 @@ export async function POST() {
         .eq('language', t.language)
         .maybeSingle()
 
-      // Fill the send-time media link from Meta's sample, but never
-      // clobber a link the user set themselves (their own hosted image).
-      // A previous Meta CDN link is replaced, which refreshes it — those
-      // URLs are signed and expire, and re-syncing is the way to renew.
+      // Give media templates a send-time link by re-hosting Meta's sample
+      // in chat-media (Meta's own CDN link 403s at send — error 131053;
+      // see template-sample-media.ts). A link that's already ours or the
+      // user's is kept. A stale Meta CDN link (stored by an earlier
+      // version of this route) is replaced — with null if re-hosting
+      // fails, so the send fails with a clear local error, not a 403.
       if (
         metaSampleUrl &&
+        (headerType === 'image' || headerType === 'video' || headerType === 'document') &&
         (!existing?.header_media_url || isMetaCdnUrl(existing.header_media_url))
       ) {
-        row.header_media_url = metaSampleUrl
+        row.header_media_url = await rehostTemplateSample({
+          storage: supabase.storage,
+          accountId,
+          metaTemplateId: t.id,
+          headerType,
+          sampleUrl: metaSampleUrl,
+        })
       }
 
       if (lookupErr) {
