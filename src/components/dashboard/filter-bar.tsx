@@ -12,6 +12,7 @@ import { CalendarRange } from "lucide-react";
 
 import type { BranchOption, DashboardFilters } from "@/lib/dashboard/filters";
 import { RANGE_PRESETS, type DateRange, type RangePreset } from "@/lib/dashboard/range";
+import { DateInput } from "@/components/ui/date-time-input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
@@ -73,27 +74,29 @@ export function FilterBar({
 
       {customOpen ? (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             {t("from")}
-            <input
-              type="date"
+            <DateInput
               value={from}
               max={to || today || undefined}
               onChange={(e) => setFrom(e.target.value)}
-              className="h-8 rounded-lg border border-input bg-background px-2 text-[13px] text-foreground"
+              required
+              aria-label={t("from")}
+              className="h-8 w-[150px] text-[13px]"
             />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             {t("to")}
-            <input
-              type="date"
+            <DateInput
               value={to}
               min={from || undefined}
               max={today || undefined}
               onChange={(e) => setTo(e.target.value)}
-              className="h-8 rounded-lg border border-input bg-background px-2 text-[13px] text-foreground"
+              required
+              aria-label={t("to")}
+              className="h-8 w-[150px] text-[13px]"
             />
-          </label>
+          </div>
           <button
             type="button"
             onClick={applyCustom}
