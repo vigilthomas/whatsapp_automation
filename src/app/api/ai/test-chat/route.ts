@@ -6,6 +6,7 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { askFor, prepareAssistant, toolRunner } from '@/lib/ai-chat/runner'
 import { converse } from '@/lib/ai-chat/conversation'
 import type { ChatTurn } from '@/lib/ai-chat/model'
+import { AiProviderError } from '@/lib/ai-chat/provider'
 
 // ============================================================
 // POST /api/ai/test-chat — try the WhatsApp AI assistant without WhatsApp.
@@ -86,6 +87,12 @@ export async function POST(request: Request) {
       }),
     })
   } catch (err) {
+    // The provider refused (rate or daily limit, bad key…): say so plainly
+    // instead of a bare 500. On WhatsApp the same failure hands the chat
+    // to staff with the fixed message.
+    if (err instanceof AiProviderError) {
+      return NextResponse.json({ error: `The AI provider couldn't answer: ${err.message}` }, { status: 503 })
+    }
     return toErrorResponse(err)
   }
 }

@@ -60,6 +60,14 @@ describe("matchByName", () => {
     expect(matchByName(items, "a")).toBeUndefined(); // ambiguous
     expect(matchByName(items, "")).toBeUndefined();
   });
+
+  it("takes the longest listed name inside a longer one (the model sometimes adds the branch)", () => {
+    const docs = [{ name: "Dr. Arjun Pillai" }, { name: "Dr. Arjun Pillai (Demo)" }];
+    expect(matchByName(docs, "Dr. Arjun Pillai (Demo) (Aluva)")?.name).toBe("Dr. Arjun Pillai (Demo)");
+    expect(matchByName(docs, "Dr. Arjun Pillai")?.name).toBe("Dr. Arjun Pillai");
+    // Still refuses a guess between two names it only partly matches.
+    expect(matchByName(docs, "arjun")).toBeUndefined();
+  });
 });
 
 describe("findTimes", () => {

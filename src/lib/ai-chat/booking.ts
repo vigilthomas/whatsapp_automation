@@ -103,7 +103,13 @@ export function matchByName<T extends { name: string }>(items: readonly T[], wan
   const exact = items.find((i) => norm(i.name) === w);
   if (exact) return exact;
   const partial = items.filter((i) => norm(i.name).includes(w) || w.includes(norm(i.name)));
-  return partial.length === 1 ? partial[0] : undefined;
+  if (partial.length === 1) return partial[0];
+  // The model sometimes adds to a listed name ("Dr. X (Demo) (Aluva)"): when
+  // every candidate is a listed name inside what it wrote, the longest is meant.
+  const inside = partial.filter((i) => w.includes(norm(i.name)));
+  if (inside.length !== partial.length || inside.length === 0) return undefined;
+  const longest = inside.reduce((a, b) => (norm(b.name).length > norm(a.name).length ? b : a));
+  return inside.filter((i) => norm(i.name).length === norm(longest.name).length).length === 1 ? longest : undefined;
 }
 
 interface Resolved {
