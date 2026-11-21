@@ -21,17 +21,33 @@ describe("parseModelReply", () => {
     expect(out).toEqual({ reply: "Hi", handoff: false, reason: "" });
   });
 
-  it("passes a handoff through with the reason for staff", () => {
+  it("passes a handoff through with the reason for staff, always with the one fixed message", () => {
     expect(parseModelReply('{"reply":"A colleague will reply.","handoff":true,"reason":"Asks about insurance"}')).toEqual({
-      reply: "A colleague will reply.",
+      reply: DEFAULT_HANDOFF_REPLY,
       handoff: true,
       reason: "Asks about insurance",
     });
+    expect(DEFAULT_HANDOFF_REPLY).toBe("Thanks for your message. A member of our team will reply to you shortly.");
+  });
+
+  it("reads the appointment id for cancel and reschedule", () => {
+    expect(parseModelReply('{"action":"cancel","appointment":"6f1c-a"}').tool).toMatchObject({ tool: "cancel", appointment: "6f1c-a" });
+    expect(parseModelReply('{"action":"reschedule","appointment_id":"6f1c-a","start":"2025-11-25 10:00"}').tool).toMatchObject({
+      tool: "reschedule",
+      appointment: "6f1c-a",
+      start: "2025-11-25 10:00",
+    });
+    expect(parseModelReply('{"action":"my_appointments"}').tool).toMatchObject({ tool: "my_appointments" });
+  });
+
+  it("marks an unreadable answer so the caller can ask once more", () => {
+    expect(parseModelReply("Sure, 10am works").unreadable).toBe(true);
+    expect(parseModelReply('{"reply":"Hi","handoff":false}').unreadable).toBeUndefined();
   });
 
   it("reads a booking tool call and trims its arguments", () => {
     const out = parseModelReply('{"tool":"book","service":" Hair Spa ","stylist":"any","start":"2025-11-25 10:00","name":"Meera"}');
-    expect(out.tool).toEqual({ tool: "book", service: "Hair Spa", stylist: "any", date: "", start: "2025-11-25 10:00", name: "Meera" });
+    expect(out.tool).toEqual({ tool: "book", service: "Hair Spa", stylist: "any", date: "", start: "2025-11-25 10:00", name: "Meera", appointment: "", after: "" });
     expect(out.handoff).toBe(false);
     // An unknown tool is not a tool call; with no reply it is a handoff.
     expect(parseModelReply('{"tool":"cancel_all"}')).toMatchObject({ handoff: true });
@@ -80,6 +96,19 @@ describe("buildSystemPrompt", () => {
     expect(withBooking).toContain("Today is 2025-11-24");
     expect(withBooking).toContain("Their saved name is Meera");
     expect(withBooking).not.toContain('send the word "book"');
+    // Own appointments: look up, cancel, move — never anyone else's.
+    expect(withBooking).toContain('"action": "my_appointments"');
+    expect(withBooking).toContain('"action": "cancel"');
+    expect(withBooking).toContain('"action": "reschedule"');
+    expect(withBooking).toContain("only this WhatsApp number");
+    expect(withBooking).toContain("no_show");
+    expect(withBooking).not.toContain("To cancel or move an existing booking, hand the chat to staff");
+  });
+
+  it("names the languages and scripts to answer in", () => {
+    const prompt = buildSystemPrompt({ clinicName: "X", clinic: DEFAULT_CLINIC_SETTINGS, services: [], doctors: [], today: "today" });
+    expect(prompt).toContain("Malayalam");
+    expect(prompt).toContain("Hindi");
   });
 
   it("says when nothing is listed instead of leaving blanks", () => {

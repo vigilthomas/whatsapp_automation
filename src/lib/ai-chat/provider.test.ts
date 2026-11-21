@@ -30,6 +30,30 @@ describe("checkBaseUrl", () => {
 describe("complete (OpenAI-compatible providers)", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it("waits and retries when the provider is rate limited (429), then answers", async () => {
+    const limited = () =>
+      new Response(JSON.stringify({ error: { message: "Rate limit reached ... Please try again in 0.05s. Need more tokens?" } }), { status: 429 });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(limited())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"hi"}' } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await complete({ provider: "groq", model: "m", apiKey: "k", system: "s", turns: [{ role: "user", content: "q" }] });
+    expect(out).toBe('{"reply":"hi"}');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up on a long or repeated rate limit instead of hanging", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: { message: "Please try again in 0.05s" } }), { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(complete({ provider: "groq", model: "m", apiKey: "k", system: "s", turns: [{ role: "user", content: "q" }] })).rejects.toThrow(/429/);
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(4);
+    const long = vi.fn(async () => new Response(JSON.stringify({ error: { message: "Please try again in 2m30s" } }), { status: 429 }));
+    vi.stubGlobal("fetch", long);
+    await expect(complete({ provider: "groq", model: "m", apiKey: "k", system: "s", turns: [{ role: "user", content: "q" }] })).rejects.toThrow(/429/);
+    expect(long).toHaveBeenCalledTimes(1);
+  });
+
   const ok = (content: string) =>
     vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 }));
 

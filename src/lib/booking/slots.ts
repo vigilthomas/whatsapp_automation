@@ -12,6 +12,8 @@ import { dynamicStarts, type Block } from "./schedule";
 import { minutesOf, type BookingConfig, type Weekday } from "./settings";
 
 export interface Busy {
+  /** The appointment's id, when known — lets a reschedule ignore the booking it moves. */
+  id?: string;
   doctor_id: string | null;
   starts_at: string;
   ends_at: string;

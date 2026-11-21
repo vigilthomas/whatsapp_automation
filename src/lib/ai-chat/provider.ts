@@ -90,6 +90,21 @@ export function checkBaseUrl(raw: unknown): string | null {
   return `${url.protocol}//${url.host}${path}`;
 }
 
+const MAX_RATE_RETRIES = 3;
+const MAX_RETRY_WAIT_MS = 20_000;
+
+/**
+ * How long a 429 asks us to wait, in ms: the provider's "try again in
+ * 1m2.5s" / "in 3.87s" wording, else a Retry-After header in seconds;
+ * null when neither says.
+ */
+export function retryAfterMs(message: string, header: string | null): number | null {
+  const m = /try again in\s+(?:(\d+)m)?\s*(?:([\d.]+)s)?/i.exec(message);
+  if (m && (m[1] || m[2])) return Math.ceil((Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0)) * 1000);
+  const secs = Number(header);
+  return header && Number.isFinite(secs) ? secs * 1000 : null;
+}
+
 export async function complete({
   provider,
   model,
@@ -126,10 +141,10 @@ export async function complete({
     if (!base) throw new AiProviderError(`${name}: the server address isn't valid`);
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-    const post = async (jsonMode: boolean) => {
+    const once = async (jsonMode: boolean) => {
       const res = await fetch(`${base}/v1/chat/completions`, {
         method: "POST",
-        signal,
+        signal: AbortSignal.timeout(info.timeoutMs),
         headers,
         // No redirects: a redirect could point the request somewhere the
         // address check never saw.
@@ -146,6 +161,22 @@ export async function complete({
         error?: { message?: string; code?: string; failed_generation?: string } | string;
       } | null;
       return { res, data };
+    };
+    // Rate limited (429, e.g. Groq's free tier: a few thousand tokens a
+    // minute): wait as long as the provider asks and try again, rather than
+    // handing a customer to staff for a pause of a few seconds. Bounded so
+    // a webhook (60 s max) never hangs: each wait ≤ MAX_RETRY_WAIT_MS, at
+    // most MAX_RATE_RETRIES times.
+    const post = async (jsonMode: boolean) => {
+      let attempt = await once(jsonMode);
+      for (let i = 0; i < MAX_RATE_RETRIES && attempt.res.status === 429; i++) {
+        const msg = typeof attempt.data?.error === "string" ? attempt.data.error : (attempt.data?.error?.message ?? "");
+        const wait = retryAfterMs(msg, attempt.res.headers.get("retry-after"));
+        if (wait === null || wait > MAX_RETRY_WAIT_MS) break;
+        await new Promise((r) => setTimeout(r, wait + 250));
+        attempt = await once(jsonMode);
+      }
+      return attempt;
     };
 
     let { res, data } = await post(info.jsonMode);

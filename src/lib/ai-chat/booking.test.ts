@@ -2,13 +2,24 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { BookingDeps } from "@/lib/booking/engine";
 import { DEFAULT_CONFIG, type BookingConfig } from "@/lib/booking/settings";
-import { bookTime, findTimes, matchByName, runTool, type ToolCall } from "./booking";
+import {
+  bookTime,
+  cancelAppointment,
+  findTimes,
+  matchByName,
+  myAppointments,
+  rescheduleAppointment,
+  runTool,
+  type AiDeps,
+  type OwnAppointment,
+  type ToolCall,
+} from "./booking";
 
 // Monday 24 Nov 2025, 08:00 in India (02:30 UTC). Hours 09:00–18:00, Sunday closed.
 const NOW = new Date("2025-11-24T02:30:00Z");
 const config: BookingConfig = { ...DEFAULT_CONFIG, minNoticeMinutes: 0, daysAhead: 7 };
 
-function deps(over: Partial<BookingDeps> = {}): BookingDeps {
+function deps(over: Partial<AiDeps> = {}): AiDeps {
   return {
     config,
     services: [
@@ -36,6 +47,8 @@ const call = (over: Partial<ToolCall>): ToolCall => ({
   date: "",
   start: "",
   name: "",
+  appointment: "",
+  after: "",
   ...over,
 });
 
@@ -69,6 +82,14 @@ describe("findTimes", () => {
     expect(await findTimes(deps(), call({ service: "Massage" }))).toMatchObject({ ok: false, services: ["Haircut - Women", "Hair Spa"] });
     expect(await findTimes(deps(), call({ service: "Haircut - Women", stylist: "Rahul" }))).toMatchObject({ ok: false, stylists: ["Anjali Menon"] });
     expect(await findTimes(deps(), call({ service: "Hair Spa", date: "2025-11-30" }))).toMatchObject({ ok: false });
+  });
+
+  it("starts the list at the time of day asked for, so evenings are reachable", async () => {
+    const r = (await findTimes(deps(), call({ service: "Hair Spa", stylist: "any", date: "2025-11-25", after: "16:00" }))) as unknown as {
+      days: { times: { time: string }[] }[];
+    };
+    expect(r.days[0].times[0].time).toBe("16:00");
+    expect(r.days[0].times.every((t) => t.time >= "16:00")).toBe(true);
   });
 
   it("leaves out booked times", async () => {
@@ -121,5 +142,120 @@ describe("runTool", () => {
   it("turns a crash into a result the model can explain", async () => {
     const r = await runTool(deps({ busy: async () => Promise.reject(new Error("db down")) }), call({ service: "Hair Spa", stylist: "any" }));
     expect(r).toMatchObject({ ok: false });
+  });
+});
+
+// ------------------------------------------------------------ the customer's own bookings
+
+// The sender's own appointments, as CustomerBookings.list returns them
+// (already limited to this contact by the loader).
+const mine: OwnAppointment[] = [
+  // Tue 25 Nov 10:00 IST, Hair Spa with Rahul — upcoming.
+  { id: "a-up", service: "Hair Spa", doctor_id: "d2", branch_id: "b1", starts_at: "2025-11-25T04:30:00Z", ends_at: "2025-11-25T05:30:00Z", status: "scheduled" },
+  // Last week, missed.
+  { id: "a-miss", service: "Haircut - Women", doctor_id: "d1", branch_id: "b1", starts_at: "2025-11-18T05:30:00Z", ends_at: "2025-11-18T06:15:00Z", status: "no_show" },
+  // Cancelled earlier, still in the future.
+  { id: "a-cxl", service: "Hair Spa", doctor_id: "d2", branch_id: "b1", starts_at: "2025-11-26T04:30:00Z", ends_at: "2025-11-26T05:30:00Z", status: "cancelled" },
+];
+
+function own(list: OwnAppointment[] = mine) {
+  return {
+    list: vi.fn(async () => list),
+    cancel: vi.fn(async () => "ok" as const),
+    move: vi.fn(async () => "ok" as const),
+  };
+}
+
+describe("myAppointments", () => {
+  it("lists only what the loader returned for this chat, split into upcoming and past, with the status", async () => {
+    const r = (await myAppointments(deps({ own: own() }))) as unknown as {
+      ok: true;
+      upcoming: { id: string; service: string; stylist: string; time: string; status: string }[];
+      past: { id: string; status: string }[];
+    };
+    expect(r.ok).toBe(true);
+    expect(r.upcoming.map((a) => a.id)).toEqual(["a-up"]);
+    expect(r.upcoming[0]).toMatchObject({ service: "Hair Spa", stylist: "Rahul Nair", time: "10:00 am", status: "scheduled" });
+    // Missed and cancelled ones are shown as such, never as upcoming.
+    expect(r.past).toEqual(expect.arrayContaining([expect.objectContaining({ id: "a-miss", status: "no_show" })]));
+    expect(r.upcoming.find((a) => a.id === "a-cxl")).toBeUndefined();
+  });
+
+  it("says so when there are none, and fails safely without the lookup", async () => {
+    expect(await myAppointments(deps({ own: own([]) }))).toMatchObject({ ok: true, upcoming: [], past: [] });
+    expect(await myAppointments(deps())).toMatchObject({ ok: false });
+  });
+});
+
+describe("cancelAppointment", () => {
+  it("cancels the customer's own upcoming appointment", async () => {
+    const o = own();
+    const r = await cancelAppointment(deps({ own: o }), call({ tool: "cancel", appointment: "a-up" }));
+    expect(r).toMatchObject({ ok: true, cancelled: { service: "Hair Spa", stylist: "Rahul Nair" } });
+    expect(o.cancel).toHaveBeenCalledWith("a-up");
+  });
+
+  it("refuses an id that isn't theirs, one already cancelled, and one in the past", async () => {
+    const o = own();
+    for (const id of ["someone-elses-id", "a-cxl", "a-miss", ""]) {
+      expect(await cancelAppointment(deps({ own: o }), call({ tool: "cancel", appointment: id }))).toMatchObject({ ok: false });
+    }
+    expect(o.cancel).not.toHaveBeenCalled();
+  });
+
+  it("reports one that changed meanwhile", async () => {
+    const o = { ...own(), cancel: vi.fn(async () => "gone" as const) };
+    expect(await cancelAppointment(deps({ own: o }), call({ tool: "cancel", appointment: "a-up" }))).toMatchObject({ ok: false });
+  });
+});
+
+describe("rescheduleAppointment", () => {
+  it("moves the customer's own appointment to a free time, keeping the service and stylist", async () => {
+    const o = own();
+    const r = await rescheduleAppointment(deps({ own: o }), call({ tool: "reschedule", appointment: "a-up", start: "2025-11-27 11:00" }));
+    expect(r).toMatchObject({ ok: true, moved: { service: "Hair Spa", stylist: "Rahul Nair", time: "11:00 am" } });
+    expect(o.move).toHaveBeenCalledWith(
+      "a-up",
+      expect.objectContaining({ doctorId: "d2", startsAt: new Date("2025-11-27T05:30:00Z"), endsAt: new Date("2025-11-27T06:30:00Z") }),
+    );
+  });
+
+  it("can move to a time overlapping the booking being moved (it doesn't block itself)", async () => {
+    const o = own();
+    // The busy list contains the appointment being moved.
+    const busy = async () => [{ id: "a-up", doctor_id: "d2", starts_at: "2025-11-25T04:30:00Z", ends_at: "2025-11-25T05:30:00Z" }];
+    const r = await rescheduleAppointment(deps({ own: o, busy }), call({ tool: "reschedule", appointment: "a-up", start: "2025-11-25 10:30" }));
+    expect(r).toMatchObject({ ok: true });
+    // …but find_times for someone else still sees it as taken.
+    const t = (await findTimes(deps({ busy }), call({ service: "Hair Spa", stylist: "Rahul", date: "2025-11-25" }))) as unknown as {
+      days: { times: { time: string }[] }[];
+    };
+    expect(t.days[0].times.map((x) => x.time)).not.toContain("10:00");
+    const t2 = (await findTimes(deps({ busy }), call({ service: "Hair Spa", stylist: "Rahul", date: "2025-11-25", appointment: "a-up" }))) as unknown as {
+      days: { times: { time: string }[] }[];
+    };
+    expect(t2.days[0].times.map((x) => x.time)).toContain("10:00");
+  });
+
+  it("refuses someone else's appointment, a past one, a busy time and a closed day", async () => {
+    const o = own();
+    const busy = async () => [{ id: "x", doctor_id: "d2", starts_at: "2025-11-27T05:30:00Z", ends_at: "2025-11-27T06:30:00Z" }];
+    const d = deps({ own: o, busy });
+    expect(await rescheduleAppointment(d, call({ tool: "reschedule", appointment: "nope", start: "2025-11-27 12:00" }))).toMatchObject({ ok: false });
+    expect(await rescheduleAppointment(d, call({ tool: "reschedule", appointment: "a-miss", start: "2025-11-27 12:00" }))).toMatchObject({ ok: false });
+    expect(await rescheduleAppointment(d, call({ tool: "reschedule", appointment: "a-up", start: "2025-11-27 11:00" }))).toMatchObject({
+      ok: false,
+      freeTimes: expect.any(Array),
+    });
+    expect(await rescheduleAppointment(d, call({ tool: "reschedule", appointment: "a-up", start: "2025-11-30 11:00" }))).toMatchObject({ ok: false });
+    expect(o.move).not.toHaveBeenCalled();
+  });
+});
+
+describe("runTool routing", () => {
+  it("routes the new actions", async () => {
+    const o = own();
+    expect(await runTool(deps({ own: o }), call({ tool: "my_appointments" }))).toMatchObject({ ok: true });
+    expect(await runTool(deps({ own: o }), call({ tool: "cancel", appointment: "a-up" }))).toMatchObject({ ok: true });
   });
 });

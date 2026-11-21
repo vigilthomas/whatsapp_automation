@@ -195,7 +195,7 @@ export async function loadDeps(
   const busy = async (from: Date, to: Date): Promise<Busy[]> => {
     const { data, error } = await db
       .from("appointments")
-      .select("doctor_id, starts_at, ends_at, service")
+      .select("id, doctor_id, starts_at, ends_at, service")
       .eq("account_id", accountId)
       .neq("status", "cancelled")
       .lt("starts_at", to.toISOString())
@@ -203,6 +203,7 @@ export async function loadDeps(
     if (error) throw error;
     // Each booking keeps its own service's buffer around it.
     return (data ?? []).map((a) => ({
+      id: a.id as string,
       doctor_id: a.doctor_id as string | null,
       starts_at: a.starts_at as string,
       ends_at: a.ends_at as string,

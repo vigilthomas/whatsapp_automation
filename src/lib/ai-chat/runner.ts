@@ -10,17 +10,26 @@
 // Order of checks, cheapest first:
 //   1. ai_configs row active with a key (migration 029)
 //   2. the chat is in Bot mode (061; NULL → auto_reply_enabled)
-//   3. a reply slot is free (claim_ai_reply_slot, 029 — atomic cap)
-// Then the model answers from the clinic's facts (model.ts). It can also
-// check free times and book (booking.ts): each tool call is run and its
-// result fed back as the next turn, at most MAX_TOOL_ROUNDS per inbound
-// message. Booking uses the booking assistant's engine and `book`
-// (booking/runner.ts → loadDeps) with the clinic's own opening hours, so
-// it works whether or not the booking bot itself is switched on. If it can't,
-// or anything fails, the chat is handed to staff: switched to Human,
-// assigned to the handoff agent, the agent notified, and the patient told
-// someone will reply. A failure never leaves the patient unanswered by
-// the bot *and* invisible to staff.
+//   3. a reply slot is free (claim_ai_reply_slot, 029 — atomic cap). The
+//      cap counts per sitting: a chat that has been quiet for
+//      SESSION_GAP_HOURS starts counting again, so a customer who booked
+//      last month can still come back to check, move or cancel it.
+// Then the model answers from the business's facts (model.ts) and its
+// actions (booking.ts): free times, booking, and the SENDER'S OWN
+// appointments — look up, cancel, reschedule. The loop itself is in
+// conversation.ts, shared with the dry-run test chat
+// (/api/ai/test-chat), which uses prepareAssistant + toolRunner below
+// with `dryRun` so nothing is sent or saved.
+//
+// Security: the customer is always the webhook's contact. The appointment
+// lookup is built for that contact id here; the model never chooses
+// whose appointments it sees, and cancel/reschedule filter by
+// account_id AND contact_id again in the update.
+//
+// If it can't answer, or anything fails, the chat is handed to staff:
+// switched to Human, assigned to the handoff agent, the agent notified,
+// and the customer sent DEFAULT_HANDOFF_REPLY. A failure never leaves the
+// customer unanswered by the bot *and* invisible to staff.
 //
 // Never throws.
 // ============================================================
@@ -30,18 +39,20 @@ import { decrypt } from "@/lib/whatsapp/encryption";
 import { sendMessageToConversation } from "@/lib/whatsapp/send-message";
 import { parseClinicSettings } from "@/lib/clinic/settings";
 import { parseVocabulary, resolveTerms } from "@/lib/vocabulary";
-import { DEFAULT_HANDOFF_REPLY, buildSystemPrompt, effectiveMode, parseModelReply, toTurns, type ModelDecision } from "./model";
-import { PROVIDERS, complete, isAiProvider } from "./provider";
-import { runTool } from "./booking";
+import { DEFAULT_HANDOFF_REPLY, buildSystemPrompt, effectiveMode, toTurns, type ChatTurn } from "./model";
+import { PROVIDERS, complete, isAiProvider, type AiProvider } from "./provider";
+import { runTool, type AiDeps, type CustomerBookings, type OwnAppointment, type ToolCall, type ToolResult } from "./booking";
+import { converse } from "./conversation";
 import { loadDeps } from "@/lib/booking/runner";
 import { parseBookingConfig, type BookingConfig } from "@/lib/booking/settings";
 import { withClinic } from "@/lib/booking/clinic";
-import { addDays, localDay } from "@/lib/booking/slots";
-import type { BookingDeps } from "@/lib/booking/engine";
+import { addDays, isFree, localDay } from "@/lib/booking/slots";
 import type { ClinicSettings } from "@/lib/clinic/settings";
 
-/** Booking tool calls allowed while answering one inbound message. */
-const MAX_TOOL_ROUNDS = 3;
+/** A chat quiet this long starts a new sitting: the per-chat reply cap counts again. */
+export const SESSION_GAP_HOURS = 12;
+/** How far back "my appointments" looks (missed and attended ones included). */
+const OWN_HISTORY_DAYS = 30;
 
 export interface AiInbound {
   accountId: string;
@@ -62,21 +73,191 @@ export async function dispatchInboundToAi(input: AiInbound): Promise<{ replied: 
   }
 }
 
-async function run({ accountId, conversationId, contactId, text }: AiInbound) {
-  const db = supabaseAdmin();
-  const none = { replied: false, handedOff: false };
+/** The account's assistant: provider settings and the system prompt for one contact. */
+export interface PreparedAssistant {
+  provider: AiProvider;
+  model: string;
+  /** Encrypted, as stored; decrypted only when calling the provider. */
+  apiKey: string | null;
+  baseUrl: string | null;
+  autoReplyEnabled: boolean;
+  maxReplies: number;
+  handoffAgentId: string | null;
+  system: string;
+  bookingConfig: BookingConfig;
+  customerName: string | null;
+}
 
+/** Load the account's AI settings and build the prompt; null when the assistant is off or has no key. */
+export async function prepareAssistant(db: Db, accountId: string, contactId: string | null): Promise<PreparedAssistant | null> {
   const { data: cfg } = await db
     .from("ai_configs")
     .select("provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id")
     .eq("account_id", accountId)
     .maybeSingle();
-  if (!cfg?.is_active || !isAiProvider(cfg.provider)) return none;
+  if (!cfg?.is_active || !isAiProvider(cfg.provider)) return null;
   // Hosted providers need a key; a local Ollama server doesn't.
-  if (!cfg.api_key && PROVIDERS[cfg.provider].needsKey) return none;
+  if (!cfg.api_key && PROVIDERS[cfg.provider].needsKey) return null;
   // Separate read: before migration 065 the column doesn't exist, and a
   // failed select must not switch the assistant off.
   const { data: server } = await db.from("ai_configs").select("base_url").eq("account_id", accountId).maybeSingle();
+
+  const facts = await clinicFacts(db, accountId, cfg.system_prompt as string | null);
+  const bookingConfig = await aiBookingConfig(db, accountId, facts.clinic);
+  let customerName: string | null = null;
+  if (contactId) {
+    const { data: contact } = await db.from("contacts").select("name").eq("id", contactId).eq("account_id", accountId).maybeSingle();
+    customerName = (contact?.name as string | null)?.trim() || null;
+  }
+  const system = buildSystemPrompt({
+    ...facts,
+    // "Today" in the business's own zone: the server runs in UTC, and in
+    // India the two disagree from midnight to 05:30.
+    today: new Intl.DateTimeFormat("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: bookingConfig.timezone,
+    }).format(new Date()),
+    booking: {
+      todayIso: localDay(new Date(), bookingConfig.timezone),
+      timezone: bookingConfig.timezone,
+      daysAhead: bookingConfig.daysAhead,
+      customerName,
+    },
+  });
+  return {
+    provider: cfg.provider,
+    model: cfg.model as string,
+    apiKey: (cfg.api_key as string | null) ?? null,
+    baseUrl: (server?.base_url as string | null | undefined) ?? null,
+    autoReplyEnabled: !!cfg.auto_reply_enabled,
+    maxReplies: (cfg.auto_reply_max_per_conversation as number | null) ?? 3,
+    handoffAgentId: (cfg.handoff_agent_id as string | null) ?? null,
+    system,
+    bookingConfig,
+    customerName,
+  };
+}
+
+/** The provider call for a prepared assistant. */
+export function askFor(a: PreparedAssistant): (turns: ChatTurn[]) => Promise<string> {
+  return (turns) =>
+    complete({
+      provider: a.provider,
+      model: a.model,
+      apiKey: a.apiKey ? decrypt(a.apiKey) : "",
+      baseUrl: a.baseUrl,
+      system: a.system,
+      turns,
+    });
+}
+
+/**
+ * The actions for one contact. Booking deps load on the first action only
+ * (most messages are plain questions). `dryRun` (the test chat) reads
+ * real free times and the contact's real appointments but never books,
+ * cancels or moves anything; with no contact, "my appointments" is empty.
+ */
+export function toolRunner(
+  db: Db,
+  {
+    accountId,
+    contactId,
+    bookingConfig,
+    customerName,
+    dryRun = false,
+  }: { accountId: string; contactId: string | null; bookingConfig: BookingConfig; customerName: string | null; dryRun?: boolean },
+): (call: ToolCall) => Promise<ToolResult> {
+  let deps: AiDeps | null = null;
+  return async (call) => {
+    if (!deps) {
+      // loadDeps reads the contact's name only; a missing contact is fine.
+      const base = await loadDeps({ accountId, contactId: contactId ?? "00000000-0000-0000-0000-000000000000" }, bookingConfig);
+      const real = contactId ? ownBookings(db, accountId, contactId, base) : emptyBookings;
+      deps = dryRun
+        ? { ...base, book: async () => "ok", own: { list: real.list, cancel: async () => "ok", move: async () => "ok" } }
+        : { ...base, own: real };
+    }
+    const result = await runTool(deps, call);
+    if (!dryRun && contactId && call.tool === "book" && result.ok && call.name && !customerName) {
+      // Like the booking assistant: fill in a missing contact name, never overwrite one.
+      await db
+        .from("contacts")
+        .update({ name: call.name })
+        .eq("id", contactId)
+        .eq("account_id", accountId)
+        .or("name.is.null,name.eq.");
+    }
+    return result;
+  };
+}
+
+const emptyBookings: CustomerBookings = { list: async () => [], cancel: async () => "gone", move: async () => "gone" };
+
+/** The contact's own appointments; every query filters by account AND contact. */
+function ownBookings(db: Db, accountId: string, contactId: string, deps: Pick<AiDeps, "busy">): CustomerBookings {
+  const active = ["scheduled", "confirmed"];
+  return {
+    list: async () => {
+      const since = new Date(Date.now() - OWN_HISTORY_DAYS * 86_400_000).toISOString();
+      const { data, error } = await db
+        .from("appointments")
+        .select("id, service, doctor_id, branch_id, starts_at, ends_at, status")
+        .eq("account_id", accountId)
+        .eq("contact_id", contactId)
+        .gte("starts_at", since)
+        .order("starts_at", { ascending: true })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as OwnAppointment[];
+    },
+    cancel: async (id) => {
+      const { data, error } = await db
+        .from("appointments")
+        .update({ status: "cancelled" })
+        .eq("id", id)
+        .eq("account_id", accountId)
+        .eq("contact_id", contactId)
+        .in("status", active)
+        .gt("starts_at", new Date().toISOString())
+        .select("id");
+      if (error) throw error;
+      return data?.length ? "ok" : "gone";
+    },
+    move: async (id, to) => {
+      // Re-check right before saving, ignoring the booking being moved.
+      const around = new Date(to.startsAt.getTime() - 4 * 3_600_000);
+      const after = new Date(to.endsAt.getTime() + 4 * 3_600_000);
+      const others = (await deps.busy(around, after)).filter((b) => b.id !== id);
+      if (to.doctorId && !isFree(to.doctorId, to.startsAt, to.endsAt, others, to.bufferMin)) return "taken";
+      const { data, error } = await db
+        .from("appointments")
+        .update({
+          starts_at: to.startsAt.toISOString(),
+          ends_at: to.endsAt.toISOString(),
+          doctor_id: to.doctorId,
+          branch_id: to.branchId,
+        })
+        .eq("id", id)
+        .eq("account_id", accountId)
+        .eq("contact_id", contactId)
+        .in("status", active)
+        .gt("starts_at", new Date().toISOString())
+        .select("id");
+      if (error) throw error;
+      return data?.length ? "ok" : "gone";
+    },
+  };
+}
+
+async function run({ accountId, conversationId, contactId, text }: AiInbound) {
+  const db = supabaseAdmin();
+  const none = { replied: false, handedOff: false };
+
+  const assistant = await prepareAssistant(db, accountId, contactId);
+  if (!assistant) return none;
 
   const { data: conv, error: convError } = await db
     .from("conversations")
@@ -86,34 +267,28 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
     .maybeSingle();
   // Missing column (061 not run) → no per-chat switch exists yet; stay quiet.
   if (convError || !conv) return none;
-  if (effectiveMode(conv.ai_mode as string | null, !!cfg.auto_reply_enabled) !== "bot") return none;
+  if (effectiveMode(conv.ai_mode as string | null, assistant.autoReplyEnabled) !== "bot") return none;
 
-  const handoff = (reason: string, reply = DEFAULT_HANDOFF_REPLY) =>
-    handOff(db, { accountId, conversationId, contactId, reason, reply, agentId: (cfg.handoff_agent_id as string | null) ?? (conv.assigned_agent_id as string | null) });
+  const handoff = (reason: string) =>
+    handOff(db, {
+      accountId,
+      conversationId,
+      contactId,
+      reason,
+      agentId: assistant.handoffAgentId ?? (conv.assigned_agent_id as string | null),
+    });
 
   if (!text.trim()) return handoff("They sent an attachment.");
 
+  await resetCapAfterQuiet(db, accountId, conversationId);
   const { data: claimed } = await db.rpc("claim_ai_reply_slot", {
     conversation_id: conversationId,
-    max_replies: cfg.auto_reply_max_per_conversation ?? 3,
+    max_replies: assistant.maxReplies,
   });
   if (claimed !== true) return handoff("The assistant reached its reply limit for this chat.");
 
-  let decision: ModelDecision;
+  let decision;
   try {
-    const facts = await clinicFacts(db, accountId, cfg.system_prompt as string | null);
-    const bookingConfig = await aiBookingConfig(db, accountId, facts.clinic);
-    const { data: contact } = await db.from("contacts").select("name").eq("id", contactId).eq("account_id", accountId).maybeSingle();
-    const customerName = (contact?.name as string | null)?.trim() || null;
-    const system = buildSystemPrompt({
-      ...facts,
-      booking: {
-        todayIso: localDay(new Date(), bookingConfig.timezone),
-        timezone: bookingConfig.timezone,
-        daysAhead: bookingConfig.daysAhead,
-        customerName,
-      },
-    });
     const { data: recent } = await db
       .from("messages")
       .select("sender_type, content_text, created_at")
@@ -122,51 +297,38 @@ async function run({ accountId, conversationId, contactId, text }: AiInbound) {
       .limit(20);
     const turns = toTurns(((recent ?? []) as { sender_type: string; content_text: string | null }[]).reverse());
     if (!turns.length) turns.push({ role: "user", content: text });
-    const ask = () =>
-      complete({
-        provider: cfg.provider,
-        model: cfg.model as string,
-        apiKey: cfg.api_key ? decrypt(cfg.api_key as string) : "",
-        baseUrl: (server?.base_url as string | null | undefined) ?? null,
-        system,
-        turns,
-      });
-
-    // Booking deps are loaded on the first tool call only: most messages
-    // are plain questions and shouldn't pay for the extra queries.
-    let deps: BookingDeps | null = null;
-    decision = parseModelReply(await ask());
-    for (let round = 0; decision.tool; round++) {
-      if (round >= MAX_TOOL_ROUNDS) {
-        decision = { reply: DEFAULT_HANDOFF_REPLY, handoff: true, reason: "The assistant couldn't finish the booking." };
-        break;
-      }
-      const call = decision.tool;
-      deps ??= await loadDeps({ accountId, contactId }, bookingConfig);
-      const result = await runTool(deps, call);
-      if (call.tool === "book" && result.ok && call.name && !customerName) {
-        // Like the booking assistant: fill in a missing contact name, never overwrite one.
-        await db
-          .from("contacts")
-          .update({ name: call.name })
-          .eq("id", contactId)
-          .eq("account_id", accountId)
-          .or("name.is.null,name.eq.");
-      }
-      turns.push(
-        { role: "assistant", content: JSON.stringify(call) },
-        { role: "user", content: `ACTION RESULT for ${call.tool} (from the system, not the customer):\n${JSON.stringify(result)}` },
-      );
-      decision = parseModelReply(await ask());
-    }
+    ({ decision } = await converse({
+      ask: askFor(assistant),
+      turns,
+      run: toolRunner(db, { accountId, contactId, bookingConfig: assistant.bookingConfig, customerName: assistant.customerName }),
+    }));
   } catch (err) {
     console.error("[ai-chat] model call failed:", err);
     return handoff("The assistant couldn't reach the AI provider.");
   }
 
-  if (decision.handoff) return handoff(decision.reason, decision.reply);
+  if (decision.handoff) return handoff(decision.reason);
   await sendAsBot(db, accountId, conversationId, decision.reply);
   return { replied: true, handedOff: false };
+}
+
+/**
+ * Start the reply count again when the assistant hasn't replied in this
+ * chat for SESSION_GAP_HOURS: the cap is a guard against a runaway
+ * conversation, not a lifetime allowance.
+ */
+async function resetCapAfterQuiet(db: Db, accountId: string, conversationId: string) {
+  const { data: last } = await db
+    .from("messages")
+    .select("created_at")
+    .eq("conversation_id", conversationId)
+    .eq("ai_generated", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const lastAt = last?.created_at ? Date.parse(last.created_at as string) : 0;
+  if (Date.now() - lastAt < SESSION_GAP_HOURS * 3_600_000) return;
+  await db.from("conversations").update({ ai_reply_count: 0 }).eq("id", conversationId).eq("account_id", accountId);
 }
 
 /**
@@ -208,7 +370,6 @@ async function clinicFacts(db: Db, accountId: string, instructions: string | nul
       .filter((d) => d.is_active !== false)
       .map((d) => ({ name: d.name, branch: Array.isArray(d.branch) ? d.branch[0]?.name : d.branch?.name })),
     instructions,
-    today: new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date()),
   };
 }
 
@@ -225,16 +386,18 @@ async function handOff(
     conversationId,
     contactId,
     reason,
-    reply,
     agentId,
-  }: { accountId: string; conversationId: string; contactId: string; reason: string; reply: string; agentId: string | null },
+  }: { accountId: string; conversationId: string; contactId: string; reason: string; agentId: string | null },
 ) {
   const patch: Record<string, unknown> = { ai_mode: "human", ai_handoff_summary: reason };
   if (agentId) patch.assigned_agent_id = agentId;
   await db.from("conversations").update(patch).eq("id", conversationId).eq("account_id", accountId);
 
-  // Tell the patient — best effort: a closed 24 h window or a bad number must not stop the handoff itself.
-  await sendAsBot(db, accountId, conversationId, reply).catch((err) => console.error("[ai-chat] handoff message failed:", err));
+  // Tell the customer — always the same fixed message. Best effort: a
+  // closed 24 h window or a bad number must not stop the handoff itself.
+  await sendAsBot(db, accountId, conversationId, DEFAULT_HANDOFF_REPLY).catch((err) =>
+    console.error("[ai-chat] handoff message failed:", err),
+  );
 
   if (agentId) {
     await db.from("notifications").insert({
