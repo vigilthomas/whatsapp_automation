@@ -31,7 +31,7 @@
  */
 
 import type { MessageTemplate, TemplateButton } from '@/types';
-import { extractVariableIndices } from './template-validators';
+import { extractVariableIndices, templateVariables } from './template-validators';
 
 export interface SendTimeParams {
   /** Values for body {{1}}, {{2}}, … indexed by variable position. */
@@ -62,7 +62,8 @@ export type MetaSendComponent =
     };
 
 type MetaSendParameter =
-  | { type: 'text'; text: string }
+  /** `parameter_name` only for templates with NAMED variables ({{name}}). */
+  | { type: 'text'; text: string; parameter_name?: string }
   | { type: 'image'; image: { link?: string; id?: string } }
   | { type: 'video'; video: { link?: string; id?: string } }
   | { type: 'document'; document: { link?: string; id?: string } }
@@ -80,17 +81,17 @@ function buildHeaderComponent(
     // TEXT header with {{1}} → need a value. Static text headers
     // (no variables) just ride along inside the template itself; no
     // header component required on send.
-    const varCount = extractVariableIndices(template.header_content ?? '').length;
-    if (varCount === 0) return null;
+    const { keys, named } = templateVariables(template.header_content ?? '');
+    if (keys.length === 0) return null;
     const value = params.headerText;
     if (!value || !value.trim()) {
       throw new Error(
-        'Header text variable {{1}} requires a value — pass headerText.',
+        `Header text variable {{${keys[0]}}} requires a value — pass headerText.`,
       );
     }
     return {
       type: 'header',
-      parameters: [{ type: 'text', text: value }],
+      parameters: [named ? { type: 'text', parameter_name: keys[0], text: value } : { type: 'text', text: value }],
     };
   }
 
@@ -127,7 +128,8 @@ function buildBodyComponent(
   template: MessageTemplate,
   params: SendTimeParams,
 ): MetaSendComponent | null {
-  const varCount = extractVariableIndices(template.body_text).length;
+  const { keys, named } = templateVariables(template.body_text);
+  const varCount = keys.length;
   const body = params.body ?? [];
   if (varCount === 0 && body.length === 0) return null;
   if (body.length < varCount) {
@@ -140,7 +142,11 @@ function buildBodyComponent(
   const values = body.slice(0, varCount);
   return {
     type: 'body',
-    parameters: values.map((text) => ({ type: 'text', text: String(text) })),
+    // Named templates ({{name}}) must say which value is which; Meta
+    // rejects a NAMED template sent with bare positional parameters.
+    parameters: values.map((text, i) =>
+      named ? { type: 'text', parameter_name: keys[i], text: String(text) } : { type: 'text', text: String(text) },
+    ),
   };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { MessageTemplate } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,11 @@ import {
   LayoutTemplate,
   Loader2,
 } from "lucide-react";
-import { extractVariableIndices } from "@/lib/whatsapp/template-validators";
+import { extractVariableIndices, templateVariables } from "@/lib/whatsapp/template-validators";
+import { renderTemplateBody } from "@/lib/whatsapp/template-body";
+import { suggestTemplateValues, type AutofillContext } from "@/lib/whatsapp/template-autofill";
+import { loadBookingHours } from "@/lib/dashboard/range-queries";
+import { useBranding } from "@/hooks/use-branding";
 import { useTranslations } from "next-intl";
 
 export interface TemplateSendValues {
@@ -34,14 +38,52 @@ interface TemplatePickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (template: MessageTemplate, values: TemplateSendValues) => void;
+  /**
+   * Who it's going to. Named placeholders ({{name}}, {{time}}…) are
+   * pre-filled from this contact and their next booking; every value
+   * stays editable before sending.
+   */
+  contact?: { id: string; name?: string | null; phone?: string | null; email?: string | null } | null;
 }
 
+/** Body with the values filled in; an empty value keeps its placeholder. */
 function renderBodyPreview(body: string, params: string[]): string {
-  return body.replace(/\{\{(\d+)\}\}/g, (_, raw) => {
-    const idx = Number(raw) - 1;
-    const value = params[idx];
-    return value && value.trim().length > 0 ? value : `{{${raw}}}`;
-  });
+  return renderTemplateBody(
+    body,
+    // A blank box keeps its placeholder visible in the preview.
+    params.map((v) => (v && v.trim().length > 0 ? v : undefined)) as string[],
+  );
+}
+
+type NextBooking = AutofillContext["appointment"];
+
+/** The contact's next upcoming (scheduled or confirmed) booking, and the business timezone. */
+async function loadAutofill(contactId: string): Promise<{ appointment: NextBooking; tz: string }> {
+  const supabase = createClient();
+  const [hours, appt] = await Promise.all([
+    loadBookingHours(supabase),
+    supabase
+      .from("appointments")
+      .select("starts_at, service, doctor:doctors(name), branch:branches(name)")
+      .eq("contact_id", contactId)
+      .in("status", ["scheduled", "confirmed"])
+      .gte("starts_at", new Date().toISOString())
+      .order("starts_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const a = appt.data as {
+    starts_at: string;
+    service: string | null;
+    doctor: { name: string } | null;
+    branch: { name: string } | null;
+  } | null;
+  return {
+    tz: hours.tz,
+    appointment: a
+      ? { starts_at: a.starts_at, service: a.service, doctor: a.doctor?.name ?? null, branch: a.branch?.name ?? null }
+      : null,
+  };
 }
 
 interface UrlButtonSlot {
@@ -56,14 +98,15 @@ interface UrlButtonSlot {
  * send-message path doesn't 400 on missing parameters.
  */
 function collectVariableSlots(template: MessageTemplate): {
-  bodyVars: number[];
+  /** Placeholder keys: '1', '2'… or names like 'time', in send order. */
+  bodyVars: string[];
   headerVarCount: number;
   urlButtonSlots: UrlButtonSlot[];
 } {
-  const bodyVars = extractVariableIndices(template.body_text);
+  const bodyVars = templateVariables(template.body_text).keys;
   const headerVarCount =
     template.header_type === "text" && template.header_content
-      ? extractVariableIndices(template.header_content).length
+      ? templateVariables(template.header_content).keys.length
       : 0;
   const urlButtonSlots: UrlButtonSlot[] = [];
   (template.buttons ?? []).forEach((b, i) => {
@@ -78,8 +121,12 @@ export function TemplatePicker({
   open,
   onOpenChange,
   onSelect,
+  contact = null,
 }: TemplatePickerProps) {
   const t = useTranslations("Inbox.templatePicker");
+  const { branding } = useBranding();
+  const [filling, setFilling] = useState(false);
+  const pickRequest = useRef(0);
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,6 +180,8 @@ export function TemplatePicker({
   }, [open]);
 
   function resetSelection() {
+    pickRequest.current++;
+    setFilling(false);
     setSelected(null);
     setParams([]);
     setHeaderText("");
@@ -159,6 +208,33 @@ export function TemplatePicker({
     setParams(new Array(slots.bodyVars.length).fill(""));
     setHeaderText("");
     setButtonParams({});
+    void prefill(template);
+  }
+
+  /** Fill named placeholders from the contact and their next booking. */
+  async function prefill(template: MessageTemplate) {
+    const body = templateVariables(template.body_text);
+    const header = templateVariables(template.header_type === "text" ? (template.header_content ?? "") : "");
+    if (!body.named && !header.named) return;
+    const id = ++pickRequest.current;
+    setFilling(true);
+    try {
+      const extra = contact?.id ? await loadAutofill(contact.id).catch(() => null) : null;
+      if (id !== pickRequest.current) return;
+      const ctx: AutofillContext = {
+        contact: contact ? { name: contact.name ?? null, phone: contact.phone ?? null, email: contact.email ?? null } : null,
+        appointment: extra?.appointment ?? null,
+        business: branding.title || null,
+        tz: extra?.tz ?? null,
+      };
+      const suggested = suggestTemplateValues(body.keys, body.named, ctx);
+      // Never overwrite what the agent already typed while this loaded.
+      setParams((cur) => cur.map((v, i) => (v ? v : (suggested[i] ?? ""))));
+      const h = suggestTemplateValues(header.keys, header.named, ctx)[0];
+      if (h) setHeaderText((cur) => cur || h);
+    } finally {
+      if (id === pickRequest.current) setFilling(false);
+    }
   }
 
   function confirm() {
@@ -197,7 +273,9 @@ export function TemplatePicker({
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {selected
-              ? t("fillPlaceholders")
+              ? templateVariables(selected.body_text).named
+                ? t("autofilled")
+                : t("fillPlaceholders")
               : t("pickTemplate")}
           </DialogDescription>
         </DialogHeader>
@@ -251,7 +329,10 @@ export function TemplatePicker({
         ) : (
           <div className="space-y-3">
             <div className="rounded-md border border-border bg-background/50 p-3">
-              <p className="mb-1 text-xs text-muted-foreground">{t("preview")}</p>
+              <p className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                {t("preview")}
+                {filling ? <Loader2 className="h-3 w-3 animate-spin" aria-label={t("filling")} /> : null}
+              </p>
               <p className="whitespace-pre-wrap text-sm text-popover-foreground">
                 {renderBodyPreview(selected.body_text, params)}
               </p>
@@ -264,7 +345,7 @@ export function TemplatePicker({
             {slots && slots.headerVarCount > 0 && (
               <div className="space-y-1">
                 <Label className="text-xs text-popover-foreground">
-                  {`Header {{1}}`}
+                  {`Header {{${templateVariables(selected.header_content ?? "").keys[0] ?? "1"}}}`}
                 </Label>
                 <Input
                   value={headerText}

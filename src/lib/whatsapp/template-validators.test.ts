@@ -275,3 +275,21 @@ describe('validateTemplatePayload — integration', () => {
     ).toThrow(/exactly 1 sample/);
   });
 });
+
+describe('templateVariables', () => {
+  it('lists numbered placeholders in number order', async () => {
+    const { templateVariables } = await import('./template-validators');
+    expect(templateVariables('{{2}} then {{1}} and {{2}}')).toEqual({ keys: ['1', '2'], named: false });
+  });
+  it('lists named placeholders once each, in the order they appear', async () => {
+    const { templateVariables } = await import('./template-validators');
+    expect(templateVariables('Time: {{time}} Service: {{service}} at {{time}}')).toEqual({
+      keys: ['time', 'service'],
+      named: true,
+    });
+  });
+  it('finds nothing in plain text', async () => {
+    const { templateVariables } = await import('./template-validators');
+    expect(templateVariables('Hello there')).toEqual({ keys: [], named: false });
+  });
+});

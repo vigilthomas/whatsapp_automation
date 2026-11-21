@@ -450,6 +450,8 @@
     },
     "templatePicker": {
       "sendTemplate": "Send template",
+      "filling": "Filling in from the contact…",
+      "autofilled": "Filled in from the contact and their next booking where possible. Check and edit before sending.",
       "fillPlaceholders": "Fill in the placeholders to render this template. Meta requires every variable to be set.",
       "pickTemplate": "Pick an approved WhatsApp template to send to this contact.",
       "noApprovedTemplates": "No approved templates",

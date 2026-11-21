@@ -72,6 +72,24 @@ export function extractVariableIndices(text: string): number[] {
 }
 
 /**
+ * The placeholders a send must fill, as keys, plus whether they are
+ * NAMED (`{{name}}`) or numbered (`{{1}}`). Meta templates use one
+ * style or the other. Numbered keys come in number order ('1', '2'…);
+ * named keys once each, in the order they first appear — which is the
+ * order a caller's `body: string[]` values are matched to them, and the
+ * order the send puts them in with their `parameter_name`.
+ */
+export function templateVariables(text: string): { keys: string[]; named: boolean } {
+  const numbered = extractVariableIndices(text);
+  if (numbered.length > 0) return { keys: numbered.map(String), named: false };
+  const keys: string[] = [];
+  for (const m of text.matchAll(/\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi)) {
+    if (!keys.includes(m[1])) keys.push(m[1]);
+  }
+  return { keys, named: keys.length > 0 };
+}
+
+/**
  * Meta requires contiguous, 1-indexed variables. `{{1}} {{3}}` is
  * invalid — it must be `{{1}} {{2}}`.
  */

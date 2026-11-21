@@ -44,6 +44,10 @@ function dbReturning(
 }
 
 describe('renderTemplateBody', () => {
+  it('fills named placeholders from the values in the order they first appear', () => {
+    expect(renderTemplateBody('Hi {{name}}, {{time}} ok {{name}}?', ['Asha', '10:30'])).toBe('Hi Asha, 10:30 ok Asha?')
+  })
+
   it('substitutes positional placeholders', () => {
     expect(
       renderTemplateBody('Your order {{1}} ships on {{2}}', ['A123', 'Friday'])

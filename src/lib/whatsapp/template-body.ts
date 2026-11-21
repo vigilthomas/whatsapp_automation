@@ -17,6 +17,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
+import { templateVariables } from '@/lib/whatsapp/template-validators';
 import type { MessageTemplate } from '@/types';
 
 /**
@@ -26,6 +27,14 @@ import type { MessageTemplate } from '@/types';
  * `{{2}}` instead of a silently truncated sentence.
  */
 export function renderTemplateBody(body: string, params: string[]): string {
+  const { keys, named } = templateVariables(body);
+  if (named) {
+    // Named `{{name}}`: values are matched to names in first-seen order.
+    return body.replace(/\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi, (whole, name: string) => {
+      const value = params[keys.indexOf(name)];
+      return value ?? whole;
+    });
+  }
   return body.replace(/\{\{(\d+)\}\}/g, (_, raw) => {
     const idx = Number(raw) - 1;
     return params[idx] ?? `{{${raw}}}`;
